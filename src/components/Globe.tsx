@@ -327,7 +327,24 @@ export function Globe({ now, cities }: Props) {
   }, [cityPositions])
 
   return (
-    <div className="relative flex-1 min-h-0 flex flex-col overflow-visible min-w-0">
+    <div className="relative flex-1 min-h-0 flex flex-col overflow-visible min-w-0 !overflow-visible">
+      <style>{`
+        @media (max-width: 640px) {
+          .globe-host-portrait {
+            transform: scale(0.5) !important;
+            transform-origin: center !important;
+            overflow: visible !important;
+            clip-path: none !important;
+            margin-left: 0 !important;
+            left: 0 !important;
+          }
+        }
+        @media (min-width: 641px) {
+          .globe-host-portrait {
+            transform: none !important;
+          }
+        }
+      `}</style>
       <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-2 p-2 sm:p-4">
         <div className="rounded-full bg-midnight-700/50 border border-sunset-500/25 px-2 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-xs text-sunset-100/80 truncate max-w-[50%]">
           Drag · 5PM glow
@@ -337,13 +354,18 @@ export function Globe({ now, cities }: Props) {
         </div>
       </div>
       <div
-        className="globe-portrait-fill flex-1 min-h-0 flex items-center justify-center overflow-visible p-0 w-[95%] max-h-[70vh] mx-auto sm:w-full sm:max-h-none sm:mx-0"
-        style={{ clipPath: 'none' }}
+        className="globe-portrait-fill flex-1 min-h-0 flex items-center justify-center overflow-visible p-0 w-[95%] max-h-[70vh] mx-auto sm:w-full sm:max-h-none sm:mx-0 !overflow-visible"
+        style={{ clipPath: 'none', overflow: 'visible' }}
       >
         <div
           ref={hostRef}
-          className="globe-host w-full h-[70vh] max-h-[70vh] min-h-0 mx-auto scale-[0.55] origin-center flex-none overflow-visible sm:h-full sm:max-h-none sm:scale-100 sm:flex-1 select-none touch-none"
-          style={{ touchAction: 'none', clipPath: 'none' }}
+          className="globe-host globe-host-portrait w-full h-[70vh] max-h-[70vh] min-h-0 mx-auto flex-none overflow-visible sm:h-full sm:max-h-none sm:flex-1 select-none touch-none !overflow-visible"
+          style={{
+            touchAction: 'none',
+            clipPath: 'none',
+            overflow: 'visible',
+            marginLeft: 0,
+          }}
         />
       </div>
       <div className="pointer-events-none absolute inset-0 rounded-[1.35rem] ring-1 ring-white/5" />
