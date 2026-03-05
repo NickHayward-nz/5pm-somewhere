@@ -341,7 +341,11 @@ export function Globe({ now, cities }: Props) {
           {now.toFormat('HH:mm:ss')}
         </div>
       </div>
-      <div ref={hostRef} className="w-full flex-1 min-h-0 select-none touch-none" style={{ touchAction: 'none' }} />
+      <div
+        ref={hostRef}
+        className="w-full max-w-[90%] mx-auto flex-1 min-h-0 h-[60vh] sm:h-full sm:max-w-full select-none touch-none"
+        style={{ touchAction: 'none' }}
+      />
       <div className="pointer-events-none absolute inset-0 rounded-[1.35rem] ring-1 ring-white/5" />
     </div>
   )
