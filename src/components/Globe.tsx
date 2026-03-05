@@ -332,6 +332,7 @@ export function Globe({ now, cities }: Props) {
         @media (max-width: 640px) {
           .globe-portrait-fill {
             width: 100% !important;
+            height: auto !important;
             max-height: 70vh !important;
             margin: 0 auto !important;
             padding: 0 !important;
@@ -342,17 +343,28 @@ export function Globe({ now, cities }: Props) {
             justify-content: center !important;
           }
           .globe-host-portrait {
-            transform: scale(0.45) !important;
-            transform-origin: center center !important;
             width: 100% !important;
+            height: auto !important;
+            transform: scale(0.7) !important;
+            transform-origin: center center !important;
+            position: relative !important;
+            left: 0 !important;
+            margin-left: 0 !important;
+            padding-left: 0 !important;
             overflow: visible !important;
             clip-path: none !important;
-            margin-left: -10% !important;
-            left: 0 !important;
             object-fit: contain !important;
             object-position: center !important;
           }
           .globe-host-portrait canvas {
+            width: 100% !important;
+            height: auto !important;
+            position: relative !important;
+            left: 0 !important;
+            margin-left: 0 !important;
+            padding-left: 0 !important;
+            overflow: visible !important;
+            clip-path: none !important;
             object-fit: contain !important;
             object-position: center !important;
           }
