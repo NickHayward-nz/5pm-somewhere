@@ -333,7 +333,7 @@ export function Globe({ now, cities }: Props) {
           .globe-portrait-fill {
             width: 100% !important;
             height: auto !important;
-            max-height: 70vh !important;
+            max-height: 65vh !important;
             margin: 0 auto !important;
             padding: 0 !important;
             overflow: visible !important;
@@ -345,11 +345,13 @@ export function Globe({ now, cities }: Props) {
           .globe-host-portrait {
             width: 100% !important;
             height: auto !important;
-            transform: scale(0.7) !important;
+            max-height: 65vh !important;
+            transform: scale(0.95) !important;
             transform-origin: center center !important;
             position: relative !important;
             left: 0 !important;
             margin-left: 0 !important;
+            margin-right: 0 !important;
             padding-left: 0 !important;
             overflow: visible !important;
             clip-path: none !important;
@@ -383,10 +385,10 @@ export function Globe({ now, cities }: Props) {
           {now.toFormat('HH:mm:ss')}
         </div>
       </div>
-      <div className="globe-portrait-fill flex-1 min-h-0 flex items-center justify-center overflow-visible p-0 w-full max-h-[70vh] mx-auto sm:max-h-none !overflow-visible">
+      <div className="globe-portrait-fill flex-1 min-h-0 flex items-center justify-center overflow-visible p-0 w-full max-h-[65vh] sm:max-h-none mx-auto !overflow-visible">
         <div
           ref={hostRef}
-          className="globe-host globe-host-portrait w-full h-[70vh] max-h-[70vh] min-h-0 flex-none overflow-visible sm:h-full sm:max-h-none sm:flex-1 select-none touch-none !overflow-visible"
+          className="globe-host globe-host-portrait w-full h-[65vh] max-h-[65vh] min-h-0 flex-none overflow-visible sm:h-full sm:max-h-none sm:flex-1 select-none touch-none !overflow-visible"
           style={{
             touchAction: 'none',
             clipPath: 'none',
