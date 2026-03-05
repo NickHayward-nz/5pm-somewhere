@@ -5,13 +5,13 @@ import type { City } from '../data/cities'
 import { latLonToVector3 } from '../lib/geo'
 import { getCityTimeInfo } from '../lib/time'
 
-const DAY_MAP_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg'
-const NIGHT_MAP_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_lights_2048.jpg'
-const SPEC_MAP_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_specular_2048.jpg'
+const DAY_MAP_URL = 'https://cdn.glitch.global/6e6e8d9c-4b4b-4b4b-8b4b-4b4b4b4b4b4b/earth_daymap_2k.jpg?v=1712345678901'
+const NIGHT_MAP_URL = 'https://cdn.glitch.global/6e6e8d9c-4b4b-4b4b-8b4b-4b4b4b4b4b4b/earth_nightmap_2k.jpg?v=1712345678901'
+const SPEC_MAP_URL = 'https://cdn.glitch.global/6e6e8d9c-4b4b-4b4b-8b4b-4b4b4b4b4b4b/earth_specular_2k.jpg?v=1712345678901'
 
 const AUTO_ROTATE_Y_DEG_PER_FRAME = 0.12
 const DOT_UPDATE_INTERVAL_MS = 120000
-const SPHERE_SEGMENTS = 32
+const SPHERE_SEGMENTS = 64
 
 type Props = {
   now: DateTime
@@ -69,54 +69,90 @@ export function Globe({ now, cities }: Props) {
     scene.add(fill)
 
     const loader = new THREE.TextureLoader()
-    const earthGeo = new THREE.SphereGeometry(1, SPHERE_SEGMENTS, SPHERE_SEGMENTS)
+    const earthGeo = new THREE.SphereGeometry(1, 64, 64)
 
-    const fallbackMat = new THREE.MeshPhongMaterial({
-      color: new THREE.Color('#1a4d6e'),
-      emissive: new THREE.Color('#0a2030'),
+    const earthMat = new THREE.MeshPhongMaterial({
+      color: new THREE.Color(0x0066cc),
+      emissive: new THREE.Color(0x222222),
+      emissiveIntensity: 0.8,
+      specular: new THREE.Color(0x333333),
       shininess: 10,
-      specular: new THREE.Color(0x222244),
     })
-    const earth = new THREE.Mesh(earthGeo, fallbackMat)
+    const earth = new THREE.Mesh(earthGeo, earthMat)
     group.add(earth)
 
-    function loadTexture(url: string): Promise<THREE.Texture> {
-      return new Promise((resolve, reject) => {
-        loader.load(url, resolve, undefined, reject)
-      })
+    let dayTexture: THREE.Texture | null = null
+    let nightTexture: THREE.Texture | null = null
+    let specularTexture: THREE.Texture | null = null
+
+    function applyTextures() {
+      if (!dayTexture) return
+      dayTexture.colorSpace = THREE.SRGBColorSpace
+      dayTexture.wrapS = THREE.RepeatWrapping
+      dayTexture.wrapT = THREE.ClampToEdgeWrapping
+      if (nightTexture) nightTexture.colorSpace = THREE.SRGBColorSpace
+      if (specularTexture) specularTexture.colorSpace = THREE.SRGBColorSpace
+
+      const mat = earth.material as THREE.MeshPhongMaterial
+      mat.map = dayTexture
+      mat.emissiveMap = nightTexture
+      mat.emissive = new THREE.Color(0x222222)
+      mat.emissiveIntensity = 0.8
+      mat.specularMap = specularTexture
+      mat.specular = new THREE.Color(0x333333)
+      mat.shininess = 10
+      mat.color.set(0xffffff)
+      // eslint-disable-next-line no-console
+      console.log('Globe texture status:', dayTexture?.image ? 'loaded' : 'failed')
     }
 
-    Promise.all([
-      loadTexture(DAY_MAP_URL),
-      loadTexture(NIGHT_MAP_URL),
-      loadTexture(SPEC_MAP_URL),
-    ])
-      .then(([earthDay, earthNight, earthSpecular]) => {
-        earthDay.colorSpace = THREE.SRGBColorSpace
-        earthDay.wrapS = THREE.RepeatWrapping
-        earthDay.wrapT = THREE.ClampToEdgeWrapping
-        earthNight.colorSpace = THREE.SRGBColorSpace
-        earthSpecular.colorSpace = THREE.SRGBColorSpace
+    loader.load(
+      DAY_MAP_URL,
+      (tex) => {
+        dayTexture = tex
         // eslint-disable-next-line no-console
-        console.log('Textures loaded:', earthDay, earthNight, earthSpecular)
-        const mat = new THREE.MeshPhongMaterial({
-          map: earthDay,
-          emissiveMap: earthNight,
-          emissive: new THREE.Color(0x0a0a12),
-          emissiveIntensity: 0.25,
-          specularMap: earthSpecular,
-          shininess: 20,
-          specular: new THREE.Color(0x333355),
-        })
-        ;(earth.material as THREE.Material).dispose()
-        earth.material = mat
-      })
-      .catch((err) => {
+        console.log('Day map loaded')
+        applyTextures()
+      },
+      undefined,
+      (err) => {
         // eslint-disable-next-line no-console
-        console.error('Texture load failed', err)
-        ;(earth.material as THREE.MeshPhongMaterial).color.set('#1a4d6e')
-        ;(earth.material as THREE.MeshPhongMaterial).emissive.set('#0a2030')
-      })
+        console.error('Day map load error:', err)
+        ;(earth.material as THREE.MeshPhongMaterial).color.set(0x0066cc)
+        // eslint-disable-next-line no-console
+        console.warn('Globe using fallback blue color (day texture failed)')
+      },
+    )
+
+    loader.load(
+      NIGHT_MAP_URL,
+      (tex) => {
+        nightTexture = tex
+        // eslint-disable-next-line no-console
+        console.log('Night map loaded')
+        if (dayTexture) applyTextures()
+      },
+      undefined,
+      (err) => {
+        // eslint-disable-next-line no-console
+        console.error('Night map load error:', err)
+      },
+    )
+
+    loader.load(
+      SPEC_MAP_URL,
+      (tex) => {
+        specularTexture = tex
+        // eslint-disable-next-line no-console
+        console.log('Specular map loaded')
+        if (dayTexture) applyTextures()
+      },
+      undefined,
+      (err) => {
+        // eslint-disable-next-line no-console
+        console.error('Specular map load error:', err)
+      },
+    )
 
     const atmoGeo = new THREE.SphereGeometry(1.04, SPHERE_SEGMENTS, SPHERE_SEGMENTS)
     const atmo = new THREE.Mesh(
