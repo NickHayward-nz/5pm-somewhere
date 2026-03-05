@@ -32,7 +32,10 @@ module.exports = {
       },
       backgroundImage: {
         'sunset-gradient':
-          'radial-gradient(circle at 0% 0%, #ffcf71 0, transparent 55%), radial-gradient(circle at 100% 0%, #f97316 0, transparent 55%), radial-gradient(circle at 50% 80%, #312e81 0, #020617 60%)',
+          'radial-gradient(circle at 0% 0%, #ffd966 0, #ffb347 25%, transparent 52%), radial-gradient(circle at 100% 0%, #ff6b35 0, #e85d04 30%, transparent 55%), radial-gradient(circle at 50% 85%, #4c1d95 0, #312e81 25%, #1e1b4b 50%, #0f0a1e 70%)',
+      },
+      backgroundColor: {
+        'sunset-bg': '#030410',
       },
     },
   },

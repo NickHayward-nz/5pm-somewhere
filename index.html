@@ -22,6 +22,13 @@
     />
   </head>
   <body class="bg-midnight-900 text-sunset-50">
+    <svg aria-hidden="true" class="absolute w-0 h-0 pointer-events-none">
+      <defs>
+        <filter id="film-grain" x="0" y="0">
+          <feTurbulence type="fractalNoise" baseFrequency="0.82" numOctaves="4" stitchTiles="stitch" />
+        </filter>
+      </defs>
+    </svg>
     <div id="root"></div>
     <script type="module" src="/src/main.tsx"></script>
   </body>
