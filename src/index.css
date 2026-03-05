@@ -1,0 +1,253 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html {
+  height: 100%;
+  overflow: hidden;
+  -webkit-overflow-scrolling: touch;
+}
+
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  font-family: theme('fontFamily.display');
+  background-color: #050716;
+  color: #fef5e7;
+  position: fixed;
+  inset: 0;
+}
+
+#root {
+  height: 100%;
+  min-height: 100%;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.vhs-noise {
+  position: relative;
+  isolation: isolate;
+}
+
+.vhs-noise::before {
+  content: '';
+  position: fixed;
+  inset: -40px;
+  pointer-events: none;
+  opacity: 0.22;
+  mix-blend-mode: soft-light;
+  background-image: repeating-linear-gradient(
+      0deg,
+      rgba(255, 255, 255, 0.04),
+      rgba(255, 255, 255, 0.04) 1px,
+      transparent 1px,
+      transparent 2px
+    ),
+    radial-gradient(circle at 10% 20%, rgba(255, 255, 255, 0.06), transparent 55%),
+    radial-gradient(circle at 80% 10%, rgba(255, 255, 255, 0.06), transparent 55%);
+  z-index: -1;
+}
+
+.polaroid-frame {
+  @apply bg-sunset-50/95 shadow-polaroid rounded-[1.75rem] border border-white/70;
+}
+
+.polaroid-inner {
+  @apply rounded-[1.35rem] overflow-hidden border border-black/10 bg-gradient-to-b from-sunset-200/5 to-midnight-800/70;
+}
+
+.btn-glow-gold {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-semibold tracking-wide uppercase bg-gradient-to-r from-sunset-300 via-sunset-400 to-sunset-500 shadow-glow-gold text-midnight-900;
+}
+
+.btn-glow-muted {
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-semibold tracking-wide uppercase bg-midnight-700/70 text-sunset-200/70 border border-sunset-500/40;
+}
+
+/* Live stream: full frame in portrait and landscape, no bottom cutoff */
+.live-stream-video-container {
+  height: calc(100dvh - 50px);
+}
+
+@media (min-width: 640px) {
+  .live-stream-video-container {
+    height: calc(100dvh - 60px);
+  }
+}
+
+@media (orientation: landscape) {
+  .live-stream-video-container {
+    height: calc(100vh - 60px);
+  }
+
+  .live-stream-video {
+    object-fit: contain;
+    max-height: 100vh;
+    max-width: 100vw;
+  }
+
+  .live-stream-skip-btn {
+    bottom: 30px !important;
+    right: 30px !important;
+    font-size: 1.2rem !important;
+  }
+}
+
+/* Main app: landscape — one enlarged left box + globe floating half-visible on right (no box) */
+@media (orientation: landscape) {
+  .app-wrapper-landscape {
+    height: 100vh !important;
+    max-height: 100dvh;
+    min-height: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    padding: 6px 8px 8px;
+  }
+
+  .app-header-landscape {
+    height: 50px !important;
+    min-height: 50px;
+    margin-bottom: 2px !important;
+    flex-shrink: 0;
+    z-index: 10;
+    font-size: 1.1rem;
+  }
+
+  .app-header-landscape .text-sm,
+  .app-header-landscape .text-base,
+  .app-header-landscape .font-mono {
+    font-size: 1rem !important;
+  }
+
+  .app-main-landscape {
+    display: flex !important;
+    flex-direction: row;
+    flex-wrap: nowrap;
+    flex: 1;
+    min-height: 0;
+    gap: 0;
+    padding: 0;
+    align-items: stretch;
+    position: relative;
+    grid-column: unset;
+    grid-cols: unset;
+  }
+
+  /* Left/center: single enlarged box with all clock info + buttons */
+  .app-main-landscape .app-clock-panel {
+    flex: 1;
+    min-width: 0;
+    max-width: none;
+    width: 100%;
+    height: auto;
+    padding: 16px;
+    margin: 8px;
+    margin-right: 0;
+    overflow: visible;
+    z-index: 2;
+    position: relative;
+  }
+
+  .app-main-landscape .app-clock-panel .polaroid-inner {
+    overflow: visible;
+    min-height: 0;
+    padding: 16px !important;
+    border-width: 1px !important;
+  }
+
+  .app-main-landscape .app-clock-panel .text-xs.uppercase {
+    font-size: clamp(0.8rem, 2.5vw, 1.05rem) !important;
+  }
+
+  .app-main-landscape .app-clock-panel h1,
+  .app-main-landscape .app-clock-panel h2,
+  .app-main-landscape .app-clock-panel p,
+  .app-main-landscape .app-clock-panel .text-xl,
+  .app-main-landscape .app-clock-panel .text-2xl,
+  .app-main-landscape .app-clock-panel .text-3xl,
+  .app-main-landscape .app-clock-panel .text-4xl,
+  .app-main-landscape .app-clock-panel .text-5xl,
+  .app-main-landscape .app-clock-panel .text-balance {
+    font-size: clamp(1.1rem, 3.5vw, 1.5rem) !important;
+    line-height: 1.3;
+    word-wrap: break-word;
+    white-space: normal;
+    text-align: center;
+  }
+
+  .app-main-landscape .app-clock-panel [class*="rounded-full"] {
+    font-size: clamp(0.75rem, 2.5vw, 1rem) !important;
+    padding: 8px 12px !important;
+  }
+
+  .app-main-landscape .app-clock-panel .text-\[10px\],
+  .app-main-landscape .app-clock-panel .text-xs {
+    font-size: clamp(0.7rem, 2vw, 0.9rem) !important;
+  }
+
+  .app-btn-landscape {
+    min-width: 120px;
+    padding: 12px 18px;
+    font-size: clamp(0.9rem, 3vw, 1.2rem) !important;
+    flex-shrink: 0;
+  }
+
+  .app-main-landscape .app-clock-panel .flex-col,
+  .app-main-landscape .app-clock-panel .sm\:flex-row,
+  .app-main-landscape .app-clock-panel .flex-col.sm\:flex-row {
+    display: flex !important;
+    flex-direction: row;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 12px;
+  }
+
+  /* Right: globe floating over background, half-visible, no box */
+  .app-main-landscape .app-globe-panel {
+    position: absolute !important;
+    top: 0;
+    right: -28%;
+    bottom: 0;
+    width: 58%;
+    flex: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    z-index: 1;
+    pointer-events: auto;
+    overflow: visible;
+  }
+
+  .app-main-landscape .app-globe-panel .polaroid-inner {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+    overflow: visible;
+    height: 100%;
+    min-height: 0;
+    max-height: none;
+    padding: 0 !important;
+  }
+
+  .app-globe-container-landscape {
+    width: 100%;
+    height: 100%;
+    max-height: none;
+    min-height: 0;
+  }
+
+  .app-footer-landscape {
+    flex-shrink: 0;
+    margin-top: 2px;
+    padding-bottom: 8px;
+    font-size: 0.8rem;
+    line-height: 1.2;
+    z-index: 2;
+  }
+}

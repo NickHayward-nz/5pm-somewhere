@@ -1,0 +1,395 @@
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { DateTime, Interval } from 'luxon'
+import { CITIES, type City } from './data/cities'
+import { useNow } from './hooks/useNow'
+import { countryCodeToFlagEmoji } from './lib/flags'
+import { formatClock } from './lib/time'
+import { Globe } from './components/Globe'
+import { getSupabase } from './lib/supabase'
+import { computeCaptureWindow, getUserTimezone, hasPostedToday, trackDailyLimitHit } from './lib/capture'
+import { useProfile } from './hooks/useProfile'
+import { RecordMoment } from './components/RecordMoment'
+import { LiveStream } from './components/LiveStream'
+import { SignInButton } from './components/SignInButton.tsx'
+
+type FeaturedCity = {
+  city: City
+  local: DateTime
+  rawDiffMinutes: number // signed minutes from 17:00 (positive = after, negative = before)
+  wrappedDiffMinutes: number // 0..1439, minutes past 17:00 with wrap-around (spec helper)
+}
+
+function App() {
+  // TEMP: auth bypassed for capture testing – re-enable sign-in gate before production
+  const AUTH_BYPASS = true
+  const now = useNow(250)
+  const [userId, setUserId] = useState<string | null>(null)
+  const [userEmail, setUserEmail] = useState<string | null>(null)
+  const [recordOpen, setRecordOpen] = useState(false)
+  const [liveStreamOpen, setLiveStreamOpen] = useState(false)
+  const userCity = 'Auckland'
+  const userCountry = 'New Zealand'
+  const premiumQuery = useMemo(() => {
+    try {
+      const qs = new URLSearchParams(window.location.search)
+      const q = qs.get('premium')
+      if (q === '1' || q === 'true') localStorage.setItem('fivepm_premium', '1')
+      if (q === '0' || q === 'false') localStorage.setItem('fivepm_premium', '0')
+      return localStorage.getItem('fivepm_premium') === '1'
+    } catch {
+      return false
+    }
+  }, [])
+
+  useEffect(() => {
+    const sb = getSupabase()
+    if (!sb) return
+    void sb.auth.getUser().then(({ data }) => {
+      setUserId(data.user?.id ?? null)
+      setUserEmail(data.user?.email ?? null)
+    })
+    const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
+      setUserId(session?.user?.id ?? null)
+      setUserEmail(session?.user?.email ?? null)
+    })
+    return () => subscription.unsubscribe()
+  }, [])
+
+  const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
+  const userTz = profile?.timezone ?? getUserTimezone()
+  const isPremium = typeof profile?.is_premium === 'boolean' ? profile.is_premium : premiumQuery
+  const hasPostedTodayState = AUTH_BYPASS
+    ? false
+    : hasPostedToday(profile?.last_post_date ?? null, userTz)
+  const checkingDailyLimit = AUTH_BYPASS ? false : profileLoading
+
+  const { candidates, bestCandidate } = useMemo(() => {
+    if (!CITIES.length) {
+      return { candidates: [] as FeaturedCity[], bestCandidate: undefined as FeaturedCity | undefined }
+    }
+
+    // Compute per-city local time and difference from 17:00 local time (in minutes).
+    // rawDiffMinutes: < 0 before 17:00, > 0 after 17:00, 0 exactly at 17:00
+    // wrappedDiffMinutes: spec-style helper: if (diff < 0) diff += 1440
+    const computed: FeaturedCity[] = CITIES.map((city) => {
+      const local = now.setZone(city.tz)
+      const rawDiffMinutes = (local.hour - 17) * 60 + local.minute
+      const wrappedDiffMinutes = rawDiffMinutes >= 0 ? rawDiffMinutes : rawDiffMinutes + 1440
+      return { city, local, rawDiffMinutes, wrappedDiffMinutes }
+    })
+
+    // 1) Cities effectively at 5 PM: STRICTLY 17:00 to 17:05 (never before).
+    const exact = computed.filter((c) => c.rawDiffMinutes >= 0 && c.rawDiffMinutes <= 5)
+    if (exact.length > 0) {
+      // Prefer the earliest after-5 city, then alphabetical.
+      const sortedExact = [...exact].sort((a, b) => {
+        if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
+        return a.city.name.localeCompare(b.city.name)
+      })
+      return { candidates: computed, bestCandidate: sortedExact[0] }
+    }
+
+    // 2) Prefer strictly positive diffs (past 5 PM). rawDiffMinutes > 0
+    const positive = computed.filter((c) => c.rawDiffMinutes > 0)
+    if (positive.length > 0) {
+      const bestPositive = [...positive].sort((a, b) => {
+        if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
+        return a.city.name.localeCompare(b.city.name)
+      })[0]
+      return { candidates: computed, bestCandidate: bestPositive }
+    }
+
+    // 3) Fallback: no positive diffs at all – pick closest BEFORE 5 PM (largest rawDiffMinutes, i.e. closest to 0 from below).
+    const negative = computed.filter((c) => c.rawDiffMinutes < 0)
+    const bestNegative = [...negative].sort((a, b) => {
+      if (a.rawDiffMinutes !== b.rawDiffMinutes) return b.rawDiffMinutes - a.rawDiffMinutes
+      return a.city.name.localeCompare(b.city.name)
+    })[0]
+
+    return { candidates: computed, bestCandidate: bestNegative }
+  }, [now])
+
+  // Stabilize featured city: lock for at least HOLD_MS before switching.
+  const HOLD_MS = 15_000
+  const [lockedCityId, setLockedCityId] = useState<string | null>(null)
+  const lockRef = useRef<{ cityId: string | null; lockUntil: number }>({
+    cityId: null,
+    lockUntil: 0,
+  })
+
+  useEffect(() => {
+    if (!bestCandidate) return
+    const nowMs = Date.now()
+    const { cityId, lockUntil } = lockRef.current
+
+    // If we are within the hold window for a locked city, keep it even if bestCandidate changes.
+    if (cityId && nowMs < lockUntil && cityId !== bestCandidate.city.id) {
+      return
+    }
+
+    // Either hold expired or no lock yet: lock (or relock) to the current best candidate.
+    if (cityId !== bestCandidate.city.id) {
+      // eslint-disable-next-line no-console
+      console.log('Switching featured city to', bestCandidate.city.name, 'after hold expired')
+      setLockedCityId(bestCandidate.city.id)
+    }
+    lockRef.current = { cityId: bestCandidate.city.id, lockUntil: nowMs + HOLD_MS }
+  }, [bestCandidate?.city.id, now.toMillis()])
+
+  const featured: FeaturedCity | undefined = useMemo(() => {
+    if (!bestCandidate) return undefined
+    if (lockedCityId) {
+      const locked = candidates.find((c) => c.city.id === lockedCityId)
+      if (locked) return locked
+    }
+    return bestCandidate
+  }, [bestCandidate, candidates, lockedCityId])
+
+  const captureWindow = useMemo(
+    () => computeCaptureWindow(now, userTz, isPremium),
+    [now, userTz, isPremium],
+  )
+
+  const featuredFlag = featured ? countryCodeToFlagEmoji(featured.city.countryCode) : '🏳️'
+  const featuredCityName = featured?.city.name ?? 'somewhere'
+  const featuredCityTime = featured?.local ?? now
+  const featuredRawDiff = featured?.rawDiffMinutes ?? 0
+  const featuredWrappedDiff = featured?.wrappedDiffMinutes ?? 0
+
+  useEffect(() => {
+    if (!featured) return
+    // Debugging: verify Luxon local time for the featured city
+    // eslint-disable-next-line no-console
+    console.log(
+      'Selected city:',
+      featured.city.name,
+      'Local:',
+      featuredCityTime.toFormat('HH:mm:ss'),
+      'Diff:',
+      featuredRawDiff,
+      "min (type: " +
+        (featuredRawDiff > 0 ? 'past' : featuredRawDiff < 0 ? 'before' : 'exact') +
+        `), wrapped=${featuredWrappedDiff}`,
+    )
+  }, [featured, featuredCityTime])
+
+  const dayRange = useMemo(() => {
+    const start = now.startOf('day')
+    const end = start.plus({ days: 1 })
+    return Interval.fromDateTimes(start, end)
+  }, [now])
+
+  return (
+    <div className="h-full min-h-0 flex flex-col overflow-hidden vhs-noise bg-sunset-gradient">
+      <div className="app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-4 lg:py-5">
+        <header className="app-header-landscape flex-shrink-0 mb-2 sm:mb-4 flex items-start justify-between gap-2 sm:gap-4">
+          <div className="flex items-center gap-2 sm:gap-3 min-w-0">
+            <div className="polaroid-frame p-1.5 sm:p-2 flex-shrink-0">
+              <div className="polaroid-inner h-9 w-9 sm:h-12 sm:w-12 grid place-items-center text-lg sm:text-2xl">
+                🌅
+              </div>
+            </div>
+            <div className="leading-tight min-w-0">
+              <div className="text-[10px] sm:text-sm uppercase tracking-[0.2em] sm:tracking-[0.24em] text-sunset-100/80 truncate">
+                5PM Somewhere
+              </div>
+              <div className="text-[10px] sm:text-xs text-sunset-200/70 font-mono hidden sm:block">
+                Luxon + Three.js · PWA
+              </div>
+            </div>
+          </div>
+
+          <div className="text-right flex-shrink-0">
+            <div className="text-[10px] sm:text-xs uppercase tracking-[0.18em] sm:tracking-[0.24em] text-sunset-100/70">
+              Your local time
+            </div>
+            <div className="font-mono text-xs sm:text-base text-sunset-50/90">{formatClock(DateTime.local())}</div>
+            <div className="text-[10px] sm:text-[11px] text-sunset-100/60 hidden sm:block">
+              {isPremium ? 'Premium (8 min)' : 'Free (5 min)'} · <span className="font-mono">?premium=1</span>
+            </div>
+            <div className="mt-1 sm:mt-2 flex justify-end">
+              <SignInButton userEmail={userEmail} />
+            </div>
+          </div>
+        </header>
+
+        <main className="app-main-landscape flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-3 sm:gap-4 lg:gap-6 lg:items-stretch content-stretch">
+          <section className="app-card-landscape app-clock-panel polaroid-frame p-2 sm:p-4 lg:p-5 min-h-0 flex flex-col overflow-hidden">
+            <div className="polaroid-inner p-3 sm:p-5 lg:p-6 flex-1 min-h-0 overflow-hidden flex flex-col">
+              <div className="text-xs uppercase tracking-[0.34em] text-sunset-100/70">
+                Live golden hour
+              </div>
+
+              {featured && (
+                <>
+                  <div className="mt-1 sm:mt-2 lg:mt-3 text-balance text-xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold leading-tight">
+                    {featuredRawDiff >= 0 && featuredRawDiff <= 5 ? (
+                      <>
+                        It’s{' '}
+                        <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
+                          5 PM
+                        </span>{' '}
+                        right now in <span className="whitespace-nowrap">{featuredFlag} {featuredCityName}</span>{' '}
+                        at{' '}
+                        <span className="whitespace-nowrap">
+                          {featuredCityTime.toFormat('HH:mm')}
+                        </span>
+                      </>
+                    ) : featuredRawDiff > 5 ? (
+                      <>
+                        Closest past{' '}
+                        <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
+                          5 PM
+                        </span>{' '}
+                        :{' '}
+                        <span className="whitespace-nowrap">
+                          {featuredFlag} {featuredCityName}
+                        </span>{' '}
+                        at{' '}
+                        <span className="whitespace-nowrap">
+                          {featuredCityTime.toFormat('HH:mm')}
+                        </span>{' '}
+                        ({Math.round(featuredRawDiff)} min ago)
+                      </>
+                    ) : (
+                      <>
+                        Next{' '}
+                        <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
+                          5 PM
+                        </span>{' '}
+                        coming soon — closest before was{' '}
+                        <span className="whitespace-nowrap">
+                          {featuredFlag} {featuredCityName}
+                        </span>{' '}
+                        at{' '}
+                        <span className="whitespace-nowrap">
+                          {featuredCityTime.toFormat('HH:mm')}
+                        </span>{' '}
+                        ({Math.abs(Math.round(featuredRawDiff))} min ago)
+                      </>
+                    )}
+                  </div>
+
+                  <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
+                    <div className="rounded-full bg-midnight-700/50 border border-sunset-500/25 px-4 py-2 font-mono">
+                      {featuredCityTime.toFormat('ccc, LLL d')} · {formatClock(featuredCityTime)}
+                    </div>
+                    <div className="rounded-full bg-midnight-700/50 border border-sunset-500/25 px-4 py-2 text-sunset-100/80">
+                      {featured.city.tz}
+                    </div>
+                  </div>
+                </>
+              )}
+
+              <div className="mt-3 sm:mt-5 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center flex-shrink-0">
+                <button
+                  type="button"
+                  className={
+                    captureWindow.active && !hasPostedTodayState && !checkingDailyLimit
+                      ? 'app-btn-landscape btn-glow-gold w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
+                      : 'app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
+                  }
+                  disabled={
+                    !captureWindow.active ||
+                    (!AUTH_BYPASS && (hasPostedTodayState || checkingDailyLimit))
+                  }
+                  title={
+                    hasPostedTodayState
+                      ? "You've already captured today's 5PM Moment."
+                      : captureWindow.active
+                        ? 'You’re in your capture window.'
+                        : isPremium
+                          ? 'Premium: 8-minute window around 5 PM local time.'
+                          : 'Free: 5-minute window around 5 PM local time.'
+                  }
+                  onClick={() => {
+                    // TEMP: auth bypassed for testing - re-enable sign-in requirement later
+                    // eslint-disable-next-line no-console
+                    console.log('Capture button tapped - start')
+                    // eslint-disable-next-line no-console
+                    console.log('Button active state:', {
+                      windowActive: captureWindow.active,
+                      hasPostedTodayState,
+                      checkingDailyLimit,
+                      AUTH_BYPASS,
+                    })
+                    // eslint-disable-next-line no-console
+                    console.log(
+                      AUTH_BYPASS ? 'Bypass active - skipping auth checks' : 'Auth check path',
+                    )
+                    // eslint-disable-next-line no-console
+                    console.log('Checking time window:', captureWindow.active, 'Posted today:', hasPostedTodayState)
+                    // eslint-disable-next-line no-console
+                    console.log(
+                      hasPostedTodayState ? 'Daily limit check: blocked' : AUTH_BYPASS ? 'Daily limit check passed/bypassed' : 'Daily limit check path',
+                    )
+                    if (!AUTH_BYPASS) {
+                      if (hasPostedTodayState) {
+                        trackDailyLimitHit({ userId, tz: userTz })
+                        return
+                      }
+                      if (!userId) {
+                        window.alert('Sign in to capture your 5PM moment.')
+                        return
+                      }
+                    }
+                    setRecordOpen(true)
+                  }}
+                >
+                  Capture My 5PM Moment 🎥
+                </button>
+
+                <button
+                  type="button"
+                  className="app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation"
+                  onClick={() => setLiveStreamOpen(true)}
+                >
+                  Watch Live 5PM Stream 🌍
+                </button>
+              </div>
+
+              <div className="mt-2 text-[10px] sm:text-xs text-sunset-100/70 font-mono flex-shrink-0">
+                {captureWindow.active
+                  ? isPremium
+                    ? 'Premium 8-minute window active.'
+                    : 'Free 5-minute window active.'
+                  : "Outside your personal 5 PM window."}
+              </div>
+
+              <div className="mt-2 sm:mt-4 text-[10px] sm:text-xs text-sunset-100/65 flex-shrink-0">
+                Cities at 5PM glow brightest. (Range: {Math.round(dayRange.length('hours'))}h)
+              </div>
+            </div>
+          </section>
+
+          <section className="app-card-landscape app-globe-landscape app-globe-panel polaroid-frame p-2 sm:p-4 lg:p-5 min-h-0 flex flex-col overflow-hidden">
+            <div className="polaroid-inner flex-1 min-h-0 flex flex-col overflow-hidden">
+              <div className="app-globe-container-landscape min-h-0 flex-1 flex flex-col">
+                <Globe
+                  now={now}
+                  cities={CITIES}
+                />
+              </div>
+            </div>
+          </section>
+        </main>
+      </div>
+      {recordOpen && (userId || AUTH_BYPASS) && (
+        <RecordMoment
+          open={recordOpen}
+          onClose={() => setRecordOpen(false)}
+          userId={userId ?? '00000000-0000-0000-0000-000000000000'}
+          userTz={userTz}
+          city={userCity}
+          country={userCountry}
+          isPremium={isPremium}
+          profile={profile ? { last_post_date: profile.last_post_date, current_streak: profile.current_streak, longest_streak: profile.longest_streak } : null}
+          onProfileUpdated={refetchProfile}
+        />
+      )}
+      <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} />
+    </div>
+  )
+}
+
+export default App
