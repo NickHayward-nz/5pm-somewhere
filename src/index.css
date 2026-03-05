@@ -59,6 +59,18 @@ body {
   @apply rounded-[1.35rem] overflow-hidden border border-black/10 bg-gradient-to-b from-sunset-200/5 to-midnight-800/70;
 }
 
+/* Main screen: thinner borders (half) + sunset halation on clock and globe boxes only */
+.app-clock-panel.polaroid-frame,
+.app-globe-panel.polaroid-frame {
+  border-width: 1px !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 20px 5px rgba(255, 165, 0, 0.6);
+}
+
+.app-clock-panel .polaroid-inner,
+.app-globe-panel .polaroid-inner {
+  border-width: 0 !important;
+}
+
 .btn-glow-gold {
   @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-semibold tracking-wide uppercase bg-gradient-to-r from-sunset-300 via-sunset-400 to-sunset-500 shadow-glow-gold text-midnight-900;
 }

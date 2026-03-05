@@ -78,7 +78,7 @@ function App() {
       return { city, local, rawDiffMinutes, wrappedDiffMinutes }
     })
 
-    // 1) Cities effectively at 5 PM: STRICTLY 17:00 to 17:05 (never before).
+    // 1) Cities effectively at 5PM: STRICTLY 17:00 to 17:05 (never before).
     const exact = computed.filter((c) => c.rawDiffMinutes >= 0 && c.rawDiffMinutes <= 5)
     if (exact.length > 0) {
       // Prefer the earliest after-5 city, then alphabetical.
@@ -89,7 +89,7 @@ function App() {
       return { candidates: computed, bestCandidate: sortedExact[0] }
     }
 
-    // 2) Prefer strictly positive diffs (past 5 PM). rawDiffMinutes > 0
+    // 2) Prefer strictly positive diffs (past 5PM). rawDiffMinutes > 0
     const positive = computed.filter((c) => c.rawDiffMinutes > 0)
     if (positive.length > 0) {
       const bestPositive = [...positive].sort((a, b) => {
@@ -99,7 +99,7 @@ function App() {
       return { candidates: computed, bestCandidate: bestPositive }
     }
 
-    // 3) Fallback: no positive diffs at all – pick closest BEFORE 5 PM (largest rawDiffMinutes, i.e. closest to 0 from below).
+    // 3) Fallback: no positive diffs at all – pick closest BEFORE 5PM (largest rawDiffMinutes, i.e. closest to 0 from below).
     const negative = computed.filter((c) => c.rawDiffMinutes < 0)
     const bestNegative = [...negative].sort((a, b) => {
       if (a.rawDiffMinutes !== b.rawDiffMinutes) return b.rawDiffMinutes - a.rawDiffMinutes
@@ -189,8 +189,8 @@ function App() {
                 🌅
               </div>
             </div>
-            <div className="leading-tight min-w-0">
-              <div className="text-[10px] sm:text-sm uppercase tracking-[0.2em] sm:tracking-[0.24em] text-sunset-100/80 truncate">
+            <div className="leading-tight min-w-0 overflow-visible">
+              <div className="text-[9px] sm:text-sm uppercase tracking-[0.15em] sm:tracking-[0.24em] text-sunset-100/80 whitespace-nowrap overflow-visible [text-overflow:clip]">
                 5PM Somewhere
               </div>
               <div className="text-[10px] sm:text-xs text-sunset-200/70 font-mono hidden sm:block">
@@ -223,51 +223,14 @@ function App() {
               {featured && (
                 <>
                   <div className="mt-1 sm:mt-2 lg:mt-3 text-balance text-xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold leading-tight">
-                    {featuredRawDiff >= 0 && featuredRawDiff <= 5 ? (
-                      <>
-                        It’s{' '}
+                    It’s{' '}
                         <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
-                          5 PM
+                          5PM
                         </span>{' '}
-                        right now in <span className="whitespace-nowrap">{featuredFlag} {featuredCityName}</span>{' '}
-                        at{' '}
+                        in <span className="whitespace-nowrap">{featuredFlag} {featuredCityName}</span>{' '}
                         <span className="whitespace-nowrap">
                           {featuredCityTime.toFormat('HH:mm')}
                         </span>
-                      </>
-                    ) : featuredRawDiff > 5 ? (
-                      <>
-                        Closest past{' '}
-                        <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
-                          5 PM
-                        </span>{' '}
-                        :{' '}
-                        <span className="whitespace-nowrap">
-                          {featuredFlag} {featuredCityName}
-                        </span>{' '}
-                        at{' '}
-                        <span className="whitespace-nowrap">
-                          {featuredCityTime.toFormat('HH:mm')}
-                        </span>{' '}
-                        ({Math.round(featuredRawDiff)} min ago)
-                      </>
-                    ) : (
-                      <>
-                        Next{' '}
-                        <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
-                          5 PM
-                        </span>{' '}
-                        coming soon — closest before was{' '}
-                        <span className="whitespace-nowrap">
-                          {featuredFlag} {featuredCityName}
-                        </span>{' '}
-                        at{' '}
-                        <span className="whitespace-nowrap">
-                          {featuredCityTime.toFormat('HH:mm')}
-                        </span>{' '}
-                        ({Math.abs(Math.round(featuredRawDiff))} min ago)
-                      </>
-                    )}
                   </div>
 
                   <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
@@ -299,8 +262,8 @@ function App() {
                       : captureWindow.active
                         ? 'You’re in your capture window.'
                         : isPremium
-                          ? 'Premium: 8-minute window around 5 PM local time.'
-                          : 'Free: 5-minute window around 5 PM local time.'
+                          ? 'Premium: 8-minute window around 5PM local time.'
+                          : 'Free: 5-minute window around 5PM local time.'
                   }
                   onClick={() => {
                     // TEMP: auth bypassed for testing - re-enable sign-in requirement later
@@ -353,12 +316,9 @@ function App() {
                   ? isPremium
                     ? 'Premium 8-minute window active.'
                     : 'Free 5-minute window active.'
-                  : "Outside your personal 5 PM window."}
+                  : "Outside your personal 5PM window."}
               </div>
 
-              <div className="mt-2 sm:mt-4 text-[10px] sm:text-xs text-sunset-100/65 flex-shrink-0">
-                Cities at 5PM glow brightest. (Range: {Math.round(dayRange.length('hours'))}h)
-              </div>
             </div>
           </section>
 
@@ -369,6 +329,9 @@ function App() {
                   now={now}
                   cities={CITIES}
                 />
+              </div>
+              <div className="text-[10px] sm:text-xs text-sunset-500/90 text-center py-1.5 sm:py-2 flex-shrink-0">
+                Cities at 5PM glow brightest (Range: {Math.round(dayRange.length('hours'))}h)
               </div>
             </div>
           </section>
