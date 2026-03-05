@@ -5,12 +5,9 @@ import type { City } from '../data/cities'
 import { latLonToVector3 } from '../lib/geo'
 import { getCityTimeInfo } from '../lib/time'
 
-const DAY_MAP_URL =
-  'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg'
-const NIGHT_MAP_URL =
-  'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_lights_2048.jpg'
-const SPEC_MAP_URL =
-  'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_specular_2048.jpg'
+const DAY_MAP_URL = 'https://threejs.org/examples/textures/planets/earth_atmos_2048.jpg'
+const NIGHT_MAP_URL = 'https://threejs.org/examples/textures/planets/earth_lights_2048.jpg'
+const SPEC_MAP_URL = 'https://threejs.org/examples/textures/planets/earth_specular_2048.jpg'
 
 const AUTO_ROTATE_Y_DEG_PER_FRAME = 0.12
 const DOT_UPDATE_INTERVAL_MS = 120000
@@ -63,24 +60,21 @@ export function Globe({ now, cities }: Props) {
     const group = new THREE.Group()
     scene.add(group)
 
-    scene.add(new THREE.AmbientLight(0xffffff, 0.6))
-    const sun = new THREE.DirectionalLight(0xffffff, 1.2)
-    sun.position.set(5, 3, 5)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.8))
+    const sun = new THREE.DirectionalLight(0xffffff, 1.5)
+    sun.position.set(10, 10, 10)
     scene.add(sun)
-    const fill = new THREE.DirectionalLight(0xb8d4ff, 0.2)
-    fill.position.set(-2, 1, -2)
-    scene.add(fill)
 
     const loader = new THREE.TextureLoader()
     loader.crossOrigin = 'anonymous'
     const earthGeo = new THREE.SphereGeometry(1, 64, 64)
 
-    const earthMat = new THREE.MeshPhongMaterial({
-      color: new THREE.Color(0x0066bb),
+    const earthMat = new THREE.MeshStandardMaterial({
+      color: new THREE.Color(0x0066cc),
       emissive: new THREE.Color(0x111111),
-      emissiveIntensity: 0.7,
-      specular: new THREE.Color(0x333333),
-      shininess: 8,
+      emissiveIntensity: 0.8,
+      roughness: 0.7,
+      metalness: 0.1,
     })
     const earth = new THREE.Mesh(earthGeo, earthMat)
     group.add(earth)
@@ -97,18 +91,17 @@ export function Globe({ now, cities }: Props) {
       if (nightTexture) nightTexture.colorSpace = THREE.SRGBColorSpace
       if (specularTexture) specularTexture.colorSpace = THREE.SRGBColorSpace
 
-      const mat = earth.material as THREE.MeshPhongMaterial
+      const mat = earth.material as THREE.MeshStandardMaterial
       mat.map = dayTexture
       mat.emissiveMap = nightTexture
       mat.emissive = new THREE.Color(0x111111)
-      mat.emissiveIntensity = 0.7
-      mat.specularMap = specularTexture
-      mat.specular = new THREE.Color(0x333333)
-      mat.shininess = 8
+      mat.emissiveIntensity = 0.8
+      mat.roughnessMap = specularTexture
+      mat.metalness = 0.1
       mat.color.set(0xffffff)
-      mat.needsUpdate = true
+      if ('needsUpdate' in mat) (mat as { needsUpdate: boolean }).needsUpdate = true
       // eslint-disable-next-line no-console
-      console.log('Texture loading status:', dayTexture ? 'success' : 'failed')
+      console.log('Globe material map:', mat.map ? 'set' : 'missing')
     }
 
     loader.load(
@@ -116,16 +109,18 @@ export function Globe({ now, cities }: Props) {
       (tex) => {
         dayTexture = tex
         // eslint-disable-next-line no-console
-        console.log('Day map loaded')
+        console.log('Texture loaded:', DAY_MAP_URL)
+        const mat = earth.material as THREE.MeshStandardMaterial
+        mat.map = tex
+        tex.colorSpace = THREE.SRGBColorSpace
+        if ('needsUpdate' in mat) (mat as { needsUpdate: boolean }).needsUpdate = true
         applyTextures()
       },
       undefined,
       (err) => {
         // eslint-disable-next-line no-console
-        console.error('Day map load error:', err)
-        ;(earth.material as THREE.MeshPhongMaterial).color.set(0x0066bb)
-        // eslint-disable-next-line no-console
-        console.warn('Globe using fallback blue color (day texture failed)')
+        console.error('Texture load failed:', DAY_MAP_URL, err)
+        ;(earth.material as THREE.MeshStandardMaterial).color.set(0x0066cc)
       },
     )
 
@@ -134,13 +129,13 @@ export function Globe({ now, cities }: Props) {
       (tex) => {
         nightTexture = tex
         // eslint-disable-next-line no-console
-        console.log('Night map loaded')
+        console.log('Texture loaded:', NIGHT_MAP_URL)
         if (dayTexture) applyTextures()
       },
       undefined,
       (err) => {
         // eslint-disable-next-line no-console
-        console.error('Night map load error:', err)
+        console.error('Texture load failed:', NIGHT_MAP_URL, err)
       },
     )
 
@@ -149,13 +144,13 @@ export function Globe({ now, cities }: Props) {
       (tex) => {
         specularTexture = tex
         // eslint-disable-next-line no-console
-        console.log('Specular map loaded')
+        console.log('Texture loaded:', SPEC_MAP_URL)
         if (dayTexture) applyTextures()
       },
       undefined,
       (err) => {
         // eslint-disable-next-line no-console
-        console.error('Specular map load error:', err)
+        console.error('Texture load failed:', SPEC_MAP_URL, err)
       },
     )
 
@@ -341,11 +336,13 @@ export function Globe({ now, cities }: Props) {
           {now.toFormat('HH:mm:ss')}
         </div>
       </div>
-      <div
-        ref={hostRef}
-        className="globe-host w-full max-w-[95%] mx-auto flex-1 min-h-0 h-[70vh] max-h-[70vh] p-2 sm:h-full sm:max-h-none sm:max-w-full sm:p-0 select-none touch-none"
-        style={{ touchAction: 'none' }}
-      />
+      <div className="globe-portrait-fill flex-1 min-h-0 flex items-center justify-center overflow-visible min-h-0">
+        <div
+          ref={hostRef}
+          className="globe-host w-[55.56%] h-[55.56%] min-h-[220px] max-w-full scale-[1.8] origin-center flex-none sm:w-full sm:h-full sm:min-h-0 sm:scale-100 sm:flex-1 select-none touch-none"
+          style={{ touchAction: 'none' }}
+        />
+      </div>
       <div className="pointer-events-none absolute inset-0 rounded-[1.35rem] ring-1 ring-white/5" />
     </div>
   )
