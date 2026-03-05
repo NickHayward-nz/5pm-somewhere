@@ -330,13 +330,31 @@ export function Globe({ now, cities }: Props) {
     <div className="relative flex-1 min-h-0 flex flex-col overflow-visible min-w-0 !overflow-visible">
       <style>{`
         @media (max-width: 640px) {
-          .globe-host-portrait {
-            transform: scale(0.5) !important;
-            transform-origin: center !important;
+          .globe-portrait-fill {
+            width: 100% !important;
+            max-height: 70vh !important;
+            margin: 0 auto !important;
+            padding: 0 !important;
             overflow: visible !important;
             clip-path: none !important;
-            margin-left: 0 !important;
+            display: flex !important;
+            align-items: center !important;
+            justify-content: center !important;
+          }
+          .globe-host-portrait {
+            transform: scale(0.45) !important;
+            transform-origin: center center !important;
+            width: 100% !important;
+            overflow: visible !important;
+            clip-path: none !important;
+            margin-left: -10% !important;
             left: 0 !important;
+            object-fit: contain !important;
+            object-position: center !important;
+          }
+          .globe-host-portrait canvas {
+            object-fit: contain !important;
+            object-position: center !important;
           }
         }
         @media (min-width: 641px) {
@@ -353,13 +371,10 @@ export function Globe({ now, cities }: Props) {
           {now.toFormat('HH:mm:ss')}
         </div>
       </div>
-      <div
-        className="globe-portrait-fill flex-1 min-h-0 flex items-center justify-center overflow-visible p-0 w-[95%] max-h-[70vh] mx-auto sm:w-full sm:max-h-none sm:mx-0 !overflow-visible"
-        style={{ clipPath: 'none', overflow: 'visible' }}
-      >
+      <div className="globe-portrait-fill flex-1 min-h-0 flex items-center justify-center overflow-visible p-0 w-full max-h-[70vh] mx-auto sm:max-h-none !overflow-visible">
         <div
           ref={hostRef}
-          className="globe-host globe-host-portrait w-full h-[70vh] max-h-[70vh] min-h-0 mx-auto flex-none overflow-visible sm:h-full sm:max-h-none sm:flex-1 select-none touch-none !overflow-visible"
+          className="globe-host globe-host-portrait w-full h-[70vh] max-h-[70vh] min-h-0 flex-none overflow-visible sm:h-full sm:max-h-none sm:flex-1 select-none touch-none !overflow-visible"
           style={{
             touchAction: 'none',
             clipPath: 'none',
