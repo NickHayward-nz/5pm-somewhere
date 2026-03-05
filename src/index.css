@@ -59,11 +59,13 @@ body {
   @apply rounded-[1.35rem] overflow-hidden border border-black/10 bg-gradient-to-b from-sunset-200/5 to-midnight-800/70;
 }
 
-/* Main screen: thinner borders (half) + sunset halation on clock and globe boxes only */
+/* Main screen: thinner borders (half) + sunset halation on every box */
+.app-header-logo-frame.polaroid-frame,
 .app-clock-panel.polaroid-frame,
 .app-globe-panel.polaroid-frame {
   border-width: 1px !important;
-  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 20px 5px rgba(255, 165, 0, 0.6);
+  border-color: rgba(255, 255, 255, 0.8) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 20px 8px rgba(255, 165, 0, 0.5);
 }
 
 .app-clock-panel .polaroid-inner,
@@ -71,12 +73,30 @@ body {
   border-width: 0 !important;
 }
 
+.app-header-logo-frame .polaroid-inner {
+  border-width: 1px !important;
+  border-color: rgba(0, 0, 0, 0.1) !important;
+  box-shadow: 0 0 12px 4px rgba(255, 165, 0, 0.4);
+}
+
+/* Sunset halation on buttons */
 .btn-glow-gold {
-  @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-semibold tracking-wide uppercase bg-gradient-to-r from-sunset-300 via-sunset-400 to-sunset-500 shadow-glow-gold text-midnight-900;
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-semibold tracking-wide uppercase bg-gradient-to-r from-sunset-300 via-sunset-400 to-sunset-500 text-midnight-900;
+  box-shadow: 0 0 40px rgba(255, 204, 128, 0.55), 0 0 20px 8px rgba(255, 165, 0, 0.5);
 }
 
 .btn-glow-muted {
-  @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-semibold tracking-wide uppercase bg-midnight-700/70 text-sunset-200/70 border border-sunset-500/40;
+  @apply inline-flex items-center justify-center gap-2 rounded-full px-7 py-3 text-sm font-semibold tracking-wide uppercase bg-midnight-700/70 text-sunset-200/70;
+  border-width: 1px !important;
+  border-color: rgba(255, 90, 58, 0.4) !important;
+  box-shadow: 0 0 20px 8px rgba(255, 165, 0, 0.45);
+}
+
+/* Sunset halation on clock panel pills (date, timezone) */
+.app-clock-panel .polaroid-inner > div.rounded-full,
+.app-clock-panel .polaroid-inner .flex-wrap .rounded-full {
+  border-width: 1px !important;
+  box-shadow: 0 0 12px 4px rgba(255, 165, 0, 0.35);
 }
 
 /* Live stream: full frame in portrait and landscape, no bottom cutoff */
@@ -149,7 +169,7 @@ body {
     grid-cols: unset;
   }
 
-  /* Left/center: single enlarged box with all clock info + buttons */
+  /* Left/center: single enlarged box with all clock info + buttons; slightly stronger halation in landscape */
   .app-main-landscape .app-clock-panel {
     flex: 1;
     min-width: 0;
@@ -162,6 +182,7 @@ body {
     overflow: visible;
     z-index: 2;
     position: relative;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.65), 0 0 24px 10px rgba(255, 165, 0, 0.55);
   }
 
   .app-main-landscape .app-clock-panel .polaroid-inner {

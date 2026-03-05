@@ -184,7 +184,7 @@ function App() {
       <div className="app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-4 lg:py-5">
         <header className="app-header-landscape flex-shrink-0 mb-2 sm:mb-4 flex items-start justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="polaroid-frame p-1.5 sm:p-2 flex-shrink-0">
+            <div className="polaroid-frame app-header-logo-frame p-1.5 sm:p-2 flex-shrink-0">
               <div className="polaroid-inner h-9 w-9 sm:h-12 sm:w-12 grid place-items-center text-lg sm:text-2xl">
                 🌅
               </div>
