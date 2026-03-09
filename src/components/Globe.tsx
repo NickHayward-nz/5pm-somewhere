@@ -138,7 +138,7 @@ export function Globe({ now, cities }: Props) {
       if (!ctx) return sourceTex as THREE.CanvasTexture
       ctx.drawImage(img, 0, 0)
 
-      // Step 1: Boost contrast/saturation only on land (green/brown pixels)
+      // Step 1: Aggressive contrast/saturation boost only on land (green/brown pixels)
       const imageData = ctx.getImageData(0, 0, w, h)
       const data = imageData.data
       for (let i = 0; i < data.length; i += 4) {
@@ -148,8 +148,8 @@ export function Globe({ now, cities }: Props) {
         // Detect land (green/brown dominance, avoid ocean blues)
         if (g > r * 1.05 && g > b * 1.05 && (r + b) / 2 < 200 && g > 80) {
           const hsl = rgbToHsl(r, g, b)
-          hsl[1] *= 1.5 // +50% saturation for land
-          hsl[2] = Math.min(1, hsl[2] * 1.25) // +25% lightness/contrast for land (clamp to avoid washout)
+          hsl[1] *= 1.8 // +80% saturation for land
+          hsl[2] = Math.min(1, hsl[2] * 1.4) // +40% lightness/contrast for land (clamp to avoid washout)
           const [newR, newG, newB] = hslToRgb(hsl[0], hsl[1], hsl[2])
           data[i] = newR
           data[i + 1] = newG
@@ -158,16 +158,16 @@ export function Globe({ now, cities }: Props) {
       }
       ctx.putImageData(imageData, 0, 0)
 
-      // Step 2: Darken land edges for definition (subtle outline)
+      // Step 2: Aggressive land edge darkening (stronger outline effect)
       ctx.globalCompositeOperation = 'multiply'
-      ctx.fillStyle = 'rgba(0,0,0,0.12)'
+      ctx.fillStyle = 'rgba(0,0,0,0.2)' // stronger black for edges
       ctx.fillRect(0, 0, w, h)
       ctx.globalCompositeOperation = 'source-over'
 
       const enhancedTexture = new THREE.CanvasTexture(canvas)
       enhancedTexture.needsUpdate = true
       // eslint-disable-next-line no-console
-      console.log('Land contrast/edge boost applied - continents should pop')
+      console.log('Aggressive land contrast/edge boost applied - continents should pop clearly')
       return enhancedTexture
     }
 
