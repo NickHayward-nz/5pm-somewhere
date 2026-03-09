@@ -70,10 +70,10 @@ export function Globe({ now, cities }: Props) {
     const earthGeo = new THREE.SphereGeometry(1, 64, 64)
 
     const earthMat = new THREE.MeshStandardMaterial({
-      color: new THREE.Color(0x0066cc),
-      emissive: new THREE.Color(0x111111),
-      emissiveIntensity: 0.8,
-      roughness: 0.7,
+      color: new THREE.Color(0xffffff),
+      emissive: new THREE.Color(0x222244),
+      emissiveIntensity: 0.9,
+      roughness: 0.8,
       metalness: 0.1,
     })
     const earth = new THREE.Mesh(earthGeo, earthMat)
@@ -82,6 +82,28 @@ export function Globe({ now, cities }: Props) {
     let dayTexture: THREE.Texture | null = null
     let nightTexture: THREE.Texture | null = null
     let specularTexture: THREE.Texture | null = null
+
+    function brightenAndSaturateTexture(sourceTex: THREE.Texture): THREE.CanvasTexture {
+      const img = sourceTex.image as HTMLImageElement
+      const w = img.naturalWidth || img.width
+      const h = img.naturalHeight || img.height
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return sourceTex as THREE.CanvasTexture
+      ctx.filter = 'brightness(1.25) saturate(1.4) contrast(1.08)'
+      ctx.drawImage(img, 0, 0)
+      ctx.filter = 'none'
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.fillStyle = 'rgba(255,255,255,0.12)'
+      ctx.fillRect(0, 0, w, h)
+      const newTexture = new THREE.CanvasTexture(canvas)
+      newTexture.needsUpdate = true
+      // eslint-disable-next-line no-console
+      console.log('Applying brightened texture')
+      return newTexture
+    }
 
     function applyTextures() {
       if (!dayTexture) return
@@ -94,12 +116,12 @@ export function Globe({ now, cities }: Props) {
       const mat = earth.material as THREE.MeshStandardMaterial
       mat.map = dayTexture
       mat.emissiveMap = nightTexture
-      mat.emissive = new THREE.Color(0x111111)
-      mat.emissiveIntensity = 0.8
+      mat.emissive = new THREE.Color(0x222244)
+      mat.emissiveIntensity = 0.9
       mat.roughnessMap = specularTexture
+      mat.roughness = 0.8
       mat.metalness = 0.1
       mat.color.set(0xffffff)
-      if ('needsUpdate' in mat) (mat as { needsUpdate: boolean }).needsUpdate = true
       // eslint-disable-next-line no-console
       console.log('Globe material map:', mat.map ? 'set' : 'missing')
     }
@@ -107,13 +129,13 @@ export function Globe({ now, cities }: Props) {
     loader.load(
       DAY_MAP_URL,
       (tex) => {
-        dayTexture = tex
+        tex.colorSpace = THREE.SRGBColorSpace
+        dayTexture = brightenAndSaturateTexture(tex)
+        dayTexture.colorSpace = THREE.SRGBColorSpace
+        dayTexture.wrapS = THREE.RepeatWrapping
+        dayTexture.wrapT = THREE.ClampToEdgeWrapping
         // eslint-disable-next-line no-console
         console.log('Texture loaded:', DAY_MAP_URL)
-        const mat = earth.material as THREE.MeshStandardMaterial
-        mat.map = tex
-        tex.colorSpace = THREE.SRGBColorSpace
-        if ('needsUpdate' in mat) (mat as { needsUpdate: boolean }).needsUpdate = true
         applyTextures()
       },
       undefined,
