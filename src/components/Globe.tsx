@@ -67,10 +67,8 @@ export function Globe({ now, cities }: Props) {
     loader.crossOrigin = 'anonymous'
     const earthGeo = new THREE.SphereGeometry(1, 64, 64)
 
-    const earthMat = new THREE.MeshPhongMaterial({
-      color: new THREE.Color(0xffffff),
-      shininess: 10,
-    })
+    // Bare-bones material – let the texture drive all color
+    const earthMat = new THREE.MeshPhongMaterial()
     const earth = new THREE.Mesh(earthGeo, earthMat)
     group.add(earth)
 
@@ -86,9 +84,10 @@ export function Globe({ now, cities }: Props) {
       mat.map = dayTexture
       mat.emissiveMap = null
       mat.specularMap = null
-      mat.shininess = 10
       // eslint-disable-next-line no-console
-      console.log('Using plain texture without any tint/filter')
+      console.log('Material map set to dayTexture:', mat.map)
+      // eslint-disable-next-line no-console
+      console.log('Day texture image loaded:', (dayTexture as any)?.image ? 'yes' : 'no')
     }
 
     loader.load(
@@ -107,7 +106,7 @@ export function Globe({ now, cities }: Props) {
         // eslint-disable-next-line no-console
         console.error('Day map load failed:', err)
         const mat = earth.material as THREE.MeshPhongMaterial
-        mat.color = new THREE.Color(0xaaddff)
+        mat.color = new THREE.Color(0x88ddff)
         // eslint-disable-next-line no-console
         console.log('Globe using fallback pastel blue (day texture failed)')
       },
