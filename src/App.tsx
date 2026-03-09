@@ -216,32 +216,30 @@ function App() {
         <main className="app-main-landscape flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-3 sm:gap-4 lg:gap-6 lg:items-stretch content-stretch">
           <section className="app-card-landscape app-clock-panel polaroid-frame p-2 sm:p-4 lg:p-5 min-h-0 flex flex-col overflow-hidden">
             <div className="polaroid-inner p-3 sm:p-5 lg:p-6 flex-1 min-h-0 overflow-hidden flex flex-col">
-              <div className="text-xs uppercase tracking-[0.34em] text-sunset-100/70">
+              <div
+                className="uppercase tracking-[0.34em] text-sunset-100/70 text-center"
+                style={{ fontSize: 'clamp(1.5rem, 5vw, 2.2rem)' }}
+              >
                 Live golden hour
               </div>
 
               {featured && (
-                <>
-                  <div className="mt-1 sm:mt-2 lg:mt-3 text-balance text-xl sm:text-3xl md:text-4xl lg:text-5xl font-semibold leading-tight">
-                    It’s{' '}
-                        <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
-                          5PM
-                        </span>{' '}
-                        in <span className="whitespace-nowrap">{featuredFlag} {featuredCityName}</span>{' '}
-                        <span className="whitespace-nowrap">
-                          {featuredCityTime.toFormat('HH:mm')}
-                        </span>
-                  </div>
-
-                  <div className="mt-2 sm:mt-3 flex flex-wrap items-center gap-2 sm:gap-3 text-xs sm:text-sm">
-                    <div className="rounded-full bg-midnight-700/50 border border-sunset-500/25 px-4 py-2 font-mono">
-                      {featuredCityTime.toFormat('ccc, LLL d')} · {formatClock(featuredCityTime)}
-                    </div>
-                    <div className="rounded-full bg-midnight-700/50 border border-sunset-500/25 px-4 py-2 text-sunset-100/80">
-                      {featured.city.tz}
-                    </div>
-                  </div>
-                </>
+                <div
+                  className="mt-1 sm:mt-2 lg:mt-3 text-balance font-semibold leading-tight text-center"
+                  style={{ fontSize: 'clamp(1.3rem, 4.5vw, 1.8rem)' }}
+                >
+                  It’s{' '}
+                  <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
+                    5PM
+                  </span>{' '}
+                  in{' '}
+                  <span className="whitespace-nowrap">
+                    {featuredFlag} {featuredCityName}
+                  </span>{' '}
+                  <span className="whitespace-nowrap">{featuredCityTime.toFormat('HH:mm')}</span>{' '}
+                  <span className="whitespace-nowrap">{featuredCityTime.toFormat('ccc')}</span>,{' '}
+                  <span className="whitespace-nowrap">{featuredCityTime.toFormat('LLL d')}</span>
+                </div>
               )}
 
               <div className="mt-3 sm:mt-5 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center flex-shrink-0">
