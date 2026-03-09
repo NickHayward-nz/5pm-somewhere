@@ -107,9 +107,10 @@ export function Globe({ now, cities }: Props) {
     const markerMat = new THREE.MeshBasicMaterial({
       color: 0xff9a62,
       transparent: true,
-      opacity: 0.85,
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
+      opacity: 1.0,
+      blending: THREE.NormalBlending,
+      depthTest: true,
+      depthWrite: true,
     })
     const markers = new THREE.InstancedMesh(markerGeo, markerMat, cityPositions.length)
     markers.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
@@ -120,9 +121,10 @@ export function Globe({ now, cities }: Props) {
     spriteCanvas.height = 128
     const ctx = spriteCanvas.getContext('2d')
     if (ctx) {
-      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 64)
+      // Tighter gradient so glow is contained (no large halo)
+      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 24)
       g.addColorStop(0, 'rgba(255,220,160,1)')
-      g.addColorStop(0.35, 'rgba(255,160,90,0.7)')
+      g.addColorStop(0.5, 'rgba(255,160,90,0.6)')
       g.addColorStop(1, 'rgba(255,120,60,0)')
       ctx.fillStyle = g
       ctx.fillRect(0, 0, 128, 128)
@@ -132,18 +134,21 @@ export function Globe({ now, cities }: Props) {
       map: spriteTex,
       color: 0xffb56b,
       transparent: true,
-      blending: THREE.AdditiveBlending,
+      opacity: 1.0,
+      blending: THREE.NormalBlending,
+      depthTest: true,
       depthWrite: false,
-      opacity: 0,
     })
 
     const sprites: THREE.Sprite[] = []
     for (let i = 0; i < cityPositions.length; i++) {
       const s = new THREE.Sprite(spriteMat.clone())
-      s.scale.setScalar(0.12)
+      s.scale.setScalar(0.06)
       group.add(s)
       sprites.push(s)
     }
+    // eslint-disable-next-line no-console
+    console.log('Dot bloom reduced')
 
     const tmpObj = new THREE.Object3D()
     const baseColor = new THREE.Color()
@@ -235,8 +240,8 @@ export function Globe({ now, cities }: Props) {
 
         const spr = sprites[i]
         spr.position.set(pos.x, pos.y, pos.z)
-        spr.scale.setScalar(0.08 + intensity * 0.22)
-        ;(spr.material as THREE.SpriteMaterial).opacity = Math.max(0, intensity - 0.12)
+        spr.scale.setScalar(0.04 + intensity * 0.08)
+        ;(spr.material as THREE.SpriteMaterial).opacity = Math.max(0, Math.min(1, intensity))
       }
 
       if (markers.instanceColor) markers.instanceColor.needsUpdate = true
