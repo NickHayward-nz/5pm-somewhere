@@ -107,10 +107,10 @@ export function Globe({ now, cities }: Props) {
     const markerMat = new THREE.MeshBasicMaterial({
       color: 0xff9a62,
       transparent: true,
-      opacity: 1.0,
-      blending: THREE.NormalBlending,
+      opacity: 0.85,
+      blending: THREE.AdditiveBlending,
       depthTest: true,
-      depthWrite: true,
+      depthWrite: false,
     })
     const markers = new THREE.InstancedMesh(markerGeo, markerMat, cityPositions.length)
     markers.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
@@ -134,8 +134,8 @@ export function Globe({ now, cities }: Props) {
       map: spriteTex,
       color: 0xffb56b,
       transparent: true,
-      opacity: 1.0,
-      blending: THREE.NormalBlending,
+      opacity: 0.9,
+      blending: THREE.AdditiveBlending,
       depthTest: true,
       depthWrite: false,
     })
@@ -143,12 +143,12 @@ export function Globe({ now, cities }: Props) {
     const sprites: THREE.Sprite[] = []
     for (let i = 0; i < cityPositions.length; i++) {
       const s = new THREE.Sprite(spriteMat.clone())
-      s.scale.setScalar(0.06)
+      s.scale.setScalar(0.1)
       group.add(s)
       sprites.push(s)
     }
     // eslint-disable-next-line no-console
-    console.log('Dot bloom reduced')
+    console.log('Dot glow restored - additive blending, opacity 0.9')
 
     const tmpObj = new THREE.Object3D()
     const baseColor = new THREE.Color()
@@ -240,8 +240,8 @@ export function Globe({ now, cities }: Props) {
 
         const spr = sprites[i]
         spr.position.set(pos.x, pos.y, pos.z)
-        spr.scale.setScalar(0.04 + intensity * 0.08)
-        ;(spr.material as THREE.SpriteMaterial).opacity = Math.max(0, Math.min(1, intensity))
+        spr.scale.setScalar(0.06 + intensity * 0.12)
+        ;(spr.material as THREE.SpriteMaterial).opacity = Math.max(0, Math.min(1, 0.4 + intensity * 0.6))
       }
 
       if (markers.instanceColor) markers.instanceColor.needsUpdate = true
