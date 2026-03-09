@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef } from 'react'
 import { DateTime } from 'luxon'
 import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { City } from '../data/cities'
 import { latLonToVector3 } from '../lib/geo'
 import { getCityTimeInfo } from '../lib/time'
@@ -8,7 +9,6 @@ import { getCityTimeInfo } from '../lib/time'
 const DAY_MAP_URL =
   'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg'
 
-const AUTO_ROTATE_Y_DEG_PER_FRAME = 0.12
 const DOT_UPDATE_INTERVAL_MS = 120000
 const SPHERE_SEGMENTS = 64
 
@@ -55,6 +55,19 @@ export function Globe({ now, cities }: Props) {
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 50)
     camera.position.set(0, 0, 3.25)
+
+    const controls = new OrbitControls(camera, renderer.domElement)
+    controls.target.set(0, 0, 0)
+    controls.enableZoom = true
+    controls.zoomSpeed = 1.0
+    controls.minDistance = 1.5
+    controls.maxDistance = 5.0
+    controls.enablePan = false
+    controls.enableRotate = true
+    controls.autoRotate = true
+    controls.autoRotateSpeed = 0.5
+    // eslint-disable-next-line no-console
+    console.log('Zoom enabled - min/max distance:', controls.minDistance, controls.maxDistance)
 
     const group = new THREE.Group()
     scene.add(group)
@@ -171,56 +184,74 @@ export function Globe({ now, cities }: Props) {
       dotTimeRef.current = DateTime.now().toMillis()
     }, DOT_UPDATE_INTERVAL_MS)
 
-    let dragging = false
-    let lastX = 0
-    let lastY = 0
-    let velX = 0
-    let velY = 0
-
-    function onPointerDown(e: PointerEvent) {
-      dragging = true
-      lastX = e.clientX
-      lastY = e.clientY
-      el.setPointerCapture(e.pointerId)
+    function zoomByWheel(deltaY: number) {
+      const rect = renderer.domElement.getBoundingClientRect()
+      const cx = rect.left + rect.width / 2
+      const cy = rect.top + rect.height / 2
+      renderer.domElement.dispatchEvent(
+        new WheelEvent('wheel', { deltaY, clientX: cx, clientY: cy, bubbles: true }),
+      )
     }
 
-    function onPointerMove(e: PointerEvent) {
-      if (!dragging) return
-      const dx = e.clientX - lastX
-      const dy = e.clientY - lastY
-      lastX = e.clientX
-      lastY = e.clientY
-      velY = dx * 0.003
-      velX = dy * 0.003
-      group.rotation.y += velY
-      group.rotation.x += velX
-      group.rotation.x = Math.max(-0.9, Math.min(0.9, group.rotation.x))
-    }
+    const zoomInBtn = document.createElement('button')
+    zoomInBtn.type = 'button'
+    zoomInBtn.textContent = '+'
+    zoomInBtn.setAttribute('aria-label', 'Zoom in')
+    Object.assign(zoomInBtn.style, {
+      position: 'absolute',
+      bottom: '12px',
+      right: '44px',
+      zIndex: '20',
+      width: '32px',
+      height: '32px',
+      borderRadius: '50%',
+      border: '1px solid rgba(255,160,90,0.5)',
+      background: 'rgba(200,100,50,0.25)',
+      color: 'rgba(255,220,180,0.95)',
+      fontSize: '18px',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      boxShadow: '0 0 12px rgba(255,140,80,0.4)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '0',
+      lineHeight: '1',
+    })
+    zoomInBtn.onclick = () => zoomByWheel(-80)
 
-    function onPointerUp(e: PointerEvent) {
-      dragging = false
-      try {
-        el.releasePointerCapture(e.pointerId)
-      } catch {
-        /* no-op */
-      }
-    }
-
-    el.addEventListener('pointerdown', onPointerDown)
-    el.addEventListener('pointermove', onPointerMove)
-    el.addEventListener('pointerup', onPointerUp)
-    el.addEventListener('pointercancel', onPointerUp)
-
-    const autoRotateY = (AUTO_ROTATE_Y_DEG_PER_FRAME * Math.PI) / 180
+    const zoomOutBtn = document.createElement('button')
+    zoomOutBtn.type = 'button'
+    zoomOutBtn.textContent = '−'
+    zoomOutBtn.setAttribute('aria-label', 'Zoom out')
+    Object.assign(zoomOutBtn.style, {
+      position: 'absolute',
+      bottom: '12px',
+      right: '12px',
+      zIndex: '20',
+      width: '32px',
+      height: '32px',
+      borderRadius: '50%',
+      border: '1px solid rgba(255,160,90,0.5)',
+      background: 'rgba(200,100,50,0.25)',
+      color: 'rgba(255,220,180,0.95)',
+      fontSize: '18px',
+      fontWeight: 'bold',
+      cursor: 'pointer',
+      boxShadow: '0 0 12px rgba(255,140,80,0.4)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      padding: '0',
+      lineHeight: '1',
+    })
+    zoomOutBtn.onclick = () => zoomByWheel(80)
+    el.style.position = 'relative'
+    el.appendChild(zoomInBtn)
+    el.appendChild(zoomOutBtn)
 
     function tick() {
-      if (!dragging) {
-        group.rotation.y += autoRotateY + velY * 0.88
-        group.rotation.x += velX * 0.88
-        velX *= 0.92
-        velY *= 0.92
-        group.rotation.x = Math.max(-0.9, Math.min(0.9, group.rotation.x))
-      }
+      controls.update()
 
       const dotNow = DateTime.fromMillis(dotTimeRef.current)
       const timeForDots = dotNow.isValid ? dotNow : now
@@ -258,10 +289,9 @@ export function Globe({ now, cities }: Props) {
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
       rafRef.current = null
       ro.disconnect()
-      el.removeEventListener('pointerdown', onPointerDown)
-      el.removeEventListener('pointermove', onPointerMove)
-      el.removeEventListener('pointerup', onPointerUp)
-      el.removeEventListener('pointercancel', onPointerUp)
+      controls.dispose()
+      if (el.contains(zoomInBtn)) el.removeChild(zoomInBtn)
+      if (el.contains(zoomOutBtn)) el.removeChild(zoomOutBtn)
       renderer.dispose()
       if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
     }
