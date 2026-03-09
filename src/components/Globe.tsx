@@ -138,18 +138,18 @@ export function Globe({ now, cities }: Props) {
       if (!ctx) return sourceTex as THREE.CanvasTexture
       ctx.drawImage(img, 0, 0)
 
-      // Step 1: Aggressive contrast/saturation boost only on land (green/brown pixels)
+      // Aggressive selective land enhancement (pixel-by-pixel)
       const imageData = ctx.getImageData(0, 0, w, h)
       const data = imageData.data
       for (let i = 0; i < data.length; i += 4) {
         const r = data[i]
         const g = data[i + 1]
         const b = data[i + 2]
-        // Detect land (green/brown dominance, avoid ocean blues)
-        if (g > r * 1.05 && g > b * 1.05 && (r + b) / 2 < 200 && g > 80) {
+        // Aggressive land detection (green/brown dominance, exclude blues)
+        if (g > r * 1.1 && g > b * 1.1 && (r + b) / 2 < 180 && g > 90) {
           const hsl = rgbToHsl(r, g, b)
-          hsl[1] *= 1.8 // +80% saturation for land
-          hsl[2] = Math.min(1, hsl[2] * 1.4) // +40% lightness/contrast for land (clamp to avoid washout)
+          hsl[1] = Math.min(1, hsl[1] * 2.0) // double saturation on land
+          hsl[2] = Math.min(1, hsl[2] * 1.5) // +50% lightness/contrast on land
           const [newR, newG, newB] = hslToRgb(hsl[0], hsl[1], hsl[2])
           data[i] = newR
           data[i + 1] = newG
@@ -158,16 +158,16 @@ export function Globe({ now, cities }: Props) {
       }
       ctx.putImageData(imageData, 0, 0)
 
-      // Step 2: Aggressive land edge darkening (stronger outline effect)
+      // Strong land edge darkening (outline effect)
       ctx.globalCompositeOperation = 'multiply'
-      ctx.fillStyle = 'rgba(0,0,0,0.2)' // stronger black for edges
+      ctx.fillStyle = 'rgba(0,0,0,0.25)' // stronger black for edges
       ctx.fillRect(0, 0, w, h)
       ctx.globalCompositeOperation = 'source-over'
 
       const enhancedTexture = new THREE.CanvasTexture(canvas)
       enhancedTexture.needsUpdate = true
       // eslint-disable-next-line no-console
-      console.log('Aggressive land contrast/edge boost applied - continents should pop clearly')
+      console.log('Aggressive land pop-out applied - continents should stand out clearly')
       return enhancedTexture
     }
 
@@ -177,18 +177,17 @@ export function Globe({ now, cities }: Props) {
       dayTexture.wrapS = THREE.RepeatWrapping
       dayTexture.wrapT = THREE.ClampToEdgeWrapping
 
-      const mat = earth.material as THREE.MeshPhongMaterial
-      mat.map = dayTexture
-      mat.color = new THREE.Color(1.2, 1.2, 1.3)
-      mat.emissive = new THREE.Color(0x88aaff)
-      mat.emissiveIntensity = 0.5
-      mat.specular = new THREE.Color(0x88ff88)
-      mat.shininess = 10
+      // Replace material with a neutral MeshPhongMaterial using the enhanced texture
+      const mat = new THREE.MeshPhongMaterial({
+        map: dayTexture,
+        shininess: 5,
+      })
+      earth.material = mat
       mat.needsUpdate = true
 
-      // Debug logging to verify texture state and tint
+      // Debug logging to verify texture state
       // eslint-disable-next-line no-console
-      console.log('Material brightened and pastel-tinted')
+      console.log('Neutral material applied with aggressive land pop-out texture')
       // eslint-disable-next-line no-console
       console.log('Material map applied:', mat.map ? 'yes' : 'no')
       // eslint-disable-next-line no-console
