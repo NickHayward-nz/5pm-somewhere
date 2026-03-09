@@ -90,18 +90,15 @@ export function Globe({ now, cities }: Props) {
       if (!ctx) return sourceTex as THREE.CanvasTexture
       ctx.drawImage(img, 0, 0)
       ctx.globalCompositeOperation = 'source-over'
-      ctx.fillStyle = 'rgba(255,255,255,0.2)'
+      ctx.fillStyle = 'rgba(255,255,255,0.15)'
       ctx.fillRect(0, 0, w, h)
       ctx.globalCompositeOperation = 'soft-light'
-      ctx.fillStyle = 'rgba(100,150,255,0.2)'
-      ctx.fillRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'overlay'
-      ctx.fillStyle = 'rgba(0,0,0,0.1)'
+      ctx.fillStyle = 'rgba(100,150,255,0.15)'
       ctx.fillRect(0, 0, w, h)
       const pastelTexture = new THREE.CanvasTexture(canvas)
       pastelTexture.needsUpdate = true
       // eslint-disable-next-line no-console
-      console.log('Pastel texture applied successfully')
+      console.log('Pastel texture applied with reduced intensity')
       return pastelTexture
     }
 
