@@ -29,6 +29,58 @@ function intensityToColor(intensity: number) {
   )
 }
 
+function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
+  r /= 255
+  g /= 255
+  b /= 255
+  const max = Math.max(r, g, b)
+  const min = Math.min(r, g, b)
+  let h = 0
+  let s = 0
+  const l = (max + min) / 2
+  if (max !== min) {
+    const d = max - min
+    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
+    switch (max) {
+      case r:
+        h = ((g - b) / d + (g < b ? 6 : 0)) / 6
+        break
+      case g:
+        h = ((b - r) / d + 2) / 6
+        break
+      default:
+        h = ((r - g) / d + 4) / 6
+    }
+  }
+  return [h * 360, s, l]
+}
+
+function hslToRgb(h: number, s: number, l: number): [number, number, number] {
+  h /= 360
+  let r: number
+  let g: number
+  let b: number
+  if (s === 0) {
+    r = g = b = l
+  } else {
+    const q = l < 0.5 ? l * (1 + s) : l + s - l * s
+    const p = 2 * l - q
+    r = hue2rgb(p, q, h + 1 / 3)
+    g = hue2rgb(p, q, h)
+    b = hue2rgb(p, q, h - 1 / 3)
+  }
+  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)]
+}
+
+function hue2rgb(p: number, q: number, t: number): number {
+  if (t < 0) t += 1
+  if (t > 1) t -= 1
+  if (t < 1 / 6) return p + (q - p) * 6 * t
+  if (t < 1 / 2) return q
+  if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
+  return p
+}
+
 export function Globe({ now, cities }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null)
   const rafRef = useRef<number | null>(null)
@@ -85,26 +137,35 @@ export function Globe({ now, cities }: Props) {
       const ctx = canvas.getContext('2d')
       if (!ctx) return sourceTex as THREE.CanvasTexture
       ctx.drawImage(img, 0, 0)
-      // Subtle unsharp mask for edge sharpness (only to define land borders)
-      const temp = document.createElement('canvas')
-      temp.width = w
-      temp.height = h
-      const tctx = temp.getContext('2d')
-      if (!tctx) return sourceTex as THREE.CanvasTexture
-      tctx.filter = 'contrast(1.3) brightness(1.1)'
-      tctx.drawImage(canvas, 0, 0)
-      tctx.filter = 'none'
-      ctx.clearRect(0, 0, w, h)
-      ctx.drawImage(temp, 0, 0)
-      // Very light overlay to emphasize land (greenish tint on land areas only)
-      ctx.globalCompositeOperation = 'overlay'
-      ctx.fillStyle = 'rgba(50,150,50,0.1)'
+
+      // Step 1: Increase saturation and contrast only on land (green/brown pixels)
+      const imageData = ctx.getImageData(0, 0, w, h)
+      const data = imageData.data
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i]
+        const g = data[i + 1]
+        const b = data[i + 2]
+        // Detect land (green/brown dominance)
+        if (g > r * 1.1 && g > b * 1.1 && (r + b) / 2 < 180) {
+          const hsl = rgbToHsl(r, g, b)
+          hsl[1] *= 1.4 // +40% saturation for land
+          hsl[2] = Math.min(1, hsl[2] * 1.2) // +20% lightness/contrast
+          const [newR, newG, newB] = hslToRgb(hsl[0], hsl[1], hsl[2])
+          data[i] = newR
+          data[i + 1] = newG
+          data[i + 2] = newB
+        }
+      }
+      ctx.putImageData(imageData, 0, 0)
+
+      // Step 2: Subtle land edge darkening (outline effect)
+      ctx.globalCompositeOperation = 'multiply'
+      ctx.fillStyle = 'rgba(0,0,0,0.1)'
       ctx.fillRect(0, 0, w, h)
       ctx.globalCompositeOperation = 'source-over'
+
       const enhancedTexture = new THREE.CanvasTexture(canvas)
       enhancedTexture.needsUpdate = true
-      // eslint-disable-next-line no-console
-      console.log('Continent edge/contrast boost applied')
       return enhancedTexture
     }
 
