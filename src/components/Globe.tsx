@@ -58,8 +58,8 @@ export function Globe({ now, cities }: Props) {
     const group = new THREE.Group()
     scene.add(group)
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0))
-    const sun = new THREE.DirectionalLight(0xffffff, 1.5)
+    scene.add(new THREE.AmbientLight(0xffffff, 0.9))
+    const sun = new THREE.DirectionalLight(0xffffff, 1.2)
     sun.position.set(5, 3, 5)
     scene.add(sun)
 
@@ -69,8 +69,9 @@ export function Globe({ now, cities }: Props) {
 
     const earthMat = new THREE.MeshPhongMaterial({
       color: new THREE.Color(0xffffff),
-      emissive: new THREE.Color(0xaaaaaa),
-      emissiveIntensity: 0.3,
+      emissive: new THREE.Color(0x888888),
+      emissiveIntensity: 0.4,
+      specular: new THREE.Color(0x666666),
       shininess: 5,
     })
     const earth = new THREE.Mesh(earthGeo, earthMat)
@@ -88,14 +89,14 @@ export function Globe({ now, cities }: Props) {
       const ctx = canvas.getContext('2d')
       if (!ctx) return sourceTex as THREE.CanvasTexture
       ctx.drawImage(img, 0, 0)
-      ctx.globalCompositeOperation = 'hue'
-      ctx.fillStyle = 'hsl(180, 50%, 80%)'
+      ctx.globalCompositeOperation = 'source-over'
+      ctx.fillStyle = 'rgba(255,255,255,0.2)'
       ctx.fillRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'saturation'
-      ctx.fillStyle = 'hsl(120, 30%, 70%)'
+      ctx.globalCompositeOperation = 'soft-light'
+      ctx.fillStyle = 'rgba(100,150,255,0.2)'
       ctx.fillRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'lighten'
-      ctx.fillStyle = 'rgba(255,255,255,0.4)'
+      ctx.globalCompositeOperation = 'overlay'
+      ctx.fillStyle = 'rgba(0,0,0,0.1)'
       ctx.fillRect(0, 0, w, h)
       const pastelTexture = new THREE.CanvasTexture(canvas)
       pastelTexture.needsUpdate = true
@@ -114,8 +115,9 @@ export function Globe({ now, cities }: Props) {
       mat.map = dayTexture
       mat.emissiveMap = null
       mat.specularMap = null
-      mat.emissive = new THREE.Color(0xaaaaaa)
-      mat.emissiveIntensity = 0.3
+      mat.emissive = new THREE.Color(0x888888)
+      mat.emissiveIntensity = 0.4
+      mat.specular = new THREE.Color(0x666666)
       mat.shininess = 5
       mat.color.set(0xffffff)
     }
