@@ -58,8 +58,8 @@ export function Globe({ now, cities }: Props) {
     const group = new THREE.Group()
     scene.add(group)
 
-    scene.add(new THREE.AmbientLight(0xffffff, 1.5))
-    const sun = new THREE.DirectionalLight(0xffffff, 2.0)
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+    const sun = new THREE.DirectionalLight(0xffffff, 1.5)
     sun.position.set(5, 3, 5)
     scene.add(sun)
 
@@ -68,10 +68,7 @@ export function Globe({ now, cities }: Props) {
     const earthGeo = new THREE.SphereGeometry(1, 64, 64)
 
     const earthMat = new THREE.MeshPhongMaterial({
-      color: new THREE.Color(1.3, 1.3, 1.4),
-      emissive: new THREE.Color(0xaaddff),
-      emissiveIntensity: 0.5,
-      specular: new THREE.Color(0x88ff88),
+      color: new THREE.Color(0xffffff),
       shininess: 10,
     })
     const earth = new THREE.Mesh(earthGeo, earthMat)
@@ -89,13 +86,9 @@ export function Globe({ now, cities }: Props) {
       mat.map = dayTexture
       mat.emissiveMap = null
       mat.specularMap = null
-      mat.color.setRGB(1.3, 1.3, 1.4)
-      mat.emissive = new THREE.Color(0xaaddff)
-      mat.emissiveIntensity = 0.5
-      mat.specular = new THREE.Color(0x88ff88)
       mat.shininess = 10
       // eslint-disable-next-line no-console
-      console.log('Material tinted for pastel without canvas')
+      console.log('Using plain texture without any tint/filter')
     }
 
     loader.load(
