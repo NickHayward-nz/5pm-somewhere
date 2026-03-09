@@ -23,19 +23,29 @@ module.exports = {
         },
       },
       fontFamily: {
-        display: ['"DM Sans"', 'system-ui', 'sans-serif'],
-        mono: ['"DM Mono"', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        display: ['Poppins', 'Inter', 'system-ui', 'sans-serif'],
+        sans: ['Inter', 'Poppins', 'system-ui', 'sans-serif'],
+        mono: ['ui-monospace', 'SFMono-Regular', 'monospace'],
+      },
+      borderRadius: {
+        lg: '16px',
       },
       boxShadow: {
-        polaroid: '0 24px 60px rgba(0, 0, 0, 0.65)',
-        'glow-gold': '0 0 40px rgba(255, 204, 128, 0.55)',
+        polaroid: '0 0 20px rgba(0, 0, 0, 0.1)',
+        'glass': '0 0 20px rgba(0, 0, 0, 0.1)',
+        'glow-orange': '0 0 24px rgba(249, 115, 22, 0.5)',
       },
       backgroundImage: {
+        'app-gradient':
+          'linear-gradient(to bottom, #3b82f6, #a855f7, #ec4899, #f97316)',
         'sunset-gradient':
-          'radial-gradient(circle at 0% 0%, #ffd966 0, #ffb347 25%, transparent 52%), radial-gradient(circle at 100% 0%, #ff6b35 0, #e85d04 30%, transparent 55%), radial-gradient(circle at 50% 85%, #4c1d95 0, #312e81 25%, #1e1b4b 50%, #0f0a1e 70%)',
+          'linear-gradient(to bottom, #3b82f6, #a855f7, #ec4899, #f97316)',
       },
-      backgroundColor: {
-        'sunset-bg': '#030410',
+      backgroundSize: {
+        cover: 'cover',
+      },
+      transitionDuration: {
+        150: '150ms',
       },
     },
   },
