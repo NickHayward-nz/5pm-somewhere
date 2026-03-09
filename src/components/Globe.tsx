@@ -58,17 +58,15 @@ export function Globe({ now, cities }: Props) {
     const group = new THREE.Group()
     scene.add(group)
 
+    // Even, simple lighting – let the texture show without shading artifacts
     scene.add(new THREE.AmbientLight(0xffffff, 1.0))
-    const sun = new THREE.DirectionalLight(0xffffff, 1.5)
-    sun.position.set(5, 3, 5)
-    scene.add(sun)
 
     const loader = new THREE.TextureLoader()
     loader.crossOrigin = 'anonymous'
     const earthGeo = new THREE.SphereGeometry(1, 64, 64)
 
-    // Bare-bones material – let the texture drive all color
-    const earthMat = new THREE.MeshPhongMaterial()
+    // Use MeshBasicMaterial so the raw texture is shown without lighting modification
+    const earthMat = new THREE.MeshBasicMaterial()
     const earth = new THREE.Mesh(earthGeo, earthMat)
     group.add(earth)
 
@@ -80,14 +78,24 @@ export function Globe({ now, cities }: Props) {
       dayTexture.wrapS = THREE.RepeatWrapping
       dayTexture.wrapT = THREE.ClampToEdgeWrapping
 
-      const mat = earth.material as THREE.MeshPhongMaterial
+      const mat = earth.material as THREE.MeshBasicMaterial
       mat.map = dayTexture
-      mat.emissiveMap = null
-      mat.specularMap = null
+      mat.needsUpdate = true
+
+      // Debug logging to verify texture state
       // eslint-disable-next-line no-console
-      console.log('Material map set to dayTexture:', mat.map)
+      console.log('Day map loaded: texture UUID', dayTexture.uuid)
       // eslint-disable-next-line no-console
-      console.log('Day texture image loaded:', (dayTexture as any)?.image ? 'yes' : 'no')
+      console.log('Material map applied:', mat.map ? 'yes' : 'no')
+      // eslint-disable-next-line no-console
+      console.log(
+        'Texture image dimensions:',
+        (dayTexture as any)?.image?.width,
+        (dayTexture as any)?.image?.height,
+      )
+
+      // Force one render pass after applying the texture
+      renderer.render(scene, camera)
     }
 
     loader.load(
@@ -105,8 +113,9 @@ export function Globe({ now, cities }: Props) {
       (err) => {
         // eslint-disable-next-line no-console
         console.error('Day map load failed:', err)
-        const mat = earth.material as THREE.MeshPhongMaterial
+        const mat = earth.material as THREE.MeshBasicMaterial
         mat.color = new THREE.Color(0x88ddff)
+        mat.needsUpdate = true
         // eslint-disable-next-line no-console
         console.log('Globe using fallback pastel blue (day texture failed)')
       },
