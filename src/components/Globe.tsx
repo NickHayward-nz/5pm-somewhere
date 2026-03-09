@@ -85,23 +85,26 @@ export function Globe({ now, cities }: Props) {
       const ctx = canvas.getContext('2d')
       if (!ctx) return sourceTex as THREE.CanvasTexture
       ctx.drawImage(img, 0, 0)
+      // Subtle unsharp mask for edge sharpness (only to define land borders)
       const temp = document.createElement('canvas')
       temp.width = w
       temp.height = h
       const tctx = temp.getContext('2d')
       if (!tctx) return sourceTex as THREE.CanvasTexture
-      tctx.filter = 'contrast(1.2) brightness(1.05)'
+      tctx.filter = 'contrast(1.3) brightness(1.1)'
       tctx.drawImage(canvas, 0, 0)
       tctx.filter = 'none'
       ctx.clearRect(0, 0, w, h)
       ctx.drawImage(temp, 0, 0)
+      // Very light overlay to emphasize land (greenish tint on land areas only)
       ctx.globalCompositeOperation = 'overlay'
-      ctx.drawImage(temp, 0, 0)
+      ctx.fillStyle = 'rgba(50,150,50,0.1)'
+      ctx.fillRect(0, 0, w, h)
       ctx.globalCompositeOperation = 'source-over'
       const enhancedTexture = new THREE.CanvasTexture(canvas)
       enhancedTexture.needsUpdate = true
       // eslint-disable-next-line no-console
-      console.log('Continent contrast/edge boost applied')
+      console.log('Continent edge/contrast boost applied')
       return enhancedTexture
     }
 
