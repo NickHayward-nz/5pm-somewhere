@@ -58,15 +58,18 @@ export function Globe({ now, cities }: Props) {
     const group = new THREE.Group()
     scene.add(group)
 
-    // Even, simple lighting – let the texture show without shading artifacts
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0))
+    // Brighter lighting so the pastel globe pops
+    scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+    const sun = new THREE.DirectionalLight(0xffffff, 1.5)
+    sun.position.set(5, 3, 5)
+    scene.add(sun)
 
     const loader = new THREE.TextureLoader()
     loader.crossOrigin = 'anonymous'
     const earthGeo = new THREE.SphereGeometry(1, 64, 64)
 
-    // Use MeshBasicMaterial so the raw texture is shown without lighting modification
-    const earthMat = new THREE.MeshBasicMaterial()
+    // MeshPhongMaterial with light pastel tint controlled via material only
+    const earthMat = new THREE.MeshPhongMaterial()
     const earth = new THREE.Mesh(earthGeo, earthMat)
     group.add(earth)
 
@@ -78,13 +81,18 @@ export function Globe({ now, cities }: Props) {
       dayTexture.wrapS = THREE.RepeatWrapping
       dayTexture.wrapT = THREE.ClampToEdgeWrapping
 
-      const mat = earth.material as THREE.MeshBasicMaterial
+      const mat = earth.material as THREE.MeshPhongMaterial
       mat.map = dayTexture
+      mat.color = new THREE.Color(1.2, 1.2, 1.3)
+      mat.emissive = new THREE.Color(0x88aaff)
+      mat.emissiveIntensity = 0.5
+      mat.specular = new THREE.Color(0x88ff88)
+      mat.shininess = 10
       mat.needsUpdate = true
 
-      // Debug logging to verify texture state
+      // Debug logging to verify texture state and tint
       // eslint-disable-next-line no-console
-      console.log('Day map loaded: texture UUID', dayTexture.uuid)
+      console.log('Material brightened and pastel-tinted')
       // eslint-disable-next-line no-console
       console.log('Material map applied:', mat.map ? 'yes' : 'no')
       // eslint-disable-next-line no-console
@@ -93,9 +101,6 @@ export function Globe({ now, cities }: Props) {
         (dayTexture as any)?.image?.width,
         (dayTexture as any)?.image?.height,
       )
-
-      // Force one render pass after applying the texture
-      renderer.render(scene, camera)
     }
 
     loader.load(
@@ -113,8 +118,8 @@ export function Globe({ now, cities }: Props) {
       (err) => {
         // eslint-disable-next-line no-console
         console.error('Day map load failed:', err)
-        const mat = earth.material as THREE.MeshBasicMaterial
-        mat.color = new THREE.Color(0x88ddff)
+        const mat = earth.material as THREE.MeshPhongMaterial
+        mat.color = new THREE.Color(0xaaddff)
         mat.needsUpdate = true
         // eslint-disable-next-line no-console
         console.log('Globe using fallback pastel blue (day texture failed)')
