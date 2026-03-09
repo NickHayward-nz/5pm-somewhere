@@ -218,14 +218,14 @@ function App() {
             <div className="polaroid-inner p-3 sm:p-5 lg:p-6 flex-1 min-h-0 overflow-hidden flex flex-col">
               <div
                 className="uppercase tracking-[0.34em] text-sunset-100/70 text-center"
-                style={{ fontSize: 'clamp(1.5rem, 5vw, 2.2rem)' }}
+                style={{ fontSize: 'clamp(1.5rem, 5vw, 2.2rem)', marginBottom: '26px' }}
               >
                 Live golden hour
               </div>
 
               {featured && (
                 <div
-                  className="mt-1 sm:mt-2 lg:mt-3 text-balance font-semibold leading-tight text-center"
+                  className="mt-1 sm:mt-2 lg:mt-3 uppercase text-balance font-semibold leading-tight text-center"
                   style={{ fontSize: 'clamp(1.3rem, 4.5vw, 1.8rem)' }}
                 >
                   It’s{' '}
