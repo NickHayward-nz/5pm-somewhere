@@ -71,10 +71,10 @@ export function Globe({ now, cities }: Props) {
 
     const earthMat = new THREE.MeshPhongMaterial({
       color: new THREE.Color(0xffffff),
-      emissive: new THREE.Color(0x222222),
-      emissiveIntensity: 1.0,
+      emissive: new THREE.Color(0x444444),
+      emissiveIntensity: 0.4,
       specular: new THREE.Color(0x444444),
-      shininess: 10,
+      shininess: 5,
     })
     const earth = new THREE.Mesh(earthGeo, earthMat)
     group.add(earth)
@@ -83,7 +83,7 @@ export function Globe({ now, cities }: Props) {
     let nightTexture: THREE.Texture | null = null
     let specularTexture: THREE.Texture | null = null
 
-    function brightenAndSaturateTexture(sourceTex: THREE.Texture): THREE.CanvasTexture {
+    function makePastelTexture(sourceTex: THREE.Texture): THREE.CanvasTexture {
       const img = sourceTex.image as HTMLImageElement
       const w = img.naturalWidth || img.width
       const h = img.naturalHeight || img.height
@@ -92,17 +92,18 @@ export function Globe({ now, cities }: Props) {
       canvas.height = h
       const ctx = canvas.getContext('2d')
       if (!ctx) return sourceTex as THREE.CanvasTexture
-      ctx.filter = 'brightness(1.25) saturate(1.4) contrast(1.08)'
       ctx.drawImage(img, 0, 0)
-      ctx.filter = 'none'
       ctx.globalCompositeOperation = 'source-over'
-      ctx.fillStyle = 'rgba(255,255,255,0.12)'
+      ctx.fillStyle = 'rgba(255,255,255,0.4)'
       ctx.fillRect(0, 0, w, h)
-      const newTexture = new THREE.CanvasTexture(canvas)
-      newTexture.needsUpdate = true
+      ctx.globalCompositeOperation = 'soft-light'
+      ctx.fillStyle = 'rgba(100,100,255,0.3)'
+      ctx.fillRect(0, 0, w, h)
+      const pastelTexture = new THREE.CanvasTexture(canvas)
+      pastelTexture.needsUpdate = true
       // eslint-disable-next-line no-console
-      console.log('Applying brightened texture')
-      return newTexture
+      console.log('Pastel texture applied successfully')
+      return pastelTexture
     }
 
     function applyTextures() {
@@ -111,33 +112,27 @@ export function Globe({ now, cities }: Props) {
       dayTexture.wrapS = THREE.RepeatWrapping
       dayTexture.wrapT = THREE.ClampToEdgeWrapping
       if (nightTexture) nightTexture.colorSpace = THREE.SRGBColorSpace
-      if (specularTexture) {
-        specularTexture.colorSpace = THREE.SRGBColorSpace
-      }
+      if (specularTexture) specularTexture.colorSpace = THREE.SRGBColorSpace
 
       const mat = earth.material as THREE.MeshPhongMaterial
       mat.map = dayTexture
       mat.emissiveMap = nightTexture ?? null
-      mat.emissive = new THREE.Color(0x222222)
-      mat.emissiveIntensity = 1.0
-      mat.specularMap = specularTexture
+      mat.emissive = new THREE.Color(0x444444)
+      mat.emissiveIntensity = nightTexture ? 0.3 : 0.4
+      mat.specularMap = specularTexture ?? null
       mat.specular = new THREE.Color(0x444444)
-      mat.shininess = 10
+      mat.shininess = 5
       mat.color.set(0xffffff)
-      // eslint-disable-next-line no-console
-      console.log('Globe texture status:', dayTexture ? 'success' : 'failed')
     }
 
     loader.load(
       DAY_MAP_URL,
       (tex) => {
         tex.colorSpace = THREE.SRGBColorSpace
-        dayTexture = brightenAndSaturateTexture(tex)
+        dayTexture = makePastelTexture(tex)
         dayTexture.colorSpace = THREE.SRGBColorSpace
         dayTexture.wrapS = THREE.RepeatWrapping
         dayTexture.wrapT = THREE.ClampToEdgeWrapping
-        // eslint-disable-next-line no-console
-        console.log('Day map loaded successfully')
         applyTextures()
       },
       undefined,
@@ -145,9 +140,9 @@ export function Globe({ now, cities }: Props) {
         // eslint-disable-next-line no-console
         console.error('Day map load failed:', err)
         const mat = earth.material as THREE.MeshPhongMaterial
-        mat.color = new THREE.Color(0x0066ff)
+        mat.color = new THREE.Color(0x88ccff)
         // eslint-disable-next-line no-console
-        console.log('Globe using fallback blue color (day texture failed)')
+        console.log('Globe using fallback pastel blue (day texture failed)')
       },
     )
 
@@ -155,30 +150,20 @@ export function Globe({ now, cities }: Props) {
       NIGHT_MAP_URL,
       (tex) => {
         nightTexture = tex
-        // eslint-disable-next-line no-console
-        console.log('Night lights loaded successfully')
         if (dayTexture) applyTextures()
       },
       undefined,
-      (err) => {
-        // eslint-disable-next-line no-console
-        console.error('Night lights load failed:', err)
-      },
+      () => {},
     )
 
     loader.load(
       SPEC_MAP_URL,
       (tex) => {
         specularTexture = tex
-        // eslint-disable-next-line no-console
-        console.log('Specular (water shine) loaded successfully')
         if (dayTexture) applyTextures()
       },
       undefined,
-      (err) => {
-        // eslint-disable-next-line no-console
-        console.error('Specular map load failed:', err)
-      },
+      () => {},
     )
 
     const atmoGeo = new THREE.SphereGeometry(1.04, SPHERE_SEGMENTS, SPHERE_SEGMENTS)
