@@ -75,6 +75,36 @@ export function Globe({ now, cities }: Props) {
 
     let dayTexture: THREE.Texture | null = null
 
+    function enhanceContinentEdges(sourceTex: THREE.Texture): THREE.CanvasTexture {
+      const img = sourceTex.image as HTMLImageElement
+      const w = img.naturalWidth || img.width
+      const h = img.naturalHeight || img.height
+      const canvas = document.createElement('canvas')
+      canvas.width = w
+      canvas.height = h
+      const ctx = canvas.getContext('2d')
+      if (!ctx) return sourceTex as THREE.CanvasTexture
+      ctx.drawImage(img, 0, 0)
+      const temp = document.createElement('canvas')
+      temp.width = w
+      temp.height = h
+      const tctx = temp.getContext('2d')
+      if (!tctx) return sourceTex as THREE.CanvasTexture
+      tctx.filter = 'contrast(1.2) brightness(1.05)'
+      tctx.drawImage(canvas, 0, 0)
+      tctx.filter = 'none'
+      ctx.clearRect(0, 0, w, h)
+      ctx.drawImage(temp, 0, 0)
+      ctx.globalCompositeOperation = 'overlay'
+      ctx.drawImage(temp, 0, 0)
+      ctx.globalCompositeOperation = 'source-over'
+      const enhancedTexture = new THREE.CanvasTexture(canvas)
+      enhancedTexture.needsUpdate = true
+      // eslint-disable-next-line no-console
+      console.log('Continent contrast/edge boost applied')
+      return enhancedTexture
+    }
+
     function applyTextures() {
       if (!dayTexture) return
       dayTexture.colorSpace = THREE.SRGBColorSpace
@@ -111,7 +141,10 @@ export function Globe({ now, cities }: Props) {
         tex.colorSpace = THREE.SRGBColorSpace
         tex.wrapS = THREE.RepeatWrapping
         tex.wrapT = THREE.ClampToEdgeWrapping
-        dayTexture = tex
+        dayTexture = enhanceContinentEdges(tex)
+        dayTexture.colorSpace = THREE.SRGBColorSpace
+        dayTexture.wrapS = THREE.RepeatWrapping
+        dayTexture.wrapT = THREE.ClampToEdgeWrapping
         applyTextures()
       },
       undefined,
