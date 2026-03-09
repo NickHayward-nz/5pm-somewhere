@@ -5,7 +5,8 @@ import type { City } from '../data/cities'
 import { latLonToVector3 } from '../lib/geo'
 import { getCityTimeInfo } from '../lib/time'
 
-const DAY_MAP_URL = 'https://raw.githubusercontent.com/mrdoob/three.js/master/examples/textures/planets/earth_atmos_2048.jpg'
+const DAY_MAP_URL =
+  'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg'
 
 const AUTO_ROTATE_Y_DEG_PER_FRAME = 0.12
 const DOT_UPDATE_INTERVAL_MS = 120000
@@ -27,58 +28,6 @@ function intensityToColor(intensity: number) {
     lerp(0.18, 0.78, t),
     lerp(0.25, 0.34, t),
   )
-}
-
-function rgbToHsl(r: number, g: number, b: number): [number, number, number] {
-  r /= 255
-  g /= 255
-  b /= 255
-  const max = Math.max(r, g, b)
-  const min = Math.min(r, g, b)
-  let h = 0
-  let s = 0
-  const l = (max + min) / 2
-  if (max !== min) {
-    const d = max - min
-    s = l > 0.5 ? d / (2 - max - min) : d / (max + min)
-    switch (max) {
-      case r:
-        h = ((g - b) / d + (g < b ? 6 : 0)) / 6
-        break
-      case g:
-        h = ((b - r) / d + 2) / 6
-        break
-      default:
-        h = ((r - g) / d + 4) / 6
-    }
-  }
-  return [h * 360, s, l]
-}
-
-function hslToRgb(h: number, s: number, l: number): [number, number, number] {
-  h /= 360
-  let r: number
-  let g: number
-  let b: number
-  if (s === 0) {
-    r = g = b = l
-  } else {
-    const q = l < 0.5 ? l * (1 + s) : l + s - l * s
-    const p = 2 * l - q
-    r = hue2rgb(p, q, h + 1 / 3)
-    g = hue2rgb(p, q, h)
-    b = hue2rgb(p, q, h - 1 / 3)
-  }
-  return [Math.round(r * 255), Math.round(g * 255), Math.round(b * 255)]
-}
-
-function hue2rgb(p: number, q: number, t: number): number {
-  if (t < 0) t += 1
-  if (t > 1) t -= 1
-  if (t < 1 / 6) return p + (q - p) * 6 * t
-  if (t < 1 / 2) return q
-  if (t < 2 / 3) return p + (q - p) * (2 / 3 - t) * 6
-  return p
 }
 
 export function Globe({ now, cities }: Props) {
@@ -110,8 +59,8 @@ export function Globe({ now, cities }: Props) {
     const group = new THREE.Group()
     scene.add(group)
 
-    // Brighter lighting so the pastel globe pops
-    scene.add(new THREE.AmbientLight(0xffffff, 1.2))
+    // Lighting for the globe
+    scene.add(new THREE.AmbientLight(0xffffff, 1.0))
     const sun = new THREE.DirectionalLight(0xffffff, 1.5)
     sun.position.set(5, 3, 5)
     scene.add(sun)
@@ -120,107 +69,24 @@ export function Globe({ now, cities }: Props) {
     loader.crossOrigin = 'anonymous'
     const earthGeo = new THREE.SphereGeometry(1, 64, 64)
 
-    // MeshPhongMaterial with light pastel tint controlled via material only
     const earthMat = new THREE.MeshPhongMaterial()
     const earth = new THREE.Mesh(earthGeo, earthMat)
     group.add(earth)
-
-    let dayTexture: THREE.Texture | null = null
-
-    function enhanceContinentEdges(sourceTex: THREE.Texture): THREE.CanvasTexture {
-      const img = sourceTex.image as HTMLImageElement
-      const w = img.naturalWidth || img.width
-      const h = img.naturalHeight || img.height
-      const canvas = document.createElement('canvas')
-      canvas.width = w
-      canvas.height = h
-      const ctx = canvas.getContext('2d')
-      if (!ctx) return sourceTex as THREE.CanvasTexture
-      ctx.drawImage(img, 0, 0)
-
-      // Aggressive selective land enhancement (pixel-by-pixel)
-      const imageData = ctx.getImageData(0, 0, w, h)
-      const data = imageData.data
-      for (let i = 0; i < data.length; i += 4) {
-        const r = data[i]
-        const g = data[i + 1]
-        const b = data[i + 2]
-        // Aggressive land detection (green/brown dominance, exclude blues)
-        if (g > r * 1.1 && g > b * 1.1 && (r + b) / 2 < 180 && g > 90) {
-          const hsl = rgbToHsl(r, g, b)
-          hsl[1] = Math.min(1, hsl[1] * 2.0) // double saturation on land
-          hsl[2] = Math.min(1, hsl[2] * 1.5) // +50% lightness/contrast on land
-          const [newR, newG, newB] = hslToRgb(hsl[0], hsl[1], hsl[2])
-          data[i] = newR
-          data[i + 1] = newG
-          data[i + 2] = newB
-        }
-      }
-      ctx.putImageData(imageData, 0, 0)
-
-      // Strong land edge darkening (outline effect)
-      ctx.globalCompositeOperation = 'multiply'
-      ctx.fillStyle = 'rgba(0,0,0,0.25)' // stronger black for edges
-      ctx.fillRect(0, 0, w, h)
-      ctx.globalCompositeOperation = 'source-over'
-
-      const enhancedTexture = new THREE.CanvasTexture(canvas)
-      enhancedTexture.needsUpdate = true
-      // eslint-disable-next-line no-console
-      console.log('Aggressive land pop-out applied - continents should stand out clearly')
-      return enhancedTexture
-    }
-
-    function applyTextures() {
-      if (!dayTexture) return
-      dayTexture.colorSpace = THREE.SRGBColorSpace
-      dayTexture.wrapS = THREE.RepeatWrapping
-      dayTexture.wrapT = THREE.ClampToEdgeWrapping
-
-      // Replace material with a neutral MeshPhongMaterial using the enhanced texture
-      const mat = new THREE.MeshPhongMaterial({
-        map: dayTexture,
-        shininess: 5,
-      })
-      earth.material = mat
-      mat.needsUpdate = true
-
-      // Debug logging to verify texture state
-      // eslint-disable-next-line no-console
-      console.log('Neutral material applied with aggressive land pop-out texture')
-      // eslint-disable-next-line no-console
-      console.log('Material map applied:', mat.map ? 'yes' : 'no')
-      // eslint-disable-next-line no-console
-      console.log(
-        'Texture image dimensions:',
-        (dayTexture as any)?.image?.width,
-        (dayTexture as any)?.image?.height,
-      )
-    }
 
     loader.load(
       DAY_MAP_URL,
       (tex) => {
         // eslint-disable-next-line no-console
-        console.log('Day map loaded successfully')
-        tex.colorSpace = THREE.SRGBColorSpace
-        tex.wrapS = THREE.RepeatWrapping
-        tex.wrapT = THREE.ClampToEdgeWrapping
-        dayTexture = enhanceContinentEdges(tex)
-        dayTexture.colorSpace = THREE.SRGBColorSpace
-        dayTexture.wrapS = THREE.RepeatWrapping
-        dayTexture.wrapT = THREE.ClampToEdgeWrapping
-        applyTextures()
+        console.log('Pastel texture loaded successfully')
+        earthMat.map = tex
+        earthMat.needsUpdate = true
       },
       undefined,
       (err) => {
         // eslint-disable-next-line no-console
-        console.error('Day map load failed:', err)
-        const mat = earth.material as THREE.MeshPhongMaterial
-        mat.color = new THREE.Color(0xaaddff)
-        mat.needsUpdate = true
-        // eslint-disable-next-line no-console
-        console.log('Globe using fallback pastel blue (day texture failed)')
+        console.error('Pastel texture load failed:', err)
+        earthMat.color = new THREE.Color(0xaaddff)
+        earthMat.needsUpdate = true
       },
     )
 
