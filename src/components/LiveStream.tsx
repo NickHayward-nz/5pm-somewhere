@@ -265,25 +265,29 @@ export function LiveStream({ open, onClose }: Props) {
     console.log('Video waiting/buffering')
   }, [])
 
+  useEffect(() => {
+    if (open) {
+      // eslint-disable-next-line no-console
+      console.log('Live stream screen updated - full cover, gradient background, logo added, VHS removed')
+    }
+  }, [open])
+
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-midnight-900 vhs-noise">
+    <div className="fixed inset-0 z-50 flex flex-col bg-sunset-gradient">
       {/* Top bar: fixed at top, height 60px, z-index 20 */}
-      <header
-        className="fixed top-0 left-0 flex h-[60px] w-full items-center justify-between gap-2 border-b border-sunset-500/20 bg-midnight-900/95 px-3 py-2 sm:px-4"
-        style={{
-          position: 'fixed',
-          top: 0,
-          left: 0,
-          width: '100%',
-          height: 60,
-          zIndex: 20,
-        }}
-      >
-        <span className="text-sm font-semibold tracking-wide text-sunset-100 sm:text-base truncate">
-          5PM Somewhere
-        </span>
+      <header className="fixed top-0 left-0 flex h-[60px] w-full items-center justify-between gap-2 border-b border-sunset-500/20 bg-midnight-900/95 px-3 py-2 sm:px-4 z-20">
+        <div className="flex items-center gap-2 min-w-0">
+          <img
+            src="/Logo.png"
+            alt="5PM Somewhere Logo"
+            className="h-10 w-auto sm:h-12 md:h-14"
+          />
+          <span className="text-sm font-semibold tracking-wide text-sunset-100 sm:text-base truncate">
+            5PM Somewhere
+          </span>
+        </div>
         <div className="flex items-center gap-2">
           <span className="font-mono text-xs text-sunset-200/90 sm:text-sm">
             {now.toFormat('HH:mm')}
@@ -298,19 +302,22 @@ export function LiveStream({ open, onClose }: Props) {
         </div>
       </header>
 
-      {/* Video container: min-height so no cutoff; overflow auto for natural scroll in landscape */}
+      {/* Video container: full-height under header, natural scroll in landscape */}
       <div
         ref={containerRef}
-        className="relative mt-[60px] w-full bg-black"
+        className="relative mt-[60px] w-full"
         style={{
           position: 'relative',
           width: '100%',
           minHeight: 'calc(100vh - 60px)',
           overflow: 'auto',
-          background: 'black',
+          background: 'transparent',
         }}
       >
-        <div className="relative w-full bg-black" style={{ minHeight: 'calc(100vh - 60px)', height: 'calc(100vh - 60px)' }}>
+        <div
+          className="relative w-full"
+          style={{ minHeight: 'calc(100vh - 60px)', height: 'calc(100vh - 60px)' }}
+        >
           {loading && queue.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-4">
               <div className="h-12 w-12 animate-spin rounded-full border-2 border-sunset-400 border-t-transparent" />
@@ -342,7 +349,7 @@ export function LiveStream({ open, onClose }: Props) {
                 controls={false}
                 preload="auto"
                 loop={false}
-                className="z-[1] block w-full max-h-full bg-black object-contain"
+                className="z-[1] block w-full max-h-full object-contain"
                 style={{
                   width: '100%',
                   height: 'auto',
