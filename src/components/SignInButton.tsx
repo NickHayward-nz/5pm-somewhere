@@ -16,7 +16,7 @@ export function SignInButton({ userEmail }: Props) {
       await sb.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin,
+          redirectTo: window.location.origin + '/auth/callback',
         },
       })
     } catch (e) {
