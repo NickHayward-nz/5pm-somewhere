@@ -20,8 +20,6 @@ type FeaturedCity = {
 }
 
 function showToast(message: string) {
-  // eslint-disable-next-line no-console
-  console.log('Showing toast:', message)
   const toast = document.createElement('div')
   toast.textContent = message
   toast.setAttribute('role', 'status')
@@ -29,16 +27,18 @@ function showToast(message: string) {
   toast.style.bottom = '20px'
   toast.style.left = '50%'
   toast.style.transform = 'translateX(-50%)'
-  toast.style.background = 'rgba(255, 140, 0, 0.9)'
+  toast.style.background = 'rgba(255, 140, 0, 0.95)'
   toast.style.color = 'white'
-  toast.style.padding = '12px 24px'
-  toast.style.borderRadius = '8px'
+  toast.style.padding = '16px 32px'
+  toast.style.borderRadius = '12px'
   toast.style.zIndex = '1000'
-  toast.style.fontSize = '1rem'
+  toast.style.fontSize = '1.1rem'
+  toast.style.fontWeight = '500'
+  toast.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)'
+  toast.style.maxWidth = '90%'
+  toast.style.textAlign = 'center'
   toast.style.opacity = '0'
   toast.style.transition = 'opacity 0.5s'
-  toast.style.maxWidth = '90vw'
-  toast.style.textAlign = 'center'
   document.body.appendChild(toast)
   setTimeout(() => { toast.style.opacity = '1' }, 100)
   setTimeout(() => { toast.style.opacity = '0' }, 3500)
@@ -53,7 +53,6 @@ function App() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [recordOpen, setRecordOpen] = useState(false)
   const [liveStreamOpen, setLiveStreamOpen] = useState(false)
-  const [showOutsideWindowToast, setShowOutsideWindowToast] = useState(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
   const premiumQuery = useMemo(() => {
@@ -280,32 +279,10 @@ function App() {
                   disabled={!AUTH_BYPASS && (hasPostedTodayState || checkingDailyLimit)}
                   title="Free 5 minute window around 5pm local time"
                   onClick={() => {
-                    // eslint-disable-next-line no-console
-                    console.log('Capture button tapped/clicked - handler fired')
-                    showToast('Free 5 minute window around 5pm local time')
-                    // TEMP: auth bypassed for testing - re-enable sign-in requirement later
-                    // eslint-disable-next-line no-console
-                    console.log('Capture button tapped - start')
-                    // eslint-disable-next-line no-console
-                    console.log('Button active state:', {
-                      windowActive: captureWindow.active,
-                      hasPostedTodayState,
-                      checkingDailyLimit,
-                      AUTH_BYPASS,
-                    })
-                    // eslint-disable-next-line no-console
-                    console.log(
-                      AUTH_BYPASS ? 'Bypass active - skipping auth checks' : 'Auth check path',
-                    )
-                    // eslint-disable-next-line no-console
-                    console.log('Checking time window:', captureWindow.active, 'Posted today:', hasPostedTodayState)
-                    // eslint-disable-next-line no-console
-                    console.log(
-                      hasPostedTodayState ? 'Daily limit check: blocked' : AUTH_BYPASS ? 'Daily limit check passed/bypassed' : 'Daily limit check path',
-                    )
                     if (!captureWindow.active) {
-                      setShowOutsideWindowToast(true)
-                      setTimeout(() => setShowOutsideWindowToast(false), 4000)
+                      showToast(
+                        "You're outside your personal 5 PM window — come back at 5 PM local time!",
+                      )
                       return
                     }
                     if (!AUTH_BYPASS) {
@@ -365,15 +342,6 @@ function App() {
         />
       )}
       <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} />
-
-      {showOutsideWindowToast && (
-        <div
-          className="fixed left-1/2 bottom-20 sm:bottom-24 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-3 rounded-xl border border-sunset-500/40 bg-midnight-800/95 shadow-[0_0_24px_rgba(255,160,90,0.2)] text-sunset-100/95 text-center text-sm sm:text-base"
-          role="alert"
-        >
-          You're outside your personal 5 PM window — come back at 5 PM local time!
-        </div>
-      )}
     </div>
   )
 }
