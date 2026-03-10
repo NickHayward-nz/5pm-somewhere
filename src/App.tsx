@@ -27,6 +27,7 @@ function App() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [recordOpen, setRecordOpen] = useState(false)
   const [liveStreamOpen, setLiveStreamOpen] = useState(false)
+  const [showOutsideWindowToast, setShowOutsideWindowToast] = useState(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
   const premiumQuery = useMemo(() => {
@@ -284,6 +285,11 @@ function App() {
                     console.log(
                       hasPostedTodayState ? 'Daily limit check: blocked' : AUTH_BYPASS ? 'Daily limit check passed/bypassed' : 'Daily limit check path',
                     )
+                    if (!captureWindow.active) {
+                      setShowOutsideWindowToast(true)
+                      setTimeout(() => setShowOutsideWindowToast(false), 4000)
+                      return
+                    }
                     if (!AUTH_BYPASS) {
                       if (hasPostedTodayState) {
                         trackDailyLimitHit({ userId, tz: userTz })
@@ -307,14 +313,6 @@ function App() {
                 >
                   Watch Live 5PM Stream 🌍
                 </button>
-              </div>
-
-              <div className="mt-2 text-[10px] sm:text-xs text-sunset-100/70 font-mono flex-shrink-0">
-                {captureWindow.active
-                  ? isPremium
-                    ? 'Premium 8-minute window active.'
-                    : 'Free 5-minute window active.'
-                  : "Outside your personal 5PM window."}
               </div>
 
             </div>
@@ -349,6 +347,15 @@ function App() {
         />
       )}
       <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} />
+
+      {showOutsideWindowToast && (
+        <div
+          className="fixed left-1/2 bottom-20 sm:bottom-24 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-3 rounded-xl border border-sunset-500/40 bg-midnight-800/95 shadow-[0_0_24px_rgba(255,160,90,0.2)] text-sunset-100/95 text-center text-sm sm:text-base"
+          role="alert"
+        >
+          You're outside your personal 5 PM window — come back at 5 PM local time!
+        </div>
+      )}
     </div>
   )
 }
