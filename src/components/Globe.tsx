@@ -348,14 +348,6 @@ export function Globe({ now, cities }: Props) {
           }
         }
       `}</style>
-      <div className="absolute inset-x-0 top-0 z-10 flex items-center justify-between gap-2 p-2 sm:p-4">
-        <div className="rounded-full bg-midnight-700/50 border border-sunset-500/25 px-2 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-xs text-sunset-100/80 truncate max-w-[50%]">
-          Drag · 5PM glow
-        </div>
-        <div className="rounded-full bg-midnight-700/50 border border-sunset-500/25 px-2 py-1.5 sm:px-4 sm:py-2 text-[10px] sm:text-xs font-mono text-sunset-50/90">
-          {now.toFormat('HH:mm:ss')}
-        </div>
-      </div>
       <div className="globe-portrait-fill flex-1 min-h-0 flex items-center justify-center overflow-visible p-0 w-full max-h-[80vh] sm:max-h-none mx-auto !overflow-visible">
         <div
           ref={hostRef}
