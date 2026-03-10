@@ -19,6 +19,30 @@ type FeaturedCity = {
   wrappedDiffMinutes: number // 0..1439, minutes past 17:00 with wrap-around (spec helper)
 }
 
+function showToast(message: string) {
+  const toast = document.createElement('div')
+  toast.textContent = message
+  toast.setAttribute('role', 'status')
+  toast.style.position = 'fixed'
+  toast.style.bottom = '20px'
+  toast.style.left = '50%'
+  toast.style.transform = 'translateX(-50%)'
+  toast.style.background = 'rgba(255, 140, 0, 0.9)'
+  toast.style.color = 'white'
+  toast.style.padding = '12px 24px'
+  toast.style.borderRadius = '8px'
+  toast.style.zIndex = '1000'
+  toast.style.fontSize = '1rem'
+  toast.style.opacity = '0'
+  toast.style.transition = 'opacity 0.5s'
+  toast.style.maxWidth = '90vw'
+  toast.style.textAlign = 'center'
+  document.body.appendChild(toast)
+  setTimeout(() => { toast.style.opacity = '1' }, 100)
+  setTimeout(() => { toast.style.opacity = '0' }, 3500)
+  setTimeout(() => toast.remove(), 4000)
+}
+
 function App() {
   // TEMP: auth bypassed for capture testing – re-enable sign-in gate before production
   const AUTH_BYPASS = true
@@ -28,7 +52,6 @@ function App() {
   const [recordOpen, setRecordOpen] = useState(false)
   const [liveStreamOpen, setLiveStreamOpen] = useState(false)
   const [showOutsideWindowToast, setShowOutsideWindowToast] = useState(false)
-  const [showFreeWindowToast, setShowFreeWindowToast] = useState(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
   const premiumQuery = useMemo(() => {
@@ -266,6 +289,7 @@ function App() {
                           : 'Free: 5-minute window around 5PM local time.'
                   }
                   onClick={() => {
+                    showToast('Free 5 minute window around 5pm local time')
                     // TEMP: auth bypassed for testing - re-enable sign-in requirement later
                     // eslint-disable-next-line no-console
                     console.log('Capture button tapped - start')
@@ -291,8 +315,6 @@ function App() {
                       setTimeout(() => setShowOutsideWindowToast(false), 4000)
                       return
                     }
-                    setShowFreeWindowToast(true)
-                    setTimeout(() => setShowFreeWindowToast(false), 4000)
                     if (!AUTH_BYPASS) {
                       if (hasPostedTodayState) {
                         trackDailyLimitHit({ userId, tz: userTz })
@@ -357,15 +379,6 @@ function App() {
           role="alert"
         >
           You're outside your personal 5 PM window — come back at 5 PM local time!
-        </div>
-      )}
-
-      {showFreeWindowToast && (
-        <div
-          className="fixed left-1/2 bottom-20 sm:bottom-24 -translate-x-1/2 z-50 max-w-[90vw] px-4 py-3 rounded-xl border border-sunset-500/50 bg-sunset-600/95 shadow-[0_0_24px_rgba(255,160,90,0.3)] text-white text-center text-sm sm:text-base"
-          role="status"
-        >
-          Free 5 minute window around 5pm local time
         </div>
       )}
     </div>
