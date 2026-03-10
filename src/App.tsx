@@ -46,8 +46,6 @@ function showToast(message: string) {
 }
 
 function App() {
-  // TEMP: auth bypassed for capture testing – re-enable sign-in gate before production
-  const AUTH_BYPASS = true
   const now = useNow(250)
   const [userId, setUserId] = useState<string | null>(null)
   const [userEmail, setUserEmail] = useState<string | null>(null)
@@ -84,10 +82,8 @@ function App() {
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
   const userTz = profile?.timezone ?? getUserTimezone()
   const isPremium = typeof profile?.is_premium === 'boolean' ? profile.is_premium : premiumQuery
-  const hasPostedTodayState = AUTH_BYPASS
-    ? false
-    : hasPostedToday(profile?.last_post_date ?? null, userTz)
-  const checkingDailyLimit = AUTH_BYPASS ? false : profileLoading
+  const hasPostedTodayState = hasPostedToday(profile?.last_post_date ?? null, userTz)
+  const checkingDailyLimit = profileLoading
 
   const { candidates, bestCandidate } = useMemo(() => {
     if (!CITIES.length) {
@@ -282,7 +278,7 @@ function App() {
                       ? 'app-btn-landscape btn-glow-gold w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                       : 'app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                   }
-                  disabled={!AUTH_BYPASS && (hasPostedTodayState || checkingDailyLimit)}
+                  disabled={hasPostedTodayState || checkingDailyLimit}
                   title="Free 5 minute window around 5pm local time"
                   onClick={() => {
                     if (!captureWindow.active) {
@@ -291,15 +287,13 @@ function App() {
                       )
                       return
                     }
-                    if (!AUTH_BYPASS) {
-                      if (hasPostedTodayState) {
-                        trackDailyLimitHit({ userId, tz: userTz })
-                        return
-                      }
-                      if (!userId) {
-                        window.alert('Sign in to capture your 5PM moment.')
-                        return
-                      }
+                    if (hasPostedTodayState) {
+                      trackDailyLimitHit({ userId, tz: userTz })
+                      return
+                    }
+                    if (!userId) {
+                      window.alert('Sign in to capture your 5PM moment.')
+                      return
                     }
                     setRecordOpen(true)
                   }}
@@ -334,11 +328,11 @@ function App() {
           </section>
         </main>
       </div>
-      {recordOpen && (userId || AUTH_BYPASS) && (
+      {recordOpen && userId && (
         <RecordMoment
           open={recordOpen}
           onClose={() => setRecordOpen(false)}
-          userId={userId ?? '00000000-0000-0000-0000-000000000000'}
+          userId={userId}
           userTz={userTz}
           city={userCity}
           country={userCountry}
