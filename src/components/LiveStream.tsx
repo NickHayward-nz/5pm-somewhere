@@ -285,6 +285,12 @@ export function LiveStream({ open, onClose }: Props) {
         backgroundSize: 'cover',
       }}
     >
+      <img
+        src="/Logo.png"
+        alt="5PM Somewhere"
+        className="absolute top-4 left-4 h-10 w-auto sm:h-12 md:h-14 z-30"
+      />
+
       {/* Video container: centered, slightly shrunk so gradient shows around edges */}
       <div
         ref={containerRef}
