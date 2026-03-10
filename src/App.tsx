@@ -210,11 +210,11 @@ function App() {
       <div className="app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-4 lg:py-5">
         <header className="app-header-landscape flex-shrink-0 mb-2 sm:mb-4 flex items-start justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
-            <div className="flex-shrink-0 flex items-center justify-center">
+            <div className="flex-shrink-0 flex items-center justify-center min-w-0">
               <img
                 src="/Logo.png"
                 alt="5PM Somewhere Logo"
-                className="h-16 w-auto sm:h-20 md:h-24 lg:h-28"
+                className="block h-10 w-auto max-w-full min-h-[40px] sm:h-12 md:h-14 object-contain"
                 onLoad={() => {
                   // eslint-disable-next-line no-console
                   console.log('Custom logo loaded')

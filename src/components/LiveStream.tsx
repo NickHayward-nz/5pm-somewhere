@@ -268,21 +268,32 @@ export function LiveStream({ open, onClose }: Props) {
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line no-console
-      console.log('Live stream screen updated - full cover, gradient background, logo added, VHS removed')
+      console.log('Live stream full-screen gradient applied')
     }
   }, [open])
 
   if (!open) return null
 
   return (
-    <div className="fixed inset-0 z-50 flex flex-col bg-sunset-gradient">
+    <div
+      className="fixed inset-0 z-[9999] flex flex-col overflow-hidden"
+      style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        width: '100vw',
+        height: '100vh',
+        background: 'linear-gradient(to bottom, #3b82f6, #a855f7, #ec4899, #f97316)',
+        backgroundSize: 'cover',
+      }}
+    >
       {/* Top bar: fixed at top, height 60px, z-index 20 */}
       <header className="fixed top-0 left-0 flex h-[60px] w-full items-center justify-between gap-2 border-b border-sunset-500/20 bg-midnight-900/95 px-3 py-2 sm:px-4 z-20">
-        <div className="flex items-center gap-2 min-w-0">
+        <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
           <img
             src="/Logo.png"
             alt="5PM Somewhere Logo"
-            className="h-10 w-auto sm:h-12 md:h-14"
+            className="block h-10 w-auto max-w-full min-h-[40px] sm:h-12 md:h-14 object-contain"
           />
           <span className="text-sm font-semibold tracking-wide text-sunset-100 sm:text-base truncate">
             5PM Somewhere
@@ -302,21 +313,28 @@ export function LiveStream({ open, onClose }: Props) {
         </div>
       </header>
 
-      {/* Video container: full-height under header, natural scroll in landscape */}
+      {/* Video container: full-height under header, gradient fills any letterbox */}
       <div
         ref={containerRef}
-        className="relative mt-[60px] w-full"
+        className="relative mt-[60px] w-full flex-1 overflow-auto"
         style={{
           position: 'relative',
           width: '100%',
           minHeight: 'calc(100vh - 60px)',
-          overflow: 'auto',
           background: 'transparent',
+          padding: 0,
+          margin: 0,
         }}
       >
         <div
-          className="relative w-full"
-          style={{ minHeight: 'calc(100vh - 60px)', height: 'calc(100vh - 60px)' }}
+          className="relative w-full flex items-center justify-center"
+          style={{
+            minHeight: 'calc(100vh - 60px)',
+            height: 'calc(100vh - 60px)',
+            background: 'transparent',
+            padding: 0,
+            margin: 0,
+          }}
         >
           {loading && queue.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-4">
@@ -349,16 +367,17 @@ export function LiveStream({ open, onClose }: Props) {
                 controls={false}
                 preload="auto"
                 loop={false}
-                className="z-[1] block w-full max-h-full object-contain"
+                className="z-[1] block w-full h-full max-h-full object-contain"
                 style={{
                   width: '100%',
-                  height: 'auto',
+                  height: '100%',
                   maxHeight: '100%',
                   objectFit: 'contain',
                   display: 'block',
                   zIndex: 1,
                   visibility: 'visible',
                   opacity: 1,
+                  background: 'transparent',
                 }}
                 onEnded={handleEnded}
                 onPlay={handlePlay}
