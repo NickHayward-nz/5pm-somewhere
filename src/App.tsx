@@ -211,8 +211,16 @@ function App() {
         <header className="app-header-landscape flex-shrink-0 mb-2 sm:mb-4 flex items-start justify-between gap-2 sm:gap-4">
           <div className="flex items-center gap-2 sm:gap-3 min-w-0">
             <div className="polaroid-frame app-header-logo-frame p-1.5 sm:p-2 flex-shrink-0">
-              <div className="polaroid-inner h-9 w-9 sm:h-12 sm:w-12 grid place-items-center text-lg sm:text-2xl">
-                🌅
+              <div className="polaroid-inner h-9 w-9 sm:h-12 sm:w-12 grid place-items-center">
+                <img
+                  src="/Logo.png"
+                  alt="5PM Somewhere Logo"
+                  className="h-10 w-auto sm:h-12 md:h-14"
+                  onLoad={() => {
+                    // eslint-disable-next-line no-console
+                    console.log('Custom logo loaded')
+                  }}
+                />
               </div>
             </div>
             <div className="leading-tight min-w-0 overflow-visible">
