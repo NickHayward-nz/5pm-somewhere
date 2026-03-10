@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
-import { useNow } from '../hooks/useNow'
 
 export type MomentRow = {
   id: string
@@ -28,7 +27,6 @@ const POSTER_PLACEHOLDER =
   'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 
 export function LiveStream({ open, onClose }: Props) {
-  const now = useNow(1000)
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -268,7 +266,7 @@ export function LiveStream({ open, onClose }: Props) {
   useEffect(() => {
     if (open) {
       // eslint-disable-next-line no-console
-      console.log('Live stream full-screen gradient applied')
+      console.log('Live stream cleaned: no bottom text, shrunk & centered video, no top bar')
     }
   }, [open])
 
@@ -276,7 +274,7 @@ export function LiveStream({ open, onClose }: Props) {
 
   return (
     <div
-      className="fixed inset-0 z-[9999] flex flex-col overflow-hidden"
+      className="fixed inset-0 z-[9999] overflow-hidden"
       style={{
         position: 'fixed',
         top: 0,
@@ -287,53 +285,26 @@ export function LiveStream({ open, onClose }: Props) {
         backgroundSize: 'cover',
       }}
     >
-      {/* Top bar: fixed at top, height 60px, z-index 20 */}
-      <header className="fixed top-0 left-0 flex h-[60px] w-full items-center justify-between gap-2 border-b border-sunset-500/20 bg-midnight-900/95 px-3 py-2 sm:px-4 z-20">
-        <div className="flex items-center gap-2 min-w-0 flex-shrink-0">
-          <img
-            src="/Logo.png"
-            alt="5PM Somewhere Logo"
-            className="block h-10 w-auto max-w-full min-h-[40px] sm:h-12 md:h-14 object-contain"
-          />
-          <span className="text-sm font-semibold tracking-wide text-sunset-100 sm:text-base truncate">
-            5PM Somewhere
-          </span>
-        </div>
-        <div className="flex items-center gap-2">
-          <span className="font-mono text-xs text-sunset-200/90 sm:text-sm">
-            {now.toFormat('HH:mm')}
-          </span>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full bg-black/50 px-3 py-1.5 text-xs text-sunset-100 hover:bg-black/70 sm:px-4 sm:py-2 sm:text-sm"
-          >
-            Close
-          </button>
-        </div>
-      </header>
-
-      {/* Video container: full-height under header, gradient fills any letterbox */}
+      {/* Video container: centered, slightly shrunk so gradient shows around edges */}
       <div
         ref={containerRef}
-        className="relative mt-[60px] w-full flex-1 overflow-auto"
+        className="relative w-full h-full"
         style={{
           position: 'relative',
           width: '100%',
-          minHeight: 'calc(100vh - 60px)',
-          background: 'transparent',
-          padding: 0,
-          margin: 0,
+          height: '100%',
         }}
       >
         <div
-          className="relative w-full flex items-center justify-center"
+          className="absolute"
           style={{
-            minHeight: 'calc(100vh - 60px)',
-            height: 'calc(100vh - 60px)',
-            background: 'transparent',
-            padding: 0,
-            margin: 0,
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)',
+            width: '92%',
+            maxWidth: '92vw',
+            height: '82%',
+            maxHeight: '82vh',
           }}
         >
           {loading && queue.length === 0 && (
@@ -399,19 +370,6 @@ export function LiveStream({ open, onClose }: Props) {
                     aria-hidden
                   />
                 ))}
-              {/* Timestamp overlay: bottom 80px so skip button never covers it */}
-              <div
-                className="absolute z-[10] max-w-[85%] overflow-hidden text-ellipsis rounded-lg bg-black/50 px-3 py-2 text-sunset-100/90"
-                style={{
-                  bottom: 80,
-                  left: 20,
-                  zIndex: 10,
-                  pointerEvents: 'none',
-                  fontSize: 'clamp(1rem, 2.5vw, 1.5rem)',
-                }}
-              >
-                {current.city}, {current.country}
-              </div>
               {transitioning && (
                 <div className="absolute inset-0 z-10 flex items-center justify-center bg-midnight-900/80">
                   <div className="h-12 w-12 animate-spin rounded-full border-2 border-sunset-400 border-t-transparent" />
@@ -440,6 +398,15 @@ export function LiveStream({ open, onClose }: Props) {
             </button>
           )}
         </div>
+
+        {/* Close button moved to corner without top bar */}
+        <button
+          type="button"
+          onClick={onClose}
+          className="fixed top-4 right-4 z-[10000] rounded-full bg-black/50 px-3 py-1.5 text-xs text-sunset-100 hover:bg-black/70 sm:px-4 sm:py-2 sm:text-sm"
+        >
+          Close
+        </button>
       </div>
     </div>
   )
