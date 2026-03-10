@@ -251,7 +251,7 @@ function App() {
 
               {featured && (
                 <div
-                  className="mt-1 sm:mt-2 lg:mt-3 mb-6 sm:mb-0 uppercase text-balance font-semibold leading-tight text-center"
+                  className="mt-1 sm:mt-2 lg:mt-3 mb-8 sm:mb-0 uppercase text-balance font-semibold leading-tight text-center"
                   style={{ fontSize: 'clamp(1.3rem, 4.5vw, 1.8rem)' }}
                 >
                   It’s{' '}
