@@ -20,6 +20,8 @@ type FeaturedCity = {
 }
 
 function showToast(message: string) {
+  // eslint-disable-next-line no-console
+  console.log('Showing toast:', message)
   const toast = document.createElement('div')
   toast.textContent = message
   toast.setAttribute('role', 'status')
@@ -275,20 +277,11 @@ function App() {
                       ? 'app-btn-landscape btn-glow-gold w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                       : 'app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                   }
-                  disabled={
-                    !captureWindow.active ||
-                    (!AUTH_BYPASS && (hasPostedTodayState || checkingDailyLimit))
-                  }
-                  title={
-                    hasPostedTodayState
-                      ? "You've already captured today's 5PM Moment."
-                      : captureWindow.active
-                        ? 'You’re in your capture window.'
-                        : isPremium
-                          ? 'Premium: 8-minute window around 5PM local time.'
-                          : 'Free: 5-minute window around 5PM local time.'
-                  }
+                  disabled={!AUTH_BYPASS && (hasPostedTodayState || checkingDailyLimit)}
+                  title="Free 5 minute window around 5pm local time"
                   onClick={() => {
+                    // eslint-disable-next-line no-console
+                    console.log('Capture button tapped/clicked - handler fired')
                     showToast('Free 5 minute window around 5pm local time')
                     // TEMP: auth bypassed for testing - re-enable sign-in requirement later
                     // eslint-disable-next-line no-console
