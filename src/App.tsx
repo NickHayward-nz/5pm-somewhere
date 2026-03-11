@@ -181,6 +181,15 @@ function App() {
 
   const featuredFlag = featured ? countryCodeToFlagEmoji(featured.city.countryCode) : '🏳️'
   const featuredCityName = featured?.city.name ?? 'somewhere'
+  const featuredCountryName = featured
+    ? (() => {
+        try {
+          return new Intl.DisplayNames(['en'], { type: 'region' }).of(featured.city.countryCode) ?? featured.city.countryCode
+        } catch {
+          return featured.city.countryCode
+        }
+      })()
+    : ''
   const featuredCityTime = featured?.local ?? now
   const featuredRawDiff = featured?.rawDiffMinutes ?? 0
   const featuredWrappedDiff = featured?.wrappedDiffMinutes ?? 0
@@ -253,7 +262,7 @@ function App() {
             <div className="polaroid-inner p-3 sm:p-5 lg:p-6 flex-1 min-h-0 overflow-hidden flex flex-col">
               <div
                 className="uppercase tracking-[0.34em] text-sunset-100/70 text-center"
-                style={{ fontSize: 'clamp(1.5rem, 5vw, 2.2rem)', marginBottom: '26px' }}
+                style={{ fontSize: 'clamp(1.4rem, 4.5vw, 1.8rem)', marginBottom: '26px' }}
               >
                 Live golden hour
               </div>
@@ -261,7 +270,7 @@ function App() {
               {featured && (
                 <div
                   className="mt-1 sm:mt-2 lg:mt-3 mb-8 sm:mb-0 uppercase text-balance font-semibold leading-tight text-center"
-                  style={{ fontSize: 'clamp(1.3rem, 4.5vw, 1.8rem)' }}
+                  style={{ fontSize: 'clamp(1.4rem, 5vw, 2rem)' }}
                 >
                   It’s{' '}
                   <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
@@ -274,6 +283,12 @@ function App() {
                   <span className="whitespace-nowrap">{featuredCityTime.toFormat('HH:mm')}</span>{' '}
                   <span className="whitespace-nowrap">{featuredCityTime.toFormat('ccc')}</span>,{' '}
                   <span className="whitespace-nowrap">{featuredCityTime.toFormat('LLL d')}</span>
+                  {featuredCountryName && (
+                    <>
+                      {' '}
+                      <span className="whitespace-nowrap">{featuredCountryName}</span>
+                    </>
+                  )}
                 </div>
               )}
 
