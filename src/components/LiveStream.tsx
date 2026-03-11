@@ -26,6 +26,59 @@ type Props = {
 const POSTER_PLACEHOLDER =
   'data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7'
 
+const REACTION_STORAGE_PREFIX = 'fivepm_react_'
+
+function getDeviceFingerprint(): string {
+  if (typeof window === 'undefined') return 'unknown'
+  const parts = [
+    navigator.userAgent,
+    `${window.screen.width}x${window.screen.height}`,
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
+  ]
+  const str = parts.join('|')
+  let h = 0
+  for (let i = 0; i < str.length; i++) h = (h * 31 + str.charCodeAt(i)) >>> 0
+  return `fp_${h.toString(36)}`
+}
+
+function getReactionStorageKey(momentId: string, field: string): string {
+  return `${REACTION_STORAGE_PREFIX}${momentId}_${field}_${getDeviceFingerprint()}`
+}
+
+function hasReacted(momentId: string, field: string): boolean {
+  try {
+    return localStorage.getItem(getReactionStorageKey(momentId, field)) === '1'
+  } catch {
+    return false
+  }
+}
+
+function showReactionToast(message: string) {
+  const el = document.createElement('div')
+  el.textContent = message
+  el.setAttribute('role', 'status')
+  Object.assign(el.style, {
+    position: 'fixed',
+    bottom: '100px',
+    left: '50%',
+    transform: 'translateX(-50%)',
+    background: 'rgba(255, 140, 0, 0.95)',
+    color: 'white',
+    padding: '10px 20px',
+    borderRadius: '10px',
+    fontSize: '0.9rem',
+    zIndex: 10001,
+    opacity: '0',
+    transition: 'opacity 0.3s',
+  })
+  document.body.appendChild(el)
+  requestAnimationFrame(() => { el.style.opacity = '1' })
+  setTimeout(() => {
+    el.style.opacity = '0'
+    setTimeout(() => el.remove(), 300)
+  }, 2000)
+}
+
 export function LiveStream({ open, onClose }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -98,6 +151,15 @@ export function LiveStream({ open, onClose }: Props) {
 
   const incrementReaction = useCallback(
     async (momentId: string, field: 'pretty_count' | 'funny_count' | 'cheers_count') => {
+      const key = getReactionStorageKey(momentId, field)
+      try {
+        if (localStorage.getItem(key) === '1') {
+          showReactionToast("You've already reacted with this!")
+          return
+        }
+      } catch {
+        // localStorage unavailable, allow reaction
+      }
       const m = queue.find((mom) => mom.id === momentId)
       if (!m) return
       const prev = m[field] ?? 0
@@ -105,6 +167,11 @@ export function LiveStream({ open, onClose }: Props) {
       setQueue((prevQueue) =>
         prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: next } : mom)),
       )
+      try {
+        localStorage.setItem(key, '1')
+      } catch {
+        // ignore
+      }
       const sb = getSupabase()
       if (!sb) return
       try {
@@ -115,6 +182,11 @@ export function LiveStream({ open, onClose }: Props) {
         setQueue((prevQueue) =>
           prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: prev } : mom)),
         )
+        try {
+          localStorage.removeItem(key)
+        } catch {
+          // ignore
+        }
       }
     },
     [queue],
@@ -410,24 +482,30 @@ export function LiveStream({ open, onClose }: Props) {
               <div className="flex-shrink-0 flex items-center justify-center gap-2 sm:gap-3 py-2 px-2 flex-wrap">
                 <button
                   type="button"
+                  disabled={!!(current && hasReacted(current.id, 'pretty_count'))}
                   onClick={() => current && incrementReaction(current.id, 'pretty_count')}
-                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors"
+                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-midnight-700/80"
                 >
                   🌅 {current?.pretty_count ?? 0}
+                  {current && hasReacted(current.id, 'pretty_count') && ' ✓'}
                 </button>
                 <button
                   type="button"
+                  disabled={!!(current && hasReacted(current.id, 'funny_count'))}
                   onClick={() => current && incrementReaction(current.id, 'funny_count')}
-                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors"
+                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-midnight-700/80"
                 >
                   😂 {current?.funny_count ?? 0}
+                  {current && hasReacted(current.id, 'funny_count') && ' ✓'}
                 </button>
                 <button
                   type="button"
+                  disabled={!!(current && hasReacted(current.id, 'cheers_count'))}
                   onClick={() => current && incrementReaction(current.id, 'cheers_count')}
-                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors"
+                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-midnight-700/80"
                 >
                   🍻 {current?.cheers_count ?? 0}
+                  {current && hasReacted(current.id, 'cheers_count') && ' ✓'}
                 </button>
               </div>
             </>
