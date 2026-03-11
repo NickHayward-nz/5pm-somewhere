@@ -10,7 +10,7 @@ import { computeCaptureWindow, getUserTimezone, hasPostedToday, trackDailyLimitH
 import { useProfile } from './hooks/useProfile'
 import { RecordMoment } from './components/RecordMoment'
 import { LiveStream } from './components/LiveStream'
-import { SignInButton } from './components/SignInButton.tsx'
+import SignInButton from './components/SignInButton.tsx'
 
 type FeaturedCity = {
   city: City
@@ -68,11 +68,13 @@ function App() {
   useEffect(() => {
     const sb = getSupabase()
     if (!sb) return
-    void sb.auth.getUser().then(({ data }) => {
+    void sb.auth.getUser().then(({ data }: { data: any }) => {
       setUserId(data.user?.id ?? null)
       setUserEmail(data.user?.email ?? null)
     })
-    const { data: { subscription } } = sb.auth.onAuthStateChange((_event, session) => {
+    const {
+      data: { subscription },
+    } = sb.auth.onAuthStateChange((_event: string, session: any) => {
       setUserId(session?.user?.id ?? null)
       setUserEmail(session?.user?.email ?? null)
     })
