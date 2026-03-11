@@ -13,10 +13,16 @@ export function SignInButton({ userEmail }: Props) {
       return
     }
     try {
+      const isLocal = window.location.origin.includes('localhost')
+      const redirectTo = isLocal
+        ? 'http://localhost:5173'
+        : 'https://5pm-somewhere-alpha.vercel.app'
+      // eslint-disable-next-line no-console
+      console.log('Sign-in redirectTo set to:', redirectTo)
       await sb.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: window.location.origin + '/auth/callback',
+          redirectTo,
         },
       })
     } catch (e) {
