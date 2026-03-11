@@ -83,7 +83,7 @@ function App() {
 
   useEffect(() => {
     // eslint-disable-next-line no-console
-    console.log('Text aligned to logo top')
+    console.log('Text top edge aligned with logo')
   }, [])
 
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
@@ -224,7 +224,7 @@ function App() {
                 }}
               />
             </div>
-            <div className="leading-tight min-w-0 overflow-visible mt-1 sm:mt-1.5 md:mt-2 lg:mt-2.5">
+            <div className="leading-tight min-w-0 overflow-visible mt-4 sm:mt-5 md:mt-6 lg:mt-7">
               <div className="text-[9px] sm:text-sm uppercase tracking-[0.15em] sm:tracking-[0.24em] text-sunset-100/80 whitespace-nowrap overflow-visible [text-overflow:clip]">
                 5PM Somewhere
               </div>
