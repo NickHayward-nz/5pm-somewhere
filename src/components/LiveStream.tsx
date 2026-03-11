@@ -149,19 +149,54 @@ export function LiveStream({ open, onClose }: Props) {
   const current = queue[currentIndex]
   const hasNext = currentIndex < queue.length - 1
 
-  const incrementReaction = useCallback(
+  const toggleReaction = useCallback(
     async (momentId: string, field: 'pretty_count' | 'funny_count' | 'cheers_count') => {
       const key = getReactionStorageKey(momentId, field)
-      try {
-        if (localStorage.getItem(key) === '1') {
-          showReactionToast("You've already reacted with this!")
-          return
+      const alreadyReacted = (() => {
+        try {
+          return localStorage.getItem(key) === '1'
+        } catch {
+          return false
         }
-      } catch {
-        // localStorage unavailable, allow reaction
-      }
+      })()
+
       const m = queue.find((mom) => mom.id === momentId)
       if (!m) return
+
+      const sb = getSupabase()
+      if (!sb) return
+
+      if (alreadyReacted) {
+        // Remove reaction: decrement count
+        const prev = m[field] ?? 0
+        const next = Math.max(0, prev - 1)
+        setQueue((prevQueue) =>
+          prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: next } : mom)),
+        )
+        try {
+          localStorage.removeItem(key)
+        } catch {
+          // ignore
+        }
+        try {
+          await sb.from('moments').update({ [field]: next }).eq('id', momentId)
+        } catch (e) {
+          // eslint-disable-next-line no-console
+          console.error('Reaction remove failed:', e)
+          setQueue((prevQueue) =>
+            prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: prev } : mom)),
+          )
+          try {
+            localStorage.setItem(key, '1')
+          } catch {
+            // ignore
+          }
+        }
+        showReactionToast('Reaction removed')
+        return
+      }
+
+      // Add reaction: increment count
       const prev = m[field] ?? 0
       const next = prev + 1
       setQueue((prevQueue) =>
@@ -172,8 +207,6 @@ export function LiveStream({ open, onClose }: Props) {
       } catch {
         // ignore
       }
-      const sb = getSupabase()
-      if (!sb) return
       try {
         await sb.from('moments').update({ [field]: next }).eq('id', momentId)
       } catch (e) {
@@ -482,30 +515,36 @@ export function LiveStream({ open, onClose }: Props) {
               <div className="flex-shrink-0 flex items-center justify-center gap-2 sm:gap-3 py-2 px-2 flex-wrap">
                 <button
                   type="button"
-                  disabled={!!(current && hasReacted(current.id, 'pretty_count'))}
-                  onClick={() => current && incrementReaction(current.id, 'pretty_count')}
-                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-midnight-700/80"
+                  onClick={() => current && toggleReaction(current.id, 'pretty_count')}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
+                    current && hasReacted(current.id, 'pretty_count')
+                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)] hover:bg-amber-400/95'
+                      : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
+                  }`}
                 >
                   🌅 {current?.pretty_count ?? 0}
-                  {current && hasReacted(current.id, 'pretty_count') && ' ✓'}
                 </button>
                 <button
                   type="button"
-                  disabled={!!(current && hasReacted(current.id, 'funny_count'))}
-                  onClick={() => current && incrementReaction(current.id, 'funny_count')}
-                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-midnight-700/80"
+                  onClick={() => current && toggleReaction(current.id, 'funny_count')}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
+                    current && hasReacted(current.id, 'funny_count')
+                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)] hover:bg-amber-400/95'
+                      : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
+                  }`}
                 >
                   😂 {current?.funny_count ?? 0}
-                  {current && hasReacted(current.id, 'funny_count') && ' ✓'}
                 </button>
                 <button
                   type="button"
-                  disabled={!!(current && hasReacted(current.id, 'cheers_count'))}
-                  onClick={() => current && incrementReaction(current.id, 'cheers_count')}
-                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors disabled:opacity-60 disabled:cursor-not-allowed disabled:hover:bg-midnight-700/80"
+                  onClick={() => current && toggleReaction(current.id, 'cheers_count')}
+                  className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
+                    current && hasReacted(current.id, 'cheers_count')
+                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)] hover:bg-amber-400/95'
+                      : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
+                  }`}
                 >
                   🍻 {current?.cheers_count ?? 0}
-                  {current && hasReacted(current.id, 'cheers_count') && ' ✓'}
                 </button>
               </div>
             </>
