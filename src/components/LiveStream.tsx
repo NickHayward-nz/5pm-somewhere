@@ -53,32 +53,6 @@ function hasReacted(momentId: string, field: string): boolean {
   }
 }
 
-function showReactionToast(message: string) {
-  const el = document.createElement('div')
-  el.textContent = message
-  el.setAttribute('role', 'status')
-  Object.assign(el.style, {
-    position: 'fixed',
-    bottom: '100px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    background: 'rgba(255, 140, 0, 0.95)',
-    color: 'white',
-    padding: '10px 20px',
-    borderRadius: '10px',
-    fontSize: '0.9rem',
-    zIndex: 10001,
-    opacity: '0',
-    transition: 'opacity 0.3s',
-  })
-  document.body.appendChild(el)
-  requestAnimationFrame(() => { el.style.opacity = '1' })
-  setTimeout(() => {
-    el.style.opacity = '0'
-    setTimeout(() => el.remove(), 300)
-  }, 2000)
-}
-
 export function LiveStream({ open, onClose }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
@@ -206,66 +180,16 @@ export function LiveStream({ open, onClose }: Props) {
         }
       })()
 
+      // One-time reaction per emoji type per video: no undo
+      if (alreadyReacted) {
+        return
+      }
+
       const m = queue.find((mom) => mom.id === momentId)
       if (!m) return
 
       const sb = getSupabase()
       if (!sb) return
-
-      if (alreadyReacted) {
-        // Remove reaction: decrement count
-        const prev = m[field] ?? 0
-        const next = Math.max(0, prev - 1)
-        setQueue((prevQueue) =>
-          prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: next } : mom)),
-        )
-        if (momentId === current?.id) {
-          if (field === 'pretty_count') {
-            setPrettyCount((c) => Math.max(0, c - 1))
-            setUserReactions((u) => ({ ...u, pretty: false }))
-          } else if (field === 'funny_count') {
-            setFunnyCount((c) => Math.max(0, c - 1))
-            setUserReactions((u) => ({ ...u, funny: false }))
-          } else if (field === 'cheers_count') {
-            setCheersCount((c) => Math.max(0, c - 1))
-            setUserReactions((u) => ({ ...u, cheers: false }))
-          }
-        }
-        try {
-          localStorage.removeItem(key)
-        } catch {
-          // ignore
-        }
-        try {
-          await sb.from('moments').update({ [field]: next }).eq('id', momentId)
-          await fetchReactionCounts(momentId)
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error('Reaction remove failed:', e)
-          setQueue((prevQueue) =>
-            prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: prev } : mom)),
-          )
-          if (momentId === current?.id) {
-            if (field === 'pretty_count') {
-              setPrettyCount((c) => c + 1)
-              setUserReactions((u) => ({ ...u, pretty: true }))
-            } else if (field === 'funny_count') {
-              setFunnyCount((c) => c + 1)
-              setUserReactions((u) => ({ ...u, funny: true }))
-            } else if (field === 'cheers_count') {
-              setCheersCount((c) => c + 1)
-              setUserReactions((u) => ({ ...u, cheers: true }))
-            }
-          }
-          try {
-            localStorage.setItem(key, '1')
-          } catch {
-            // ignore
-          }
-        }
-        showReactionToast('Reaction removed')
-        return
-      }
 
       // Add reaction: increment count
       const prev = m[field] ?? 0
@@ -625,10 +549,11 @@ export function LiveStream({ open, onClose }: Props) {
               <div className="flex-shrink-0 flex items-center justify-center gap-2 sm:gap-3 py-2 px-2 flex-wrap">
                 <button
                   type="button"
+                  disabled={userReactions.pretty}
                   onClick={() => current && toggleReaction(current.id, 'pretty_count')}
                   className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
                     userReactions.pretty
-                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)] hover:bg-amber-400/95'
+                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
                       : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
                   }`}
                 >
@@ -636,10 +561,11 @@ export function LiveStream({ open, onClose }: Props) {
                 </button>
                 <button
                   type="button"
+                  disabled={userReactions.funny}
                   onClick={() => current && toggleReaction(current.id, 'funny_count')}
                   className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
                     userReactions.funny
-                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)] hover:bg-amber-400/95'
+                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
                       : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
                   }`}
                 >
@@ -647,10 +573,11 @@ export function LiveStream({ open, onClose }: Props) {
                 </button>
                 <button
                   type="button"
+                  disabled={userReactions.cheers}
                   onClick={() => current && toggleReaction(current.id, 'cheers_count')}
                   className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
                     userReactions.cheers
-                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)] hover:bg-amber-400/95'
+                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
                       : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
                   }`}
                 >
