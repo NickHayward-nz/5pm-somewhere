@@ -86,6 +86,14 @@ export function LiveStream({ open, onClose }: Props) {
   const [transitioning, setTransitioning] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [currentBlobUrl, setCurrentBlobUrl] = useState<string | null>(null)
+  const [prettyCount, setPrettyCount] = useState(0)
+  const [funnyCount, setFunnyCount] = useState(0)
+  const [cheersCount, setCheersCount] = useState(0)
+  const [userReactions, setUserReactions] = useState({
+    pretty: false,
+    funny: false,
+    cheers: false,
+  })
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const loadingMoreRef = useRef(false)
@@ -171,6 +179,14 @@ export function LiveStream({ open, onClose }: Props) {
             : mom,
         ),
       )
+      setPrettyCount(data.pretty_count ?? 0)
+      setFunnyCount(data.funny_count ?? 0)
+      setCheersCount(data.cheers_count ?? 0)
+      setUserReactions({
+        pretty: hasReacted(momentId, 'pretty_count'),
+        funny: hasReacted(momentId, 'funny_count'),
+        cheers: hasReacted(momentId, 'cheers_count'),
+      })
       // eslint-disable-next-line no-console
       console.log('Fetched reaction counts for video', momentId, data)
     } catch (e) {
@@ -203,6 +219,18 @@ export function LiveStream({ open, onClose }: Props) {
         setQueue((prevQueue) =>
           prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: next } : mom)),
         )
+        if (momentId === current?.id) {
+          if (field === 'pretty_count') {
+            setPrettyCount((c) => Math.max(0, c - 1))
+            setUserReactions((u) => ({ ...u, pretty: false }))
+          } else if (field === 'funny_count') {
+            setFunnyCount((c) => Math.max(0, c - 1))
+            setUserReactions((u) => ({ ...u, funny: false }))
+          } else if (field === 'cheers_count') {
+            setCheersCount((c) => Math.max(0, c - 1))
+            setUserReactions((u) => ({ ...u, cheers: false }))
+          }
+        }
         try {
           localStorage.removeItem(key)
         } catch {
@@ -217,6 +245,18 @@ export function LiveStream({ open, onClose }: Props) {
           setQueue((prevQueue) =>
             prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: prev } : mom)),
           )
+          if (momentId === current?.id) {
+            if (field === 'pretty_count') {
+              setPrettyCount((c) => c + 1)
+              setUserReactions((u) => ({ ...u, pretty: true }))
+            } else if (field === 'funny_count') {
+              setFunnyCount((c) => c + 1)
+              setUserReactions((u) => ({ ...u, funny: true }))
+            } else if (field === 'cheers_count') {
+              setCheersCount((c) => c + 1)
+              setUserReactions((u) => ({ ...u, cheers: true }))
+            }
+          }
           try {
             localStorage.setItem(key, '1')
           } catch {
@@ -233,6 +273,18 @@ export function LiveStream({ open, onClose }: Props) {
       setQueue((prevQueue) =>
         prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: next } : mom)),
       )
+      if (momentId === current?.id) {
+        if (field === 'pretty_count') {
+          setPrettyCount((c) => c + 1)
+          setUserReactions((u) => ({ ...u, pretty: true }))
+        } else if (field === 'funny_count') {
+          setFunnyCount((c) => c + 1)
+          setUserReactions((u) => ({ ...u, funny: true }))
+        } else if (field === 'cheers_count') {
+          setCheersCount((c) => c + 1)
+          setUserReactions((u) => ({ ...u, cheers: true }))
+        }
+      }
       try {
         localStorage.setItem(key, '1')
       } catch {
@@ -247,6 +299,18 @@ export function LiveStream({ open, onClose }: Props) {
         setQueue((prevQueue) =>
           prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: prev } : mom)),
         )
+        if (momentId === current?.id) {
+          if (field === 'pretty_count') {
+            setPrettyCount((c) => Math.max(0, c - 1))
+            setUserReactions((u) => ({ ...u, pretty: false }))
+          } else if (field === 'funny_count') {
+            setFunnyCount((c) => Math.max(0, c - 1))
+            setUserReactions((u) => ({ ...u, funny: false }))
+          } else if (field === 'cheers_count') {
+            setCheersCount((c) => Math.max(0, c - 1))
+            setUserReactions((u) => ({ ...u, cheers: false }))
+          }
+        }
         try {
           localStorage.removeItem(key)
         } catch {
@@ -254,12 +318,20 @@ export function LiveStream({ open, onClose }: Props) {
         }
       }
     },
-    [queue, fetchReactionCounts],
+    [queue, fetchReactionCounts, current?.id],
   )
 
   // When current video changes (skip, return, initial load), fetch latest reaction counts from Supabase
   useEffect(() => {
     if (!current?.id) return
+    setPrettyCount(current.pretty_count ?? 0)
+    setFunnyCount(current.funny_count ?? 0)
+    setCheersCount(current.cheers_count ?? 0)
+    setUserReactions({
+      pretty: hasReacted(current.id, 'pretty_count'),
+      funny: hasReacted(current.id, 'funny_count'),
+      cheers: hasReacted(current.id, 'cheers_count'),
+    })
     fetchReactionCounts(current.id)
   }, [current?.id, fetchReactionCounts])
 
@@ -555,34 +627,34 @@ export function LiveStream({ open, onClose }: Props) {
                   type="button"
                   onClick={() => current && toggleReaction(current.id, 'pretty_count')}
                   className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
-                    current && hasReacted(current.id, 'pretty_count')
+                    userReactions.pretty
                       ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)] hover:bg-amber-400/95'
                       : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
                   }`}
                 >
-                  🌅 {current?.pretty_count ?? 0}
+                  🌅 {prettyCount || 0}
                 </button>
                 <button
                   type="button"
                   onClick={() => current && toggleReaction(current.id, 'funny_count')}
                   className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
-                    current && hasReacted(current.id, 'funny_count')
+                    userReactions.funny
                       ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)] hover:bg-amber-400/95'
                       : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
                   }`}
                 >
-                  😂 {current?.funny_count ?? 0}
+                  😂 {funnyCount || 0}
                 </button>
                 <button
                   type="button"
                   onClick={() => current && toggleReaction(current.id, 'cheers_count')}
                   className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
-                    current && hasReacted(current.id, 'cheers_count')
+                    userReactions.cheers
                       ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)] hover:bg-amber-400/95'
                       : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
                   }`}
                 >
-                  🍻 {current?.cheers_count ?? 0}
+                  🍻 {cheersCount || 0}
                 </button>
               </div>
             </>
