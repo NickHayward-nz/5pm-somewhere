@@ -238,7 +238,6 @@ export function LiveStream({ open, onClose }: Props) {
         }
         try {
           await sb.from('moments').update({ [field]: next }).eq('id', momentId)
-          await fetchReactionCounts(momentId)
         } catch (e) {
           // eslint-disable-next-line no-console
           console.error('Reaction remove failed:', e)
@@ -292,7 +291,6 @@ export function LiveStream({ open, onClose }: Props) {
       }
       try {
         await sb.from('moments').update({ [field]: next }).eq('id', momentId)
-        await fetchReactionCounts(momentId)
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Reaction update failed:', e)
