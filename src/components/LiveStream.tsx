@@ -69,6 +69,7 @@ export function LiveStream({ open, onClose }: Props) {
     cheers: false,
   })
   const [fetchFrozenUntil, setFetchFrozenUntil] = useState(0)
+  const currentVideoIdRef = useRef<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const loadingMoreRef = useRef(false)
@@ -133,8 +134,8 @@ export function LiveStream({ open, onClose }: Props) {
   const hasNext = currentIndex < queue.length - 1
 
   const fetchReactionCounts = useCallback(
-    async (momentId: string) => {
-      if (Date.now() < fetchFrozenUntil) {
+    async (momentId: string, opts?: { force?: boolean }) => {
+      if (!opts?.force && Date.now() < fetchFrozenUntil) {
         // eslint-disable-next-line no-console
         console.log('Fetch skipped - frozen until:', new Date(fetchFrozenUntil).toLocaleTimeString())
         return
@@ -160,14 +161,16 @@ export function LiveStream({ open, onClose }: Props) {
             : mom,
         ),
       )
-      setPrettyCount(data.pretty_count ?? 0)
-      setFunnyCount(data.funny_count ?? 0)
-      setCheersCount(data.cheers_count ?? 0)
-      setUserReactions({
-        pretty: hasReacted(momentId, 'pretty_count'),
-        funny: hasReacted(momentId, 'funny_count'),
-        cheers: hasReacted(momentId, 'cheers_count'),
-      })
+      if (currentVideoIdRef.current === momentId) {
+        setPrettyCount(data.pretty_count ?? 0)
+        setFunnyCount(data.funny_count ?? 0)
+        setCheersCount(data.cheers_count ?? 0)
+        setUserReactions({
+          pretty: hasReacted(momentId, 'pretty_count'),
+          funny: hasReacted(momentId, 'funny_count'),
+          cheers: hasReacted(momentId, 'cheers_count'),
+        })
+      }
       // eslint-disable-next-line no-console
       console.log('Fetched counts for video', momentId, data)
     } catch (e) {
@@ -222,10 +225,10 @@ export function LiveStream({ open, onClose }: Props) {
         }
         try {
           await sb.from('moments').update({ [field]: newCount }).eq('id', momentId)
-          const freezeEnd = Date.now() + 3000
+          const freezeEnd = Date.now() + 5000
           setFetchFrozenUntil(freezeEnd)
           // eslint-disable-next-line no-console
-          console.log('Reaction updated - frozen fetch until:', new Date(freezeEnd).toLocaleTimeString())
+          console.log('Reaction updated - fetch frozen until:', new Date(freezeEnd).toLocaleTimeString())
         } catch (e) {
           // eslint-disable-next-line no-console
           console.error('Reaction remove failed:', e)
@@ -280,10 +283,11 @@ export function LiveStream({ open, onClose }: Props) {
         await sb.from('moments').update({ [field]: optimisticCount }).eq('id', momentId)
         // eslint-disable-next-line no-console
         console.log('Reaction updated - optimistic count:', optimisticCount)
-        const freezeEnd = Date.now() + 3000
+        const freezeEnd = Date.now() + 5000
         setFetchFrozenUntil(freezeEnd)
         // eslint-disable-next-line no-console
-        console.log('Reaction updated - frozen fetch until:', new Date(freezeEnd).toLocaleTimeString())
+        console.log('Reaction updated - fetch frozen until:', new Date(freezeEnd).toLocaleTimeString())
+        setTimeout(() => fetchReactionCounts(momentId, { force: true }), 1500)
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Reaction update failed:', e)
@@ -316,6 +320,7 @@ export function LiveStream({ open, onClose }: Props) {
   // When current video changes (skip, return, initial load), fetch latest reaction counts from Supabase
   useEffect(() => {
     if (!current?.id) return
+    currentVideoIdRef.current = current.id
     setPrettyCount(current.pretty_count ?? 0)
     setFunnyCount(current.funny_count ?? 0)
     setCheersCount(current.cheers_count ?? 0)
