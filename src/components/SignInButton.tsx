@@ -9,7 +9,9 @@ export default function SignInButton({ userEmail }: Props) {
 
   const handleSignIn = async () => {
     if (!sb) {
-      window.alert('Supabase is not configured.')
+      // eslint-disable-next-line no-console
+      console.error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in env')
+      window.alert('Supabase is not configured - check env vars.')
       return
     }
     try {
