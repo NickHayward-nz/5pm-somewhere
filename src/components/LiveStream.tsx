@@ -188,7 +188,7 @@ export function LiveStream({ open, onClose }: Props) {
         cheers: hasReacted(momentId, 'cheers_count'),
       })
       // eslint-disable-next-line no-console
-      console.log('Fetched reaction counts for video', momentId, data)
+      console.log('Fetched latest counts for video', momentId, data)
     } catch (e) {
       // eslint-disable-next-line no-console
       console.error('Failed to fetch reaction counts:', e)
@@ -238,6 +238,7 @@ export function LiveStream({ open, onClose }: Props) {
         }
         try {
           await sb.from('moments').update({ [field]: next }).eq('id', momentId)
+          await fetchReactionCounts(momentId)
         } catch (e) {
           // eslint-disable-next-line no-console
           console.error('Reaction remove failed:', e)
@@ -291,6 +292,7 @@ export function LiveStream({ open, onClose }: Props) {
       }
       try {
         await sb.from('moments').update({ [field]: next }).eq('id', momentId)
+        await fetchReactionCounts(momentId)
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Reaction update failed:', e)
