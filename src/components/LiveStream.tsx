@@ -96,6 +96,30 @@ export function LiveStream({ open, onClose }: Props) {
   const current = queue[currentIndex]
   const hasNext = currentIndex < queue.length - 1
 
+  const incrementReaction = useCallback(
+    async (momentId: string, field: 'pretty_count' | 'funny_count' | 'cheers_count') => {
+      const m = queue.find((mom) => mom.id === momentId)
+      if (!m) return
+      const prev = m[field] ?? 0
+      const next = prev + 1
+      setQueue((prevQueue) =>
+        prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: next } : mom)),
+      )
+      const sb = getSupabase()
+      if (!sb) return
+      try {
+        await sb.from('moments').update({ [field]: next }).eq('id', momentId)
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Reaction update failed:', e)
+        setQueue((prevQueue) =>
+          prevQueue.map((mom) => (mom.id === momentId ? { ...mom, [field]: prev } : mom)),
+        )
+      }
+    },
+    [queue],
+  )
+
   // Load current video as blob URL; revoke previous only after new one loads (in onCanPlay)
   useEffect(() => {
     if (!current?.video_url) {
@@ -302,7 +326,7 @@ export function LiveStream({ open, onClose }: Props) {
         }}
       >
         <div
-          className="absolute"
+          className="absolute flex flex-col"
           style={{
             top: '50%',
             left: '50%',
@@ -333,54 +357,79 @@ export function LiveStream({ open, onClose }: Props) {
           )}
           {current && !loading && (
             <>
-              <video
-                ref={videoRef}
-                key={currentVideoKey}
-                src={currentBlobUrl || current.video_url}
-                poster={POSTER_PLACEHOLDER}
-                autoPlay
-                playsInline
-                muted={false}
-                controls={false}
-                preload="auto"
-                loop={false}
-                className="z-[1] block w-full h-full max-h-full object-contain"
-                style={{
-                  width: '100%',
-                  height: '100%',
-                  maxHeight: '100%',
-                  objectFit: 'contain',
-                  display: 'block',
-                  zIndex: 1,
-                  visibility: 'visible',
-                  opacity: 1,
-                  background: 'transparent',
-                }}
-                onEnded={handleEnded}
-                onPlay={handlePlay}
-                onCanPlay={handleCanPlay}
-                onPlaying={handlePlaying}
-                onLoadedData={handleLoadedData}
-                onLoadedMetadata={handleLoadedMetadata}
-                onError={handleError}
-                onWaiting={handleWaiting}
-              />
-              {queue
-                .slice(currentIndex + 1, currentIndex + 1 + PRELOAD_NEXT)
-                .map((m) => (
-                  <video
-                    key={`preload-${m.id}`}
-                    src={m.video_url}
-                    preload="auto"
-                    className="hidden"
-                    aria-hidden
-                  />
-                ))}
-              {transitioning && (
-                <div className="absolute inset-0 z-10 flex items-center justify-center bg-midnight-900/80">
-                  <div className="h-12 w-12 animate-spin rounded-full border-2 border-sunset-400 border-t-transparent" />
-                </div>
-              )}
+              <div className="flex-1 min-h-0 relative">
+                <video
+                  ref={videoRef}
+                  key={currentVideoKey}
+                  src={currentBlobUrl || current.video_url}
+                  poster={POSTER_PLACEHOLDER}
+                  autoPlay
+                  playsInline
+                  muted={false}
+                  controls={false}
+                  preload="auto"
+                  loop={false}
+                  className="z-[1] block w-full h-full max-h-full object-contain"
+                  style={{
+                    width: '100%',
+                    height: '100%',
+                    maxHeight: '100%',
+                    objectFit: 'contain',
+                    display: 'block',
+                    zIndex: 1,
+                    visibility: 'visible',
+                    opacity: 1,
+                    background: 'transparent',
+                  }}
+                  onEnded={handleEnded}
+                  onPlay={handlePlay}
+                  onCanPlay={handleCanPlay}
+                  onPlaying={handlePlaying}
+                  onLoadedData={handleLoadedData}
+                  onLoadedMetadata={handleLoadedMetadata}
+                  onError={handleError}
+                  onWaiting={handleWaiting}
+                />
+                {queue
+                  .slice(currentIndex + 1, currentIndex + 1 + PRELOAD_NEXT)
+                  .map((m) => (
+                    <video
+                      key={`preload-${m.id}`}
+                      src={m.video_url}
+                      preload="auto"
+                      className="hidden"
+                      aria-hidden
+                    />
+                  ))}
+                {transitioning && (
+                  <div className="absolute inset-0 z-10 flex items-center justify-center bg-midnight-900/80">
+                    <div className="h-12 w-12 animate-spin rounded-full border-2 border-sunset-400 border-t-transparent" />
+                  </div>
+                )}
+              </div>
+              <div className="flex-shrink-0 flex items-center justify-center gap-2 sm:gap-3 py-2 px-2 flex-wrap">
+                <button
+                  type="button"
+                  onClick={() => current && incrementReaction(current.id, 'pretty_count')}
+                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors"
+                >
+                  🌅 {current?.pretty_count ?? 0}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => current && incrementReaction(current.id, 'funny_count')}
+                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors"
+                >
+                  😂 {current?.funny_count ?? 0}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => current && incrementReaction(current.id, 'cheers_count')}
+                  className="rounded-full bg-midnight-700/80 border border-sunset-500/40 px-3 py-1.5 text-sm text-sunset-100 hover:bg-midnight-600/90 transition-colors"
+                >
+                  🍻 {current?.cheers_count ?? 0}
+                </button>
+              </div>
             </>
           )}
           {current && queue.length > 0 && (
