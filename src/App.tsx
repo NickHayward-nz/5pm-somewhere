@@ -212,7 +212,7 @@ function App() {
               <img
                 src="/Logo.png"
                 alt="5PM Somewhere Logo"
-                className="block h-10 w-auto max-w-full min-h-[40px] sm:h-12 md:h-14 object-contain"
+                className="block h-20 w-auto max-w-full min-h-[80px] sm:h-24 md:h-28 lg:h-32 object-contain"
                 onLoad={() => {
                   // eslint-disable-next-line no-console
                   console.log('Custom logo loaded')

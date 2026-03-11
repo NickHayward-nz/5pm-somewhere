@@ -524,7 +524,7 @@ export function LiveStream({ open, onClose }: Props) {
       <img
         src="/Logo.png"
         alt="5PM Somewhere"
-        className="absolute top-4 left-4 h-10 w-auto sm:h-12 md:h-14 z-30"
+        className="absolute top-4 left-4 h-20 w-auto sm:h-24 md:h-28 lg:h-32 z-30"
       />
 
       {/* Video container: centered, slightly shrunk so gradient shows around edges */}
