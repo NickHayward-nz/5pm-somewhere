@@ -149,6 +149,36 @@ export function LiveStream({ open, onClose }: Props) {
   const current = queue[currentIndex]
   const hasNext = currentIndex < queue.length - 1
 
+  const fetchReactionCounts = useCallback(async (momentId: string) => {
+    const sb = getSupabase()
+    if (!sb) return
+    try {
+      const { data, error } = await sb
+        .from('moments')
+        .select('pretty_count, funny_count, cheers_count')
+        .eq('id', momentId)
+        .single()
+      if (error || !data) return
+      setQueue((prevQueue) =>
+        prevQueue.map((mom) =>
+          mom.id === momentId
+            ? {
+                ...mom,
+                pretty_count: data.pretty_count ?? mom.pretty_count,
+                funny_count: data.funny_count ?? mom.funny_count,
+                cheers_count: data.cheers_count ?? mom.cheers_count,
+              }
+            : mom,
+        ),
+      )
+      // eslint-disable-next-line no-console
+      console.log('Fetched reaction counts for video', momentId, data)
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error('Failed to fetch reaction counts:', e)
+    }
+  }, [])
+
   const toggleReaction = useCallback(
     async (momentId: string, field: 'pretty_count' | 'funny_count' | 'cheers_count') => {
       const key = getReactionStorageKey(momentId, field)
@@ -180,6 +210,7 @@ export function LiveStream({ open, onClose }: Props) {
         }
         try {
           await sb.from('moments').update({ [field]: next }).eq('id', momentId)
+          await fetchReactionCounts(momentId)
         } catch (e) {
           // eslint-disable-next-line no-console
           console.error('Reaction remove failed:', e)
@@ -209,6 +240,7 @@ export function LiveStream({ open, onClose }: Props) {
       }
       try {
         await sb.from('moments').update({ [field]: next }).eq('id', momentId)
+        await fetchReactionCounts(momentId)
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Reaction update failed:', e)
@@ -222,44 +254,14 @@ export function LiveStream({ open, onClose }: Props) {
         }
       }
     },
-    [queue],
+    [queue, fetchReactionCounts],
   )
 
   // When current video changes (skip, return, initial load), fetch latest reaction counts from Supabase
   useEffect(() => {
-    const videoId = current?.id
-    if (!videoId) return
-    const sb = getSupabase()
-    if (!sb) return
-    let cancelled = false
-    sb
-      .from('moments')
-      .select('pretty_count, funny_count, cheers_count')
-      .eq('id', videoId)
-      .single()
-      .then(({ data, error }) => {
-        if (cancelled || error) return
-        if (data) {
-          setQueue((prevQueue) =>
-            prevQueue.map((mom) =>
-              mom.id === videoId
-                ? {
-                    ...mom,
-                    pretty_count: data.pretty_count ?? mom.pretty_count,
-                    funny_count: data.funny_count ?? mom.funny_count,
-                    cheers_count: data.cheers_count ?? mom.cheers_count,
-                  }
-                : mom,
-            ),
-          )
-          // eslint-disable-next-line no-console
-          console.log('Fetched reaction counts for video', videoId, data)
-        }
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [current?.id])
+    if (!current?.id) return
+    fetchReactionCounts(current.id)
+  }, [current?.id, fetchReactionCounts])
 
   // Load current video as blob URL; revoke previous only after new one loads (in onCanPlay)
   useEffect(() => {
