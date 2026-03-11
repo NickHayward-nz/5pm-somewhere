@@ -216,7 +216,31 @@ export function LiveStream({ open, onClose }: Props) {
       }
       try {
         await sb.from('moments').update({ [field]: next }).eq('id', momentId)
-        await fetchReactionCounts(momentId)
+        // Re-fetch to confirm real count; use real value with fallback to optimistic so we never overwrite with 0
+        const { data: countData } = await sb
+          .from('moments')
+          .select('pretty_count, funny_count, cheers_count')
+          .eq('id', momentId)
+          .single()
+        if (countData && momentId === current?.id) {
+          setPrettyCount(
+            field === 'pretty_count' ? (countData.pretty_count ?? next) : (countData.pretty_count ?? 0),
+          )
+          setFunnyCount(
+            field === 'funny_count' ? (countData.funny_count ?? next) : (countData.funny_count ?? 0),
+          )
+          setCheersCount(
+            field === 'cheers_count' ? (countData.cheers_count ?? next) : (countData.cheers_count ?? 0),
+          )
+          const newVal =
+            field === 'pretty_count'
+              ? countData.pretty_count
+              : field === 'funny_count'
+                ? countData.funny_count
+                : countData.cheers_count
+          // eslint-disable-next-line no-console
+          console.log('Reaction synced - new count:', newVal)
+        }
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Reaction update failed:', e)
@@ -242,7 +266,7 @@ export function LiveStream({ open, onClose }: Props) {
         }
       }
     },
-    [queue, fetchReactionCounts, current?.id],
+    [queue, current?.id],
   )
 
   // When current video changes (skip, return, initial load), fetch latest reaction counts from Supabase
