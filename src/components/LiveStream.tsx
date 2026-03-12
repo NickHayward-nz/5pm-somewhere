@@ -1,4 +1,4 @@
-// FORCE COMMIT - all reaction fixes from March 13 2025 - do not remove yet
+// FORCE COMMIT - reaction count fix - 2025-03-13 - delete me me me me after push
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 
