@@ -1,4 +1,4 @@
-// FORCE COMMIT - reaction count fix - 2025-03-13 - delete me me me me after push
+// FORCE COMMIT - Supabase update logging and row insert fix - 2025-03-13 - remove after testing
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 
@@ -156,7 +156,26 @@ export function LiveStream({ open, onClose }: Props) {
           .select('pretty_count, funny_count, cheers_count')
           .eq('id', momentId)
           .single()
-        if (error || !data) return
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error('Failed to fetch reaction counts:', error)
+          return
+        }
+        if (!data) {
+          // eslint-disable-next-line no-console
+          console.log('No moment row found for id:', momentId)
+          try {
+            await sb
+              .from('moments')
+              .insert({ id: momentId, pretty_count: 0, funny_count: 0, cheers_count: 0 })
+            // eslint-disable-next-line no-console
+            console.log('Inserted new moment row with initial counts')
+          } catch (insertErr) {
+            // eslint-disable-next-line no-console
+            console.error('Failed to insert initial moment row:', insertErr)
+          }
+          return
+        }
         setQueue((prevQueue) =>
           prevQueue.map((mom) =>
             mom.id === momentId
@@ -231,15 +250,41 @@ export function LiveStream({ open, onClose }: Props) {
         } catch {
           // ignore
         }
-        try {
-          await sb.from('moments').update({ [field]: newCount }).eq('id', momentId)
-          const freezeEnd = Date.now() + 5000
-          setFetchFrozenUntil(freezeEnd)
+      try {
+        const { error } = await sb.from('moments').update({ [field]: newCount }).eq('id', momentId)
+        if (error) {
           // eslint-disable-next-line no-console
-          console.log('Reaction updated - fetch frozen until:', new Date(freezeEnd).toLocaleTimeString())
-        } catch (e) {
-          // eslint-disable-next-line no-console
-          console.error('Reaction remove failed:', e)
+          console.error('Supabase reaction update (undo) failed:', error)
+          const prevCount =
+            field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
+          setQueue((prevQueue) =>
+            prevQueue.map((mom) =>
+              mom.id === momentId ? { ...mom, [field]: prevCount } : mom,
+            ),
+          )
+          setPrettyCount(field === 'pretty_count' ? prevCount : prettyCount)
+          setFunnyCount(field === 'funny_count' ? prevCount : funnyCount)
+          setCheersCount(field === 'cheers_count' ? prevCount : cheersCount)
+          setUserReactions((u) => ({
+            ...u,
+            pretty: field === 'pretty_count' ? true : u.pretty,
+            funny: field === 'funny_count' ? true : u.funny,
+            cheers: field === 'cheers_count' ? true : u.cheers,
+          }))
+          try {
+            localStorage.setItem(key, '1')
+          } catch {
+            // ignore
+          }
+          return
+        }
+        const freezeEnd = Date.now() + 5000
+        setFetchFrozenUntil(freezeEnd)
+        // eslint-disable-next-line no-console
+        console.log('Reaction updated - fetch frozen until:', new Date(freezeEnd).toLocaleTimeString())
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Reaction remove failed:', e)
           const prevCount =
             field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
           setQueue((prevQueue) =>
@@ -288,9 +333,35 @@ export function LiveStream({ open, onClose }: Props) {
         // ignore
       }
       try {
-        await sb.from('moments').update({ [field]: optimisticCount }).eq('id', momentId)
+        const { error } = await sb.from('moments').update({ [field]: optimisticCount }).eq('id', momentId)
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error('Supabase reaction update failed:', error)
+          const prevCount =
+            field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
+          setQueue((prevQueue) =>
+            prevQueue.map((mom) =>
+              mom.id === momentId ? { ...mom, [field]: prevCount } : mom,
+            ),
+          )
+          setPrettyCount(field === 'pretty_count' ? prevCount : prettyCount)
+          setFunnyCount(field === 'funny_count' ? prevCount : funnyCount)
+          setCheersCount(field === 'cheers_count' ? prevCount : cheersCount)
+          setUserReactions((u) => ({
+            ...u,
+            pretty: field === 'pretty_count' ? false : u.pretty,
+            funny: field === 'funny_count' ? false : u.funny,
+            cheers: field === 'cheers_count' ? false : u.cheers,
+          }))
+          try {
+            localStorage.removeItem(key)
+          } catch {
+            // ignore
+          }
+          return
+        }
         // eslint-disable-next-line no-console
-        console.log('Reaction updated - optimistic count:', optimisticCount)
+        console.log('Supabase reaction update succeeded for field:', field, 'value:', optimisticCount)
         const now = Date.now()
         const freezeEnd = now + 5000
         setFetchFrozenUntil(freezeEnd)
