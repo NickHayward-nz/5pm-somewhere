@@ -134,49 +134,52 @@ export function LiveStream({ open, onClose }: Props) {
   const hasNext = currentIndex < queue.length - 1
 
   const fetchReactionCounts = useCallback(
-    async (momentId: string, opts?: { force?: boolean }) => {
-      if (!opts?.force && Date.now() < fetchFrozenUntil) {
+    async (momentId: string) => {
+      if (Date.now() < fetchFrozenUntil) {
         // eslint-disable-next-line no-console
-        console.log('Fetch skipped - frozen until:', new Date(fetchFrozenUntil).toLocaleTimeString())
+        console.log(
+          'Fetch skipped - reaction freeze active until',
+          new Date(fetchFrozenUntil).toLocaleTimeString(),
+        )
         return
       }
       const sb = getSupabase()
-    if (!sb) return
-    try {
-      const { data, error } = await sb
-        .from('moments')
-        .select('pretty_count, funny_count, cheers_count')
-        .eq('id', momentId)
-        .single()
-      if (error || !data) return
-      setQueue((prevQueue) =>
-        prevQueue.map((mom) =>
-          mom.id === momentId
-            ? {
-                ...mom,
-                pretty_count: data.pretty_count ?? mom.pretty_count,
-                funny_count: data.funny_count ?? mom.funny_count,
-                cheers_count: data.cheers_count ?? mom.cheers_count,
-              }
-            : mom,
-        ),
-      )
-      if (currentVideoIdRef.current === momentId) {
-        setPrettyCount(data.pretty_count ?? 0)
-        setFunnyCount(data.funny_count ?? 0)
-        setCheersCount(data.cheers_count ?? 0)
-        setUserReactions({
-          pretty: hasReacted(momentId, 'pretty_count'),
-          funny: hasReacted(momentId, 'funny_count'),
-          cheers: hasReacted(momentId, 'cheers_count'),
-        })
+      if (!sb) return
+      try {
+        const { data, error } = await sb
+          .from('moments')
+          .select('pretty_count, funny_count, cheers_count')
+          .eq('id', momentId)
+          .single()
+        if (error || !data) return
+        setQueue((prevQueue) =>
+          prevQueue.map((mom) =>
+            mom.id === momentId
+              ? {
+                  ...mom,
+                  pretty_count: data.pretty_count ?? mom.pretty_count,
+                  funny_count: data.funny_count ?? mom.funny_count,
+                  cheers_count: data.cheers_count ?? mom.cheers_count,
+                }
+              : mom,
+          ),
+        )
+        if (currentVideoIdRef.current === momentId) {
+          setPrettyCount(data.pretty_count ?? 0)
+          setFunnyCount(data.funny_count ?? 0)
+          setCheersCount(data.cheers_count ?? 0)
+          setUserReactions({
+            pretty: hasReacted(momentId, 'pretty_count'),
+            funny: hasReacted(momentId, 'funny_count'),
+            cheers: hasReacted(momentId, 'cheers_count'),
+          })
+        }
+        // eslint-disable-next-line no-console
+        console.log('Normal fetch counts:', data)
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to fetch reaction counts:', e)
       }
-      // eslint-disable-next-line no-console
-      console.log('Fetched counts for video', momentId, data)
-    } catch (e) {
-      // eslint-disable-next-line no-console
-      console.error('Failed to fetch reaction counts:', e)
-    }
     },
     [fetchFrozenUntil],
   )
@@ -286,8 +289,36 @@ export function LiveStream({ open, onClose }: Props) {
         const freezeEnd = Date.now() + 5000
         setFetchFrozenUntil(freezeEnd)
         // eslint-disable-next-line no-console
-        console.log('Reaction updated - fetch frozen until:', new Date(freezeEnd).toLocaleTimeString())
-        setTimeout(() => fetchReactionCounts(momentId, { force: true }), 1500)
+        console.log(
+          'Reaction updated - reaction freeze active until',
+          new Date(freezeEnd).toLocaleTimeString(),
+        )
+        // Force sync at the end of the freeze window so we pick up the real count without ever flashing back to 0
+        setTimeout(async () => {
+          const sbInner = getSupabase()
+          if (!sbInner) return
+          try {
+            const { data } = await sbInner
+              .from('moments')
+              .select('pretty_count, funny_count, cheers_count')
+              .eq('id', momentId)
+              .single()
+            if (!data) return
+            if (momentId !== current?.id) return
+            if (field === 'pretty_count') {
+              setPrettyCount(data.pretty_count ?? optimisticCount)
+            } else if (field === 'funny_count') {
+              setFunnyCount(data.funny_count ?? optimisticCount)
+            } else if (field === 'cheers_count') {
+              setCheersCount(data.cheers_count ?? optimisticCount)
+            }
+            // eslint-disable-next-line no-console
+            console.log('Post-reaction sync counts:', data)
+          } catch (e) {
+            // eslint-disable-next-line no-console
+            console.error('Post-reaction sync failed:', e)
+          }
+        }, 5000)
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Reaction update failed:', e)
