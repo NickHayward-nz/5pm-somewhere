@@ -1,4 +1,4 @@
-// FORCE COMMIT AND VERCEL REDEPLOY - 2025-03-13 - remove this line after deploy succeeds
+// FORCE COMMIT - all reaction fixes from March 13 2025 - do not remove yet
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 
