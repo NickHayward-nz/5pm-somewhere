@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 
 type Props = {
@@ -6,6 +7,7 @@ type Props = {
 
 export default function SignInButton({ userEmail }: Props) {
   const sb = getSupabase()
+  const [email, setEmail] = useState('')
   // eslint-disable-next-line no-console
   console.log('Sign-in box rendered')
 
@@ -43,6 +45,26 @@ export default function SignInButton({ userEmail }: Props) {
     }
   }
 
+  const handleMagicLink = async () => {
+    if (!sb) {
+      window.alert('Supabase not configured')
+      return
+    }
+    try {
+      await sb.auth.signInWithOtp({
+        email: email.trim(),
+        options: {
+          emailRedirectTo: `${window.location.origin}/auth/callback`,
+        },
+      })
+      window.alert('Magic link sent! Check your email.')
+    } catch (e) {
+      // eslint-disable-next-line no-console
+      console.error(e)
+      window.alert('Unable to send magic link.')
+    }
+  }
+
   const glassBox =
     'bg-white/10 backdrop-blur-md border border-white/20 rounded-lg shadow-lg px-3 py-2 sm:px-4 sm:py-2 min-w-[140px] flex items-center justify-center gap-2 text-white font-medium text-[0.7rem] sm:text-xs'
 
@@ -64,13 +86,27 @@ export default function SignInButton({ userEmail }: Props) {
   }
 
   return (
-    <div className={glassBox}>
+    <div className={`${glassBox} flex-col items-stretch gap-2`}>
       <button
         type="button"
         onClick={handleSignIn}
         className="btn-glow flex-shrink-0 text-[0.7rem] sm:text-xs px-2 py-1 sm:px-3 sm:py-1.5 hover:scale-105 transition-transform"
       >
         Sign in with Google
+      </button>
+      <input
+        type="email"
+        placeholder="your@email.com"
+        value={email}
+        onChange={(e) => setEmail(e.target.value)}
+        className="rounded px-3 py-2 bg-white/10 border border-white/20 text-white placeholder:text-white/50 text-[0.7rem] sm:text-xs w-full min-w-0"
+      />
+      <button
+        type="button"
+        onClick={handleMagicLink}
+        className="btn-glow flex-shrink-0 text-[0.7rem] sm:text-xs px-2 py-1 sm:px-3 sm:py-1.5 hover:scale-105 transition-transform"
+      >
+        Send Magic Link
       </button>
     </div>
   )
