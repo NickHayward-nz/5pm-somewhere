@@ -70,6 +70,7 @@ export function LiveStream({ open, onClose }: Props) {
     cheers: false,
   })
   const [fetchFrozenUntil, setFetchFrozenUntil] = useState(0)
+  const [lastReactionTime, setLastReactionTime] = useState(0)
   const currentVideoIdRef = useRef<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -136,11 +137,14 @@ export function LiveStream({ open, onClose }: Props) {
 
   const fetchReactionCounts = useCallback(
     async (momentId: string) => {
-      if (Date.now() < fetchFrozenUntil) {
+      // Skip normal fetches for a window after a recent reaction so we don't overwrite optimistic counts with stale data
+      if (Date.now() < fetchFrozenUntil || Date.now() - lastReactionTime < 15000) {
         // eslint-disable-next-line no-console
         console.log(
           'Fetch skipped - reaction freeze active until',
-          new Date(fetchFrozenUntil).toLocaleTimeString(),
+          new Date(
+            Math.max(fetchFrozenUntil, lastReactionTime + 15000),
+          ).toLocaleTimeString(),
         )
         return
       }
@@ -182,7 +186,7 @@ export function LiveStream({ open, onClose }: Props) {
         console.error('Failed to fetch reaction counts:', e)
       }
     },
-    [fetchFrozenUntil],
+    [fetchFrozenUntil, lastReactionTime],
   )
 
   const toggleReaction = useCallback(
@@ -287,14 +291,16 @@ export function LiveStream({ open, onClose }: Props) {
         await sb.from('moments').update({ [field]: optimisticCount }).eq('id', momentId)
         // eslint-disable-next-line no-console
         console.log('Reaction updated - optimistic count:', optimisticCount)
-        const freezeEnd = Date.now() + 5000
+        const now = Date.now()
+        const freezeEnd = now + 5000
         setFetchFrozenUntil(freezeEnd)
+        setLastReactionTime(now)
         // eslint-disable-next-line no-console
         console.log(
           'Reaction updated - reaction freeze active until',
           new Date(freezeEnd).toLocaleTimeString(),
         )
-        // Force sync at the end of the freeze window so we pick up the real count without ever flashing back to 0
+        // Force a one-time sync after 12s and never let the count drop below the optimistic value
         setTimeout(async () => {
           const sbInner = getSupabase()
           if (!sbInner) return
@@ -307,19 +313,27 @@ export function LiveStream({ open, onClose }: Props) {
             if (!data) return
             if (momentId !== current?.id) return
             if (field === 'pretty_count') {
-              setPrettyCount(data.pretty_count ?? optimisticCount)
+              const synced = data.pretty_count ?? 0
+              setPrettyCount(Math.max(synced, optimisticCount))
+              // eslint-disable-next-line no-console
+              console.log(
+                'Final 12s sync count (pretty):',
+                synced,
+                'using max:',
+                Math.max(synced, optimisticCount),
+              )
             } else if (field === 'funny_count') {
-              setFunnyCount(data.funny_count ?? optimisticCount)
+              const synced = data.funny_count ?? 0
+              setFunnyCount(Math.max(synced, optimisticCount))
             } else if (field === 'cheers_count') {
-              setCheersCount(data.cheers_count ?? optimisticCount)
+              const synced = data.cheers_count ?? 0
+              setCheersCount(Math.max(synced, optimisticCount))
             }
-            // eslint-disable-next-line no-console
-            console.log('Post-reaction sync counts:', data)
           } catch (e) {
             // eslint-disable-next-line no-console
-            console.error('Post-reaction sync failed:', e)
+            console.error('Final 12s sync failed:', e)
           }
-        }, 5000)
+        }, 12000)
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Reaction update failed:', e)
