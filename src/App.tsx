@@ -218,7 +218,7 @@ function App() {
   }, [now])
 
   return (
-    <div className="h-full min-h-0 flex flex-col overflow-hidden vhs-noise bg-sunset-gradient">
+    <div className="min-h-screen flex flex-col overflow-x-hidden vhs-noise bg-sunset-gradient">
       <div className="app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-4 lg:py-5">
         <header className="app-header-landscape flex-shrink-0 mb-2 sm:mb-4 flex items-start justify-between gap-2 sm:gap-4">
           <div className="flex items-start gap-2 sm:gap-3 min-w-0">
