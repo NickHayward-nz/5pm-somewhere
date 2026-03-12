@@ -8,6 +8,7 @@ type Props = {
 export default function SignInButton({ userEmail }: Props) {
   const sb = getSupabase()
   const [email, setEmail] = useState('')
+  const [showSignInModal, setShowSignInModal] = useState(false)
   // eslint-disable-next-line no-console
   console.log('Sign-in box rendered')
 
@@ -86,29 +87,61 @@ export default function SignInButton({ userEmail }: Props) {
   }
 
   return (
-    <div className={`${glassBox} flex-col items-stretch gap-2`}>
+    <>
       <button
         type="button"
-        onClick={handleSignIn}
-        className="btn-glow flex-shrink-0 text-[0.7rem] sm:text-xs px-2 py-1 sm:px-3 sm:py-1.5 hover:scale-105 transition-transform"
+        onClick={() => setShowSignInModal(true)}
+        className="btn-glow text-[0.7rem] sm:text-xs px-3 py-1.5 sm:px-4 sm:py-1.5 rounded-full bg-white/10 backdrop-blur-md border border-white/20 shadow-lg text-white font-medium hover:scale-105 transition-transform"
       >
-        Sign in with Google
+        Sign In
       </button>
-      <input
-        type="email"
-        placeholder="your@email.com"
-        value={email}
-        onChange={(e) => setEmail(e.target.value)}
-        className="rounded px-3 py-2 bg-white/10 border border-white/20 text-white placeholder:text-white/50 text-[0.7rem] sm:text-xs w-full min-w-0"
-      />
-      <button
-        type="button"
-        onClick={handleMagicLink}
-        className="btn-glow flex-shrink-0 text-[0.7rem] sm:text-xs px-2 py-1 sm:px-3 sm:py-1.5 hover:scale-105 transition-transform"
-      >
-        Send Magic Link
-      </button>
-    </div>
+
+      {showSignInModal && (
+        <div
+          className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-[10001] p-4"
+          onClick={() => setShowSignInModal(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Sign in"
+        >
+          <div
+            className="bg-white/10 backdrop-blur-md border border-white/20 rounded-xl shadow-2xl p-6 sm:p-8 max-w-[400px] w-full mx-4 relative"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <button
+              type="button"
+              onClick={() => setShowSignInModal(false)}
+              className="absolute top-4 right-4 text-white/70 hover:text-white text-sm"
+            >
+              Close
+            </button>
+            <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 text-center pr-8">Sign In</h2>
+            <button
+              type="button"
+              onClick={handleSignIn}
+              className="w-full btn-glow py-3 rounded-lg mb-6 text-sm sm:text-base font-medium"
+            >
+              Sign in with Google
+            </button>
+            <div className="text-center text-white/70 text-xs sm:text-sm mb-4">or use email</div>
+            <input
+              type="email"
+              placeholder="your@email.com"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="w-full bg-white/10 border border-white/20 rounded-lg px-4 py-3 mb-4 text-white placeholder-white/50 focus:outline-none focus:border-white/40 text-sm"
+            />
+            <button
+              type="button"
+              onClick={handleMagicLink}
+              className="w-full bg-gradient-to-r from-orange-500 to-pink-500 py-3 rounded-lg text-white font-medium hover:opacity-90 text-sm"
+            >
+              Send Magic Link
+            </button>
+          </div>
+        </div>
+      )}
+    </>
   )
 }
 
