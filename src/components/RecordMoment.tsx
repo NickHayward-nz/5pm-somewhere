@@ -353,12 +353,20 @@ export function RecordMoment(props: Props) {
       )
 
       const now = DateTime.now().setZone(userTz)
-      // TEMP: use a valid UUID for anonymous/test uploads to satisfy Supabase uuid column
-      const testUserId = '00000000-0000-0000-0000-000000000000'
-      const effectiveId = userId || testUserId
+
+      const { data: userData, error: userError } = await sb.auth.getUser()
+      if (userError) {
+        // eslint-disable-next-line no-console
+        console.error('Failed to get current user for upload:', userError)
+      }
+      const authUserId = userData?.user?.id
+      if (!authUserId) {
+        window.alert('You must be signed in to upload a moment.')
+        return
+      }
       // eslint-disable-next-line no-console
-      console.log('Using user_id for upload:', effectiveId)
-      const path = `${effectiveId}/${now.toFormat('yyyy/LL/dd')}/${now.toMillis()}.webm`
+      console.log('Using user_id for upload:', authUserId)
+      const path = `${authUserId}/${now.toFormat('yyyy/LL/dd')}/${now.toMillis()}.webm`
       // eslint-disable-next-line no-console
       console.log('Uploading to path:', path)
 
@@ -380,7 +388,7 @@ export function RecordMoment(props: Props) {
       console.log('Public video URL:', videoUrl)
 
       const insertRow = {
-        user_id: effectiveId,
+        user_id: authUserId,
         timezone: userTz,
         city,
         country,
@@ -392,7 +400,7 @@ export function RecordMoment(props: Props) {
         cheers_count: 0,
       }
       // eslint-disable-next-line no-console
-      console.log('Using user_id for insert:', effectiveId)
+      console.log('Using real user_id from auth for insert:', authUserId)
       // eslint-disable-next-line no-console
       console.log('Inserting moments row:', insertRow)
 
@@ -419,7 +427,7 @@ export function RecordMoment(props: Props) {
         await updateProfileAfterUpload(userId, userTz, previous)
         onProfileUpdated()
       }
-      trackVideoUploaded({ userId: effectiveId, durationSec, isPremium, tz: userTz })
+      trackVideoUploaded({ userId: authUserId, durationSec, isPremium, tz: userTz })
       // eslint-disable-next-line no-console
       console.log('=== UPLOAD COMPLETE ===')
       onClose()
