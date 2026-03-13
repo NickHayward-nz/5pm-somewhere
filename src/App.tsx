@@ -363,7 +363,7 @@ function App() {
           onProfileUpdated={refetchProfile}
         />
       )}
-      <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} />
+      <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} userId={userId} />
     </div>
   )
 }

@@ -19,9 +19,16 @@ export type MomentRow = {
 const FETCH_LIMIT = 20
 const PRELOAD_NEXT = 3
 
+const REACTION_FIELD_TO_TYPE: Record<'pretty_count' | 'funny_count' | 'cheers_count', 'pretty' | 'funny' | 'cheers'> = {
+  pretty_count: 'pretty',
+  funny_count: 'funny',
+  cheers_count: 'cheers',
+}
+
 type Props = {
   open: boolean
   onClose: () => void
+  userId?: string | null
 }
 
 const POSTER_PLACEHOLDER =
@@ -54,7 +61,7 @@ function hasReacted(momentId: string, field: string): boolean {
   }
 }
 
-export function LiveStream({ open, onClose }: Props) {
+export function LiveStream({ open, onClose, userId }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -192,11 +199,25 @@ export function LiveStream({ open, onClose }: Props) {
           setPrettyCount(data.pretty_count ?? 0)
           setFunnyCount(data.funny_count ?? 0)
           setCheersCount(data.cheers_count ?? 0)
-          setUserReactions({
-            pretty: hasReacted(momentId, 'pretty_count'),
-            funny: hasReacted(momentId, 'funny_count'),
-            cheers: hasReacted(momentId, 'cheers_count'),
-          })
+          if (userId) {
+            const { data: myReactions } = await sb
+              .from('user_reactions')
+              .select('reaction_type')
+              .eq('user_id', userId)
+              .eq('moment_id', momentId)
+            const types = new Set((myReactions ?? []).map((r: { reaction_type: string }) => r.reaction_type))
+            setUserReactions({
+              pretty: types.has('pretty'),
+              funny: types.has('funny'),
+              cheers: types.has('cheers'),
+            })
+          } else {
+            setUserReactions({
+              pretty: hasReacted(momentId, 'pretty_count'),
+              funny: hasReacted(momentId, 'funny_count'),
+              cheers: hasReacted(momentId, 'cheers_count'),
+            })
+          }
         }
         // eslint-disable-next-line no-console
         console.log('Normal fetch counts:', data)
@@ -205,25 +226,36 @@ export function LiveStream({ open, onClose }: Props) {
         console.error('Failed to fetch reaction counts:', e)
       }
     },
-    [fetchFrozenUntil, lastReactionTime],
+    [fetchFrozenUntil, lastReactionTime, userId],
   )
 
   const toggleReaction = useCallback(
     async (momentId: string, field: 'pretty_count' | 'funny_count' | 'cheers_count') => {
       const key = getReactionStorageKey(momentId, field)
-      const alreadyReacted = (() => {
-        try {
-          return localStorage.getItem(key) === '1'
-        } catch {
-          return false
-        }
-      })()
-
       const sb = getSupabase()
       if (!sb) return
 
       const currentVideoId = current?.id
       if (momentId !== currentVideoId) return
+
+      let alreadyReacted: boolean
+      if (userId) {
+        const reactionType = REACTION_FIELD_TO_TYPE[field]
+        const { data } = await sb
+          .from('user_reactions')
+          .select('id')
+          .eq('user_id', userId)
+          .eq('moment_id', momentId)
+          .eq('reaction_type', reactionType)
+          .maybeSingle()
+        alreadyReacted = !!data
+      } else {
+        try {
+          alreadyReacted = localStorage.getItem(key) === '1'
+        } catch {
+          alreadyReacted = false
+        }
+      }
 
       if (alreadyReacted) {
         // Undo: decrement
@@ -245,16 +277,56 @@ export function LiveStream({ open, onClose }: Props) {
           funny: field === 'funny_count' ? false : u.funny,
           cheers: field === 'cheers_count' ? false : u.cheers,
         }))
-        try {
-          localStorage.removeItem(key)
-        } catch {
-          // ignore
+        if (!userId) {
+          try {
+            localStorage.removeItem(key)
+          } catch {
+            // ignore
+          }
+        }
+        if (userId) {
+          const { error: delErr } = await sb
+            .from('user_reactions')
+            .delete()
+            .eq('user_id', userId)
+            .eq('moment_id', momentId)
+            .eq('reaction_type', REACTION_FIELD_TO_TYPE[field])
+          if (delErr) {
+            // eslint-disable-next-line no-console
+            console.error('user_reactions delete (undo) failed:', delErr)
+            const prevCount =
+              field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
+            setQueue((prevQueue) =>
+              prevQueue.map((mom) =>
+                mom.id === momentId ? { ...mom, [field]: prevCount } : mom,
+              ),
+            )
+            setPrettyCount(field === 'pretty_count' ? prevCount : prettyCount)
+            setFunnyCount(field === 'funny_count' ? prevCount : funnyCount)
+            setCheersCount(field === 'cheers_count' ? prevCount : cheersCount)
+            setUserReactions((u) => ({
+              ...u,
+              pretty: field === 'pretty_count' ? true : u.pretty,
+              funny: field === 'funny_count' ? true : u.funny,
+              cheers: field === 'cheers_count' ? true : u.cheers,
+            }))
+            return
+          }
         }
       try {
         const { error } = await sb.from('moments').update({ [field]: newCount }).eq('id', momentId)
         if (error) {
           // eslint-disable-next-line no-console
           console.error('Supabase reaction update (undo) failed:', error)
+          if (userId) {
+            await sb
+              .from('user_reactions')
+              .insert({
+                user_id: userId,
+                moment_id: momentId,
+                reaction_type: REACTION_FIELD_TO_TYPE[field],
+              })
+          }
           const prevCount =
             field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
           setQueue((prevQueue) =>
@@ -271,10 +343,12 @@ export function LiveStream({ open, onClose }: Props) {
             funny: field === 'funny_count' ? true : u.funny,
             cheers: field === 'cheers_count' ? true : u.cheers,
           }))
-          try {
-            localStorage.setItem(key, '1')
-          } catch {
-            // ignore
+          if (!userId) {
+            try {
+              localStorage.setItem(key, '1')
+            } catch {
+              // ignore
+            }
           }
           return
         }
@@ -285,6 +359,15 @@ export function LiveStream({ open, onClose }: Props) {
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Reaction remove failed:', e)
+          if (userId) {
+            await sb
+              .from('user_reactions')
+              .insert({
+                user_id: userId,
+                moment_id: momentId,
+                reaction_type: REACTION_FIELD_TO_TYPE[field],
+              })
+          }
           const prevCount =
             field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
           setQueue((prevQueue) =>
@@ -301,10 +384,12 @@ export function LiveStream({ open, onClose }: Props) {
             funny: field === 'funny_count' ? true : u.funny,
             cheers: field === 'cheers_count' ? true : u.cheers,
           }))
-          try {
-            localStorage.setItem(key, '1')
-          } catch {
-            // ignore
+          if (!userId) {
+            try {
+              localStorage.setItem(key, '1')
+            } catch {
+              // ignore
+            }
           }
         }
         return
@@ -327,16 +412,22 @@ export function LiveStream({ open, onClose }: Props) {
         funny: field === 'funny_count' ? true : u.funny,
         cheers: field === 'cheers_count' ? true : u.cheers,
       }))
-      try {
-        localStorage.setItem(key, '1')
-      } catch {
-        // ignore
+      if (!userId) {
+        try {
+          localStorage.setItem(key, '1')
+        } catch {
+          // ignore
+        }
       }
-      try {
-        const { error } = await sb.from('moments').update({ [field]: optimisticCount }).eq('id', momentId)
-        if (error) {
+      if (userId) {
+        const { error: insertErr } = await sb.from('user_reactions').insert({
+          user_id: userId,
+          moment_id: momentId,
+          reaction_type: REACTION_FIELD_TO_TYPE[field],
+        })
+        if (insertErr) {
           // eslint-disable-next-line no-console
-          console.error('Supabase reaction update failed:', error)
+          console.error('user_reactions insert failed:', insertErr)
           const prevCount =
             field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
           setQueue((prevQueue) =>
@@ -353,10 +444,44 @@ export function LiveStream({ open, onClose }: Props) {
             funny: field === 'funny_count' ? false : u.funny,
             cheers: field === 'cheers_count' ? false : u.cheers,
           }))
-          try {
-            localStorage.removeItem(key)
-          } catch {
-            // ignore
+          return
+        }
+      }
+      try {
+        const { error } = await sb.from('moments').update({ [field]: optimisticCount }).eq('id', momentId)
+        if (error) {
+          // eslint-disable-next-line no-console
+          console.error('Supabase reaction update failed:', error)
+          if (userId) {
+            await sb
+              .from('user_reactions')
+              .delete()
+              .eq('user_id', userId)
+              .eq('moment_id', momentId)
+              .eq('reaction_type', REACTION_FIELD_TO_TYPE[field])
+          }
+          const prevCount =
+            field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
+          setQueue((prevQueue) =>
+            prevQueue.map((mom) =>
+              mom.id === momentId ? { ...mom, [field]: prevCount } : mom,
+            ),
+          )
+          setPrettyCount(field === 'pretty_count' ? prevCount : prettyCount)
+          setFunnyCount(field === 'funny_count' ? prevCount : funnyCount)
+          setCheersCount(field === 'cheers_count' ? prevCount : cheersCount)
+          setUserReactions((u) => ({
+            ...u,
+            pretty: field === 'pretty_count' ? false : u.pretty,
+            funny: field === 'funny_count' ? false : u.funny,
+            cheers: field === 'cheers_count' ? false : u.cheers,
+          }))
+          if (!userId) {
+            try {
+              localStorage.removeItem(key)
+            } catch {
+              // ignore
+            }
           }
           return
         }
@@ -408,6 +533,14 @@ export function LiveStream({ open, onClose }: Props) {
       } catch (e) {
         // eslint-disable-next-line no-console
         console.error('Reaction update failed:', e)
+        if (userId) {
+          await sb
+            .from('user_reactions')
+            .delete()
+            .eq('user_id', userId)
+            .eq('moment_id', momentId)
+            .eq('reaction_type', REACTION_FIELD_TO_TYPE[field])
+        }
         setQueue((prevQueue) =>
           prevQueue.map((mom) =>
             mom.id === momentId
@@ -424,14 +557,16 @@ export function LiveStream({ open, onClose }: Props) {
           funny: field === 'funny_count' ? false : u.funny,
           cheers: field === 'cheers_count' ? false : u.cheers,
         }))
-        try {
-          localStorage.removeItem(key)
-        } catch {
-          // ignore
+        if (!userId) {
+          try {
+            localStorage.removeItem(key)
+          } catch {
+            // ignore
+          }
         }
       }
     },
-    [prettyCount, funnyCount, cheersCount, current?.id, fetchReactionCounts],
+    [prettyCount, funnyCount, cheersCount, current?.id, fetchReactionCounts, userId],
   )
 
   // When current video changes (skip, return, initial load), fetch latest reaction counts from Supabase
@@ -441,13 +576,64 @@ export function LiveStream({ open, onClose }: Props) {
     setPrettyCount(current.pretty_count ?? 0)
     setFunnyCount(current.funny_count ?? 0)
     setCheersCount(current.cheers_count ?? 0)
-    setUserReactions({
-      pretty: hasReacted(current.id, 'pretty_count'),
-      funny: hasReacted(current.id, 'funny_count'),
-      cheers: hasReacted(current.id, 'cheers_count'),
-    })
+    setUserReactions(
+      userId
+        ? { pretty: false, funny: false, cheers: false }
+        : {
+            pretty: hasReacted(current.id, 'pretty_count'),
+            funny: hasReacted(current.id, 'funny_count'),
+            cheers: hasReacted(current.id, 'cheers_count'),
+          },
+    )
     fetchReactionCounts(current.id)
-  }, [current?.id, fetchReactionCounts])
+  }, [current?.id, fetchReactionCounts, userId])
+
+  // Realtime: when logged in, sync user_reactions for current moment across devices/tabs
+  useEffect(() => {
+    if (!userId || !current?.id) return
+    const sb = getSupabase()
+    if (!sb) return
+    const momentId = current.id
+    const channel = sb
+      .channel(`user_reactions:${userId}:${momentId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'user_reactions',
+          filter: `user_id=eq.${userId}`,
+        },
+        (payload) => {
+          const row = payload.new as { moment_id?: string; reaction_type?: string } | undefined
+          const oldRow = payload.old as { moment_id?: string; reaction_type?: string } | undefined
+          const mid = row?.moment_id ?? oldRow?.moment_id
+          const type = row?.reaction_type ?? oldRow?.reaction_type
+          if (mid !== momentId || !type) return
+          if (payload.eventType === 'INSERT') {
+            setUserReactions((u) => ({
+              ...u,
+              pretty: type === 'pretty' ? true : u.pretty,
+              funny: type === 'funny' ? true : u.funny,
+              cheers: type === 'cheers' ? true : u.cheers,
+            }))
+          } else if (payload.eventType === 'DELETE') {
+            setUserReactions((u) => ({
+              ...u,
+              pretty: type === 'pretty' ? false : u.pretty,
+              funny: type === 'funny' ? false : u.funny,
+              cheers: type === 'cheers' ? false : u.cheers,
+            }))
+          }
+          // Refetch global counts so this client sees latest
+          fetchReactionCounts(momentId)
+        },
+      )
+      .subscribe()
+    return () => {
+      sb.removeChannel(channel)
+    }
+  }, [userId, current?.id, fetchReactionCounts])
 
   // Load current video as blob URL; revoke previous only after new one loads (in onCanPlay)
   useEffect(() => {
