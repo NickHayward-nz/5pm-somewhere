@@ -379,7 +379,7 @@ export function RecordMoment(props: Props) {
       console.log('Public video URL:', videoUrl)
 
       const insertRow = {
-        user_id: null,
+        user_id: effectiveId,
         timezone: userTz,
         city,
         country,
@@ -390,6 +390,8 @@ export function RecordMoment(props: Props) {
         funny_count: 0,
         cheers_count: 0,
       }
+      // eslint-disable-next-line no-console
+      console.log('Using user_id for insert:', effectiveId)
       // eslint-disable-next-line no-console
       console.log('Inserting moments row:', insertRow)
 
