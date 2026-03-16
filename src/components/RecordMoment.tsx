@@ -1,4 +1,6 @@
 // FORCE COMMIT - user_id fix - 2025-03-13 - delete me after push
+// FORCE COMMIT - user_id fix - 2025-03-13 - delete me after push
+// FORCE COMMIT - user_id fix - 2025-03-13 - delete me after push
 import { useEffect, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getSupabase } from '../lib/supabase'
@@ -330,6 +332,8 @@ export function RecordMoment(props: Props) {
     try {
       const sb = getSupabase()
       if (!sb) throw new Error('Supabase is not configured.')
+      // eslint-disable-next-line no-console
+      console.log('Supabase auth session:', await sb.auth.getSession())
       const res = await fetch(previewUrl)
       const blob = await res.blob()
       const duration = durationSec
@@ -404,7 +408,20 @@ export function RecordMoment(props: Props) {
       // eslint-disable-next-line no-console
       console.log('Inserting moments row:', insertRow)
 
+      const { data: sessionData } = await sb.auth.getSession()
+      const session = sessionData?.session
+      if (!session) {
+        // eslint-disable-next-line no-console
+        console.error('No active auth session - upload will fail RLS')
+        window.alert('You must be signed in to upload a moment.')
+        return
+      }
+      // eslint-disable-next-line no-console
+      console.log('Authenticated session found - proceeding with insert')
+
       try {
+        // eslint-disable-next-line no-console
+        console.log('Insert request should be authenticated now')
         const { data, error } = await sb.from('moments').insert([insertRow])
         if (error) throw error
         // eslint-disable-next-line no-console
