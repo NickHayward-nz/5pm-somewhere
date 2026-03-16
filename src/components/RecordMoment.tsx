@@ -83,6 +83,24 @@ export function RecordMoment(props: Props) {
     return () => cleanup()
   }, [])
 
+  // Ensure session is persisted and client has auth token before upload (e.g. after sign-in)
+  useEffect(() => {
+    if (!open) return
+    const sb = getSupabase()
+    if (!sb) return
+    void sb.auth.refreshSession()
+    const {
+      data: { subscription },
+    } = sb.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        void sb.auth.refreshSession()
+      }
+    })
+    return () => {
+      subscription?.unsubscribe()
+    }
+  }, [open])
+
   async function startCountdownAndRecord() {
     setError(null)
     // TEMP: auth + daily-limit bypassed for testing - re-enable last_post_date check later
@@ -332,8 +350,16 @@ export function RecordMoment(props: Props) {
     try {
       const sb = getSupabase()
       if (!sb) throw new Error('Supabase is not configured.')
+      const { data: sessionResult } = await sb.auth.getSession()
+      const session = sessionResult?.session
+      if (!session) {
+        // eslint-disable-next-line no-console
+        console.error('No active session - upload will fail RLS')
+        window.alert('You must be signed in to upload a moment.')
+        return
+      }
       // eslint-disable-next-line no-console
-      console.log('Supabase auth session:', await sb.auth.getSession())
+      console.log('Authenticated session found - token present, proceeding with insert')
       const res = await fetch(previewUrl)
       const blob = await res.blob()
       const duration = durationSec
@@ -408,20 +434,9 @@ export function RecordMoment(props: Props) {
       // eslint-disable-next-line no-console
       console.log('Inserting moments row:', insertRow)
 
-      const { data: sessionData } = await sb.auth.getSession()
-      const session = sessionData?.session
-      if (!session) {
-        // eslint-disable-next-line no-console
-        console.error('No active auth session - upload will fail RLS')
-        window.alert('You must be signed in to upload a moment.')
-        return
-      }
-      // eslint-disable-next-line no-console
-      console.log('Authenticated session found - proceeding with insert')
-
       try {
         // eslint-disable-next-line no-console
-        console.log('Insert request should be authenticated now')
+        console.log('Insert request headers should include auth token')
         const { data, error } = await sb.from('moments').insert([insertRow])
         if (error) throw error
         // eslint-disable-next-line no-console
