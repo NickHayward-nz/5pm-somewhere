@@ -368,6 +368,15 @@ export function RecordMoment(props: Props) {
         return
       }
       // eslint-disable-next-line no-console
+      console.log('Session check in upload:', session ? 'Signed in as ' + session.user?.id : 'Not signed in')
+      const authUserId = session.user?.id ?? userId
+      // eslint-disable-next-line no-console
+      console.log('Final user_id for insert:', authUserId || 'MISSING')
+      if (!authUserId) {
+        window.alert('You must be signed in to upload a moment.')
+        return
+      }
+      // eslint-disable-next-line no-console
       console.log('Authenticated session found - token present, proceeding with insert')
       const res = await fetch(previewUrl)
       const blob = await res.blob()
@@ -393,16 +402,6 @@ export function RecordMoment(props: Props) {
 
       const now = DateTime.now().setZone(userTz)
 
-      const { data: userData, error: userError } = await sb.auth.getUser()
-      if (userError) {
-        // eslint-disable-next-line no-console
-        console.error('Failed to get current user for upload:', userError)
-      }
-      const authUserId = userData?.user?.id
-      if (!authUserId) {
-        window.alert('You must be signed in to upload a moment.')
-        return
-      }
       // eslint-disable-next-line no-console
       console.log('Using user_id for upload:', authUserId)
       const path = `${authUserId}/${now.toFormat('yyyy/LL/dd')}/${now.toMillis()}.webm`
