@@ -47,6 +47,11 @@ export function RecordMoment(props: Props) {
   const MAX_SEC = isPremium ? 30 : 20
 
   useEffect(() => {
+    // eslint-disable-next-line no-console
+    console.log('Modal open state:', open, 'Step:', step)
+  }, [open, step])
+
+  useEffect(() => {
     if (!open) {
       cleanup()
       if (previewUrlRef.current) {
@@ -92,6 +97,10 @@ export function RecordMoment(props: Props) {
     const {
       data: { subscription },
     } = sb.auth.onAuthStateChange((event) => {
+      // eslint-disable-next-line no-console
+      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
+        console.log('RecordMoment auth event:', event)
+      }
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         void sb.auth.refreshSession()
       }

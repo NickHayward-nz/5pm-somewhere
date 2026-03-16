@@ -51,6 +51,7 @@ function App() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [recordOpen, setRecordOpen] = useState(false)
   const [liveStreamOpen, setLiveStreamOpen] = useState(false)
+  const recordOpenRef = useRef(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
   const premiumQuery = useMemo(() => {
@@ -66,6 +67,10 @@ function App() {
   }, [])
 
   useEffect(() => {
+    recordOpenRef.current = recordOpen
+  }, [recordOpen])
+
+  useEffect(() => {
     const sb = getSupabase()
     if (!sb) return
     void sb.auth.getUser().then(({ data }: { data: any }) => {
@@ -74,9 +79,18 @@ function App() {
     })
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange((_event: any, session: any) => {
-      setUserId(session?.user?.id ?? null)
-      setUserEmail(session?.user?.email ?? null)
+    } = sb.auth.onAuthStateChange((event: any, session: any) => {
+      // eslint-disable-next-line no-console
+      console.log('Auth state change:', event, 'Session:', session != null ? 'present' : 'null')
+      if (session != null) {
+        setUserId(session.user?.id ?? null)
+        setUserEmail(session.user?.email ?? null)
+      } else {
+        if (!recordOpenRef.current) {
+          setUserId(null)
+          setUserEmail(null)
+        }
+      }
     })
     return () => subscription.unsubscribe()
   }, [])
