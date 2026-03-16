@@ -361,15 +361,12 @@ export function RecordMoment(props: Props) {
       if (!sb) throw new Error('Supabase is not configured.')
       const { data: sessionResult } = await sb.auth.getSession()
       const session = sessionResult?.session
-      if (!session) {
-        // eslint-disable-next-line no-console
-        console.error('No active session - upload will fail RLS')
-        window.alert('You must be signed in to upload a moment.')
-        return
-      }
       // eslint-disable-next-line no-console
-      console.log('Session check in upload:', session ? 'Signed in as ' + session.user?.id : 'Not signed in')
-      const authUserId = session.user?.id ?? userId
+      console.log(
+        'Session check in upload:',
+        session ? 'Signed in as ' + (session.user?.id ?? 'UNKNOWN') : 'Not signed in',
+      )
+      const authUserId = (session && session.user?.id) ? session.user.id : userId
       // eslint-disable-next-line no-console
       console.log('Final user_id for insert:', authUserId || 'MISSING')
       if (!authUserId) {
