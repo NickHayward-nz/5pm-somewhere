@@ -252,9 +252,6 @@ function App() {
               <div className="text-[9px] sm:text-sm uppercase tracking-[0.15em] sm:tracking-[0.24em] text-sunset-100/80 whitespace-nowrap overflow-visible [text-overflow:clip]">
                 5PM Somewhere
               </div>
-              <div className="text-[10px] sm:text-xs text-sunset-200/70 font-mono hidden sm:block">
-                Luxon + Three.js · PWA
-              </div>
             </div>
           </div>
 
@@ -263,9 +260,6 @@ function App() {
               Your local time
             </div>
             <div className="font-mono text-xs sm:text-base text-sunset-50/90">{formatClock(DateTime.local())}</div>
-            <div className="text-[10px] sm:text-[11px] text-sunset-100/60 hidden sm:block">
-              {isPremium ? 'Premium (8 min)' : 'Free (5 min)'} · <span className="font-mono">?premium=1</span>
-            </div>
             <div className="mt-1 sm:mt-2 flex justify-end">
               <SignInButton userEmail={userEmail} />
             </div>
