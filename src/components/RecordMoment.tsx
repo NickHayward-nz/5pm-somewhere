@@ -88,22 +88,16 @@ export function RecordMoment(props: Props) {
     return () => cleanup()
   }, [])
 
-  // Ensure session is persisted and client has auth token before upload (e.g. after sign-in)
+  // Optional: observe auth events while the modal is open (for debugging only)
   useEffect(() => {
     if (!open) return
     const sb = getSupabase()
     if (!sb) return
-    void sb.auth.refreshSession()
     const {
       data: { subscription },
     } = sb.auth.onAuthStateChange((event) => {
       // eslint-disable-next-line no-console
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-        console.log('RecordMoment auth event:', event)
-      }
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        void sb.auth.refreshSession()
-      }
+      console.log('RecordMoment auth event:', event)
     })
     return () => {
       subscription?.unsubscribe()
@@ -360,13 +354,16 @@ export function RecordMoment(props: Props) {
       const sb = getSupabase()
       if (!sb) throw new Error('Supabase is not configured.')
       const { data: sessionResult } = await sb.auth.getSession()
-      const session = sessionResult?.session
+      const session = sessionResult?.session ?? null
+      if (!session || !session.user?.id) {
+        // eslint-disable-next-line no-console
+        console.error('No active session in upload()')
+        window.alert('You must be signed in to upload a moment.')
+        return
+      }
+      const authUserId = session.user.id
       // eslint-disable-next-line no-console
-      console.log(
-        'Session check in upload:',
-        session ? 'Signed in as ' + (session.user?.id ?? 'UNKNOWN') : 'Not signed in',
-      )
-      const authUserId = (session && session.user?.id) ? session.user.id : userId
+      console.log('Session check in upload: Signed in as', authUserId)
       // eslint-disable-next-line no-console
       console.log('Final user_id for insert:', authUserId || 'MISSING')
       if (!authUserId) {
