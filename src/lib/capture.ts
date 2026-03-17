@@ -25,9 +25,12 @@ export function computeCaptureWindow(
 ): CaptureWindowState {
   const local = now.setZone(userTz)
   const diffMinutes = (local.hour - 17) * 60 + local.minute
-  const radiusMinutes = isPremium ? 4 : 2.5 // Free: 5 min window (±2.5), Premium: 8 min (±4)
-  const active = Math.abs(diffMinutes) <= radiusMinutes
-  const label = isPremium ? '8 min premium window' : '5 min free window'
+
+  // We want the capture window to start exactly at 5:00 PM local time (diffMinutes >= 0),
+  // and last for 5 minutes for free users and 8 minutes for premium users.
+  const maxMinutes = isPremium ? 8 : 5
+  const active = diffMinutes >= 0 && diffMinutes <= maxMinutes
+  const label = isPremium ? '8 min premium window (from 5:00 PM)' : '5 min free window (from 5:00 PM)'
   return { active, diffMinutes, label }
 }
 
