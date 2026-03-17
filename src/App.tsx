@@ -121,24 +121,32 @@ function App() {
       return { city, local, rawDiffMinutes, wrappedDiffMinutes }
     })
 
+    // Use day number to rotate between candidate cities across days.
+    // Same day => same index; next day => next index (mod list length).
+    const dayNumber = Math.floor(now.toUTC().toSeconds() / 86400)
+
     // 1) Cities effectively at 5PM: STRICTLY 17:00 to 17:05 (never before).
     const exact = computed.filter((c) => c.rawDiffMinutes >= 0 && c.rawDiffMinutes <= 5)
     if (exact.length > 0) {
-      // Prefer the earliest after-5 city, then alphabetical.
+      // Prefer the earliest after-5 city, then alphabetical; rotate daily through matches.
       const sortedExact = [...exact].sort((a, b) => {
         if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
         return a.city.name.localeCompare(b.city.name)
       })
-      return { candidates: computed, bestCandidate: sortedExact[0] }
+      const idx = dayNumber % sortedExact.length
+      const bestExact = sortedExact[idx]
+      return { candidates: computed, bestCandidate: bestExact }
     }
 
     // 2) Prefer strictly positive diffs (past 5PM). rawDiffMinutes > 0
     const positive = computed.filter((c) => c.rawDiffMinutes > 0)
     if (positive.length > 0) {
-      const bestPositive = [...positive].sort((a, b) => {
+      const sortedPositive = [...positive].sort((a, b) => {
         if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
         return a.city.name.localeCompare(b.city.name)
-      })[0]
+      })
+      const idx = dayNumber % sortedPositive.length
+      const bestPositive = sortedPositive[idx]
       return { candidates: computed, bestCandidate: bestPositive }
     }
 
