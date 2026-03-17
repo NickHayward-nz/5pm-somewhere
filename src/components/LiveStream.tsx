@@ -143,6 +143,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
 
   const current = queue[currentIndex]
   const hasNext = currentIndex < queue.length - 1
+  const hasPrev = currentIndex > 0
 
   const fetchReactionCounts = useCallback(
     async (momentId: string) => {
@@ -738,6 +739,19 @@ export function LiveStream({ open, onClose, userId }: Props) {
     }
   }, [hasNext, fetchMore])
 
+  const goPrev = useCallback(() => {
+    setTransitioning(true)
+    const video = videoRef.current
+    if (video) {
+      video.pause()
+    }
+    setCurrentIndex((i) => {
+      if (i <= 0) return 0
+      return i - 1
+    })
+    setTransitioning(false)
+  }, [])
+
   const handleEnded = useCallback(() => {
     goNext()
   }, [goNext])
@@ -962,24 +976,48 @@ export function LiveStream({ open, onClose, userId }: Props) {
             </>
           )}
           {current && queue.length > 0 && (
-            <button
-              type="button"
-              onClick={goNext}
-              className="fixed flex items-center justify-center rounded-full border-2 border-sunset-400/80 bg-sunset-500 font-bold uppercase leading-none text-midnight-900 shadow-lg hover:bg-sunset-400"
-              style={{
-                position: 'fixed',
-                bottom: 30,
-                right: 20,
-                zIndex: 30,
-                width: 90,
-                height: 48,
-                fontSize: '0.875rem',
-                backgroundColor: 'rgb(251 191 36)',
-                borderRadius: '9999px',
-              }}
-            >
-              Skip →
-            </button>
+            <>
+              {hasPrev && (
+                <button
+                  type="button"
+                  onClick={goPrev}
+                  aria-label="Previous video"
+                  className="fixed flex items-center justify-center rounded-full border-2 border-sunset-400/80 bg-sunset-500 text-midnight-900 shadow-lg hover:bg-sunset-400"
+                  style={{
+                    position: 'fixed',
+                    bottom: 30,
+                    left: 20,
+                    zIndex: 30,
+                    width: 56,
+                    height: 56,
+                    fontSize: '1.5rem',
+                    backgroundColor: 'rgb(251 191 36)',
+                    borderRadius: '9999px',
+                  }}
+                >
+                  ←
+                </button>
+              )}
+              <button
+                type="button"
+                onClick={goNext}
+                aria-label="Next video"
+                className="fixed flex items-center justify-center rounded-full border-2 border-sunset-400/80 bg-sunset-500 text-midnight-900 shadow-lg hover:bg-sunset-400"
+                style={{
+                  position: 'fixed',
+                  bottom: 30,
+                  right: 20,
+                  zIndex: 30,
+                  width: 56,
+                  height: 56,
+                  fontSize: '1.5rem',
+                  backgroundColor: 'rgb(251 191 36)',
+                  borderRadius: '9999px',
+                }}
+              >
+                →
+              </button>
+            </>
           )}
         </div>
 

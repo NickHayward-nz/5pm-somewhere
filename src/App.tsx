@@ -17,6 +17,7 @@ type FeaturedCity = {
   local: DateTime
   rawDiffMinutes: number // signed minutes from 17:00 (positive = after, negative = before)
   wrappedDiffMinutes: number // 0..1439, minutes past 17:00 with wrap-around (spec helper)
+  minutesSinceLastFive: number // 0..1439, minutes since most recent 17:00 (today or yesterday)
 }
 
 function showToast(message: string) {
@@ -112,56 +113,44 @@ function App() {
     }
 
     // Compute per-city local time and difference from 17:00 local time (in minutes).
-    // rawDiffMinutes: < 0 before 17:00, > 0 after 17:00, 0 exactly at 17:00
+    // rawDiffMinutes: < 0 before 17:00, > 0 after 17:00, 0 exactly at 17:00 (today)
     // wrappedDiffMinutes: spec-style helper: if (diff < 0) diff += 1440
+    // minutesSinceLastFive: minutes since MOST RECENT 17:00 (today or yesterday), always 0..1439
     const computed: FeaturedCity[] = CITIES.map((city) => {
       const local = now.setZone(city.tz)
-      const rawDiffMinutes = (local.hour - 17) * 60 + local.minute
+      const minutesToday = local.hour * 60 + local.minute
+      const FIVE_PM = 17 * 60
+      const MINUTES_PER_DAY = 24 * 60
+      const rawDiffMinutes = minutesToday - FIVE_PM
       const wrappedDiffMinutes = rawDiffMinutes >= 0 ? rawDiffMinutes : rawDiffMinutes + 1440
-      return { city, local, rawDiffMinutes, wrappedDiffMinutes }
+      const minutesSinceLastFive = (minutesToday - FIVE_PM + MINUTES_PER_DAY) % MINUTES_PER_DAY
+      return { city, local, rawDiffMinutes, wrappedDiffMinutes, minutesSinceLastFive }
     })
 
     // Use day number to rotate between candidate cities across days.
     const dayNumber = Math.floor(now.toUTC().toSeconds() / 86400)
-    const MAX_MINUTES_PAST_5 = 45
+    const MAX_MINUTES_SINCE_5 = 120 // 5pm–7pm window over the last 24 hours
 
-    // 1) Cities at 5PM: 17:00–17:05 (exact window).
-    const exact = computed.filter((c) => c.rawDiffMinutes >= 0 && c.rawDiffMinutes <= 5)
-    if (exact.length > 0) {
-      const sortedExact = [...exact].sort((a, b) => {
-        if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
-        return a.city.name.localeCompare(b.city.name)
-      })
-      const idx = dayNumber % sortedExact.length
-      return { candidates: computed, bestCandidate: sortedExact[idx] }
+    // Only consider cities where the MOST RECENT 5PM (today or yesterday) was within the last 2 hours.
+    const windowCities = computed.filter((c) => c.minutesSinceLastFive <= MAX_MINUTES_SINCE_5)
+    if (windowCities.length === 0) {
+      // No city currently between 5pm and 7pm (in the last 24h) in its own timezone.
+      return { candidates: computed, bestCandidate: undefined }
     }
 
-    // 2) Cities within 5–5:45 window: 17:01–17:45 (never before 5pm, never beyond 45 min past).
-    const withinWindow = computed.filter(
-      (c) => c.rawDiffMinutes > 0 && c.rawDiffMinutes <= MAX_MINUTES_PAST_5,
+    // Among those, pick the closest past 5PM (smallest minutesSinceLastFive), with daily rotation over ties.
+    const minSince = Math.min(...windowCities.map((c) => c.minutesSinceLastFive))
+    const closest = windowCities.filter(
+      (c) => Math.abs(c.minutesSinceLastFive - minSince) <= 1,
     )
-    if (withinWindow.length > 0) {
-      const sorted = [...withinWindow].sort((a, b) => {
-        if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
-        return a.city.name.localeCompare(b.city.name)
-      })
-      const idx = dayNumber % sorted.length
-      return { candidates: computed, bestCandidate: sorted[idx] }
-    }
-
-    // 3) Fallback: no city in 17:00–17:45 → pick closest after 17:45 (min rawDiffMinutes > 45). Never show before 5pm.
-    const pastWindow = computed.filter((c) => c.rawDiffMinutes > MAX_MINUTES_PAST_5)
-    if (pastWindow.length > 0) {
-      const sorted = [...pastWindow].sort((a, b) => {
-        if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
-        return a.city.name.localeCompare(b.city.name)
-      })
-      const idx = dayNumber % sorted.length
-      return { candidates: computed, bestCandidate: sorted[idx] }
-    }
-
-    // 4) All cities are before 5pm: do not feature any (never show earlier than 5pm).
-    return { candidates: computed, bestCandidate: undefined }
+    const sorted = [...closest].sort((a, b) => {
+      if (a.minutesSinceLastFive !== b.minutesSinceLastFive) {
+        return a.minutesSinceLastFive - b.minutesSinceLastFive
+      }
+      return a.city.name.localeCompare(b.city.name)
+    })
+    const idx = dayNumber % sorted.length
+    return { candidates: computed, bestCandidate: sorted[idx] }
   }, [now])
 
   // Stabilize featured city: lock for at least HOLD_MS before switching.
