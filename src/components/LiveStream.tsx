@@ -18,6 +18,7 @@ export type MomentRow = {
 
 const FETCH_LIMIT = 20
 const PRELOAD_NEXT = 3
+const LIVE_WINDOW_MINUTES = 35
 
 const REACTION_FIELD_TO_TYPE: Record<'pretty_count' | 'funny_count' | 'cheers_count', 'pretty' | 'funny' | 'cheers'> = {
   pretty_count: 'pretty',
@@ -89,10 +90,11 @@ export function LiveStream({ open, onClose, userId }: Props) {
     const sb = getSupabase()
     if (!sb || loadingMoreRef.current) return []
     loadingMoreRef.current = true
-    // Time filter disabled for testing: fetch latest 20 regardless of created_at
+    const cutoff = new Date(Date.now() - LIVE_WINDOW_MINUTES * 60 * 1000).toISOString()
     const { data: videos, error } = await sb
       .from('moments')
       .select('*')
+      .gte('created_at', cutoff)
       .order('created_at', { ascending: false })
       .limit(FETCH_LIMIT)
     loadingMoreRef.current = false
@@ -106,7 +108,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
     }
     if (list.length === 0) {
       // eslint-disable-next-line no-console
-      console.log('No videos found in moments table')
+      console.log('No moments in the last', LIVE_WINDOW_MINUTES, 'minutes')
     }
     return list
   }, [])
@@ -120,7 +122,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
     fetchMore().then((rows) => {
       setQueue(rows)
       setLoading(false)
-      if (rows.length === 0) setError('No moments uploaded yet.')
+      if (rows.length === 0) setError('No moments in the last 35 minutes — check back soon.')
     })
   }, [open, fetchMore])
 
