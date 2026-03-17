@@ -122,42 +122,46 @@ function App() {
     })
 
     // Use day number to rotate between candidate cities across days.
-    // Same day => same index; next day => next index (mod list length).
     const dayNumber = Math.floor(now.toUTC().toSeconds() / 86400)
+    const MAX_MINUTES_PAST_5 = 45
 
-    // 1) Cities effectively at 5PM: STRICTLY 17:00 to 17:05 (never before).
+    // 1) Cities at 5PM: 17:00–17:05 (exact window).
     const exact = computed.filter((c) => c.rawDiffMinutes >= 0 && c.rawDiffMinutes <= 5)
     if (exact.length > 0) {
-      // Prefer the earliest after-5 city, then alphabetical; rotate daily through matches.
       const sortedExact = [...exact].sort((a, b) => {
         if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
         return a.city.name.localeCompare(b.city.name)
       })
       const idx = dayNumber % sortedExact.length
-      const bestExact = sortedExact[idx]
-      return { candidates: computed, bestCandidate: bestExact }
+      return { candidates: computed, bestCandidate: sortedExact[idx] }
     }
 
-    // 2) Prefer strictly positive diffs (past 5PM). rawDiffMinutes > 0
-    const positive = computed.filter((c) => c.rawDiffMinutes > 0)
-    if (positive.length > 0) {
-      const sortedPositive = [...positive].sort((a, b) => {
+    // 2) Cities within 5–5:45 window: 17:01–17:45 (never before 5pm, never beyond 45 min past).
+    const withinWindow = computed.filter(
+      (c) => c.rawDiffMinutes > 0 && c.rawDiffMinutes <= MAX_MINUTES_PAST_5,
+    )
+    if (withinWindow.length > 0) {
+      const sorted = [...withinWindow].sort((a, b) => {
         if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
         return a.city.name.localeCompare(b.city.name)
       })
-      const idx = dayNumber % sortedPositive.length
-      const bestPositive = sortedPositive[idx]
-      return { candidates: computed, bestCandidate: bestPositive }
+      const idx = dayNumber % sorted.length
+      return { candidates: computed, bestCandidate: sorted[idx] }
     }
 
-    // 3) Fallback: no positive diffs at all – pick closest BEFORE 5PM (largest rawDiffMinutes, i.e. closest to 0 from below).
-    const negative = computed.filter((c) => c.rawDiffMinutes < 0)
-    const bestNegative = [...negative].sort((a, b) => {
-      if (a.rawDiffMinutes !== b.rawDiffMinutes) return b.rawDiffMinutes - a.rawDiffMinutes
-      return a.city.name.localeCompare(b.city.name)
-    })[0]
+    // 3) Fallback: no city in 17:00–17:45 → pick closest after 17:45 (min rawDiffMinutes > 45). Never show before 5pm.
+    const pastWindow = computed.filter((c) => c.rawDiffMinutes > MAX_MINUTES_PAST_5)
+    if (pastWindow.length > 0) {
+      const sorted = [...pastWindow].sort((a, b) => {
+        if (a.rawDiffMinutes !== b.rawDiffMinutes) return a.rawDiffMinutes - b.rawDiffMinutes
+        return a.city.name.localeCompare(b.city.name)
+      })
+      const idx = dayNumber % sorted.length
+      return { candidates: computed, bestCandidate: sorted[idx] }
+    }
 
-    return { candidates: computed, bestCandidate: bestNegative }
+    // 4) All cities are before 5pm: do not feature any (never show earlier than 5pm).
+    return { candidates: computed, bestCandidate: undefined }
   }, [now])
 
   // Stabilize featured city: lock for at least HOLD_MS before switching.
