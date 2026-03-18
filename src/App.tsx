@@ -6,10 +6,11 @@ import { countryCodeToFlagEmoji } from './lib/flags'
 import { formatClock } from './lib/time'
 import { Globe } from './components/Globe'
 import { getSupabase } from './lib/supabase'
-import { computeCaptureWindow, getUserTimezone, hasPostedToday, trackDailyLimitHit } from './lib/capture'
+import { computeCaptureWindow, getStreakTier, getUploadsToday, getUserTimezone, trackDailyLimitHit } from './lib/capture'
 import { useProfile } from './hooks/useProfile'
 import { RecordMoment } from './components/RecordMoment'
 import { LiveStream } from './components/LiveStream'
+import MyMoments from './components/MyMoments'
 import SignInButton from './components/SignInButton'
 
 type FeaturedCity = {
@@ -52,6 +53,8 @@ function App() {
   const [userEmail, setUserEmail] = useState<string | null>(null)
   const [recordOpen, setRecordOpen] = useState(false)
   const [liveStreamOpen, setLiveStreamOpen] = useState(false)
+  const [myMomentsOpen, setMyMomentsOpen] = useState(false)
+  const [streakOpen, setStreakOpen] = useState(false)
   const recordOpenRef = useRef(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
@@ -104,8 +107,13 @@ function App() {
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
   const userTz = profile?.timezone ?? getUserTimezone()
   const isPremium = typeof profile?.is_premium === 'boolean' ? profile.is_premium : premiumQuery
-  const hasPostedTodayState = hasPostedToday(profile?.last_post_date ?? null, userTz)
   const checkingDailyLimit = profileLoading
+  const currentStreak = profile?.current_streak ?? 0
+  const streakTier = getStreakTier(currentStreak)
+  const uploadsToday = getUploadsToday(userId, userTz)
+  const extraDailyUploads = streakTier?.extraDailyUploads ?? 0
+  const maxUploadsPerDay = 1 + extraDailyUploads
+  const hasUsedDailyQuota = uploadsToday >= maxUploadsPerDay
 
   const { candidates, bestCandidate } = useMemo(() => {
     if (!CITIES.length) {
@@ -190,8 +198,8 @@ function App() {
   }, [bestCandidate, candidates, lockedCityId])
 
   const captureWindow = useMemo(
-    () => computeCaptureWindow(now, userTz, isPremium),
-    [now, userTz, isPremium],
+    () => computeCaptureWindow(now, userTz, isPremium, currentStreak),
+    [now, userTz, isPremium, currentStreak],
   )
 
   const featuredFlag = featured ? countryCodeToFlagEmoji(featured.city.countryCode) : '🏳️'
@@ -260,8 +268,18 @@ function App() {
               Your local time
             </div>
             <div className="font-mono text-xs sm:text-base text-sunset-50/90">{formatClock(DateTime.local())}</div>
-            <div className="mt-1 sm:mt-2 flex justify-end">
-              <SignInButton userEmail={userEmail} />
+            <div className="mt-1 sm:mt-2 flex justify-end items-center gap-2">
+              {userId && currentStreak > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setStreakOpen(true)}
+                  className="inline-flex items-center gap-1 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-semibold text-midnight-900 shadow hover:bg-amber-400"
+                  title="View your streak perks"
+                >
+                  🔥 {currentStreak}
+                </button>
+              )}
+              <SignInButton userEmail={userEmail} onUsernameClick={userId ? () => setMyMomentsOpen(true) : undefined} />
             </div>
           </div>
         </header>
@@ -305,12 +323,12 @@ function App() {
                 <button
                   type="button"
                   className={
-                    captureWindow.active && !hasPostedTodayState && !checkingDailyLimit
+                    captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit
                       ? 'app-btn-landscape btn-glow-gold w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                       : 'app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                   }
-                  disabled={hasPostedTodayState || checkingDailyLimit}
-                  title="Free 5 minute window around 5pm local time"
+                  disabled={hasUsedDailyQuota || checkingDailyLimit}
+                  title="Upload your 5PM moment during your active window"
                   onClick={() => {
                     if (!captureWindow.active) {
                       showToast(
@@ -318,8 +336,9 @@ function App() {
                       )
                       return
                     }
-                    if (hasPostedTodayState) {
+                    if (hasUsedDailyQuota) {
                       trackDailyLimitHit({ userId, tz: userTz })
+                      showToast('You have used your daily upload limit for today.')
                       return
                     }
                     if (!userId) {
@@ -373,6 +392,49 @@ function App() {
         />
       )}
       <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} userId={userId} />
+      {userId && (
+        <MyMoments open={myMomentsOpen} onClose={() => setMyMomentsOpen(false)} userId={userId} />
+      )}
+      {streakOpen && streakTier && (
+        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-midnight-900/95 p-4 shadow-xl border border-sunset-500/40">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold tracking-[0.14em] uppercase text-sunset-100/80">
+                Streak rewards
+              </div>
+              <button
+                type="button"
+                onClick={() => setStreakOpen(false)}
+                className="text-[11px] text-sunset-100/70 hover:text-sunset-50"
+              >
+                Close
+              </button>
+            </div>
+            <div className="text-sm text-sunset-100/90 mb-1">
+              🔥 Current streak:{' '}
+              <span className="font-semibold">
+                {currentStreak} day{currentStreak === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="text-[11px] text-sunset-100/70 mb-2">
+              Tier:{' '}
+              <span className="font-semibold">
+                {streakTier.name}
+                {streakTier.badge ? ` • ${streakTier.badge}` : ''}
+              </span>
+            </div>
+            <ul className="list-disc pl-4 text-[11px] text-sunset-100/80 space-y-1 mb-3">
+              {streakTier.perks.map((perk) => (
+                <li key={perk}>{perk}</li>
+              ))}
+            </ul>
+            <div className="text-[10px] text-sunset-100/60">
+              Keep posting every day at 5PM local time to climb to the next tier and unlock more
+              boosts.
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

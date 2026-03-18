@@ -3,9 +3,10 @@ import { getSupabase } from '../lib/supabase'
 
 type Props = {
   userEmail: string | null
+  onUsernameClick?: () => void
 }
 
-export default function SignInButton({ userEmail }: Props) {
+export default function SignInButton({ userEmail, onUsernameClick }: Props) {
   const sb = getSupabase()
   const [email, setEmail] = useState('')
   const [showSignInModal, setShowSignInModal] = useState(false)
@@ -72,9 +73,16 @@ export default function SignInButton({ userEmail }: Props) {
   if (userEmail) {
     return (
       <div className={glassBox}>
-        <span className="font-mono text-sunset-200/90 truncate max-w-[120px] sm:max-w-[160px]" title={userEmail}>
+        <button
+          type="button"
+          onClick={() => onUsernameClick?.()}
+          className="font-mono text-sunset-200/90 truncate max-w-[120px] sm:max-w-[160px] text-left hover:opacity-90 focus:outline-none"
+          title={userEmail}
+          aria-label="Open My 5PM Moments"
+          disabled={!onUsernameClick}
+        >
           {userEmail}
-        </span>
+        </button>
         <button
           type="button"
           onClick={handleSignOut}
