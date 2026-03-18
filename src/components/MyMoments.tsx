@@ -44,6 +44,13 @@ async function shareMoment(params: { moment: MomentRow; logoFile: File | null })
     logoFile = await getLogoFile()
   }
   const text = buildShareText(moment.city)
+  const shareThumbDataUrl = await generateShareThumbnailWithLogo({
+    videoUrl: moment.video_url,
+    targetWidth: 480,
+    targetHeight: 270,
+    logoSrc: '/Logo.png',
+  })
+  const shareThumbFile = shareThumbDataUrl ? dataUrlToFile(shareThumbDataUrl, '5pm-moment-share.jpg') : null
 
   const nav: any = navigator
   if (!nav?.share) {
@@ -58,10 +65,26 @@ async function shareMoment(params: { moment: MomentRow; logoFile: File | null })
     }
   }
 
-  // Prefer attaching the logo when supported.
+  // Prefer attaching the share thumbnail when supported.
   try {
-    const canShareFiles = nav.canShare?.({ files: logoFile ? [logoFile] : [] })
-    if (logoFile && canShareFiles) {
+    const canShareFiles = nav.canShare?.({ files: shareThumbFile ? [shareThumbFile] : [] })
+    if (shareThumbFile && canShareFiles) {
+      await nav.share({
+        title: '5PM Somewhere',
+        text,
+        url: APP_URL,
+        files: [shareThumbFile],
+      })
+      return
+    }
+  } catch {
+    // Ignore file-share failures and try text+url share.
+  }
+
+  // Fallback: attach the logo file if we can, otherwise just share text+url.
+  try {
+    const canShareLogoFiles = nav.canShare?.({ files: logoFile ? [logoFile] : [] })
+    if (logoFile && canShareLogoFiles) {
       await nav.share({
         title: '5PM Somewhere',
         text,
@@ -71,14 +94,10 @@ async function shareMoment(params: { moment: MomentRow; logoFile: File | null })
       return
     }
   } catch {
-    // Ignore file-share failures and try text+url share.
+    // ignore and fall through
   }
 
-  await nav.share({
-    title: '5PM Somewhere',
-    text,
-    url: APP_URL,
-  })
+  await nav.share({ title: '5PM Somewhere', text, url: APP_URL })
 }
 
 function formatDuration(seconds: number): string {
@@ -168,6 +187,85 @@ async function generateFirstFrameThumbnail(args: {
     return canvas.toDataURL('image/jpeg', 0.82)
   } catch {
     return null
+  }
+}
+
+function dataUrlToFile(dataUrl: string, filename: string): File | null {
+  try {
+    // data:[<mediatype>][;base64],<data>
+    const match = dataUrl.match(/^data:(.*);base64,(.*)$/)
+    if (!match) return null
+    const mime = match[1]
+    const b64 = match[2]
+    const binary = atob(b64)
+    const bytes = new Uint8Array(binary.length)
+    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
+    const blob = new Blob([bytes], { type: mime })
+    return new File([blob], filename, { type: mime })
+  } catch {
+    return null
+  }
+}
+
+async function loadImage(src: string): Promise<HTMLImageElement> {
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.src = src
+  await new Promise<void>((resolve, reject) => {
+    img.onload = () => resolve()
+    img.onerror = () => reject(new Error('Image load failed'))
+  })
+  return img
+}
+
+async function generateShareThumbnailWithLogo(args: {
+  videoUrl: string
+  targetWidth: number
+  targetHeight: number
+  logoSrc: string
+}): Promise<string | null> {
+  const { videoUrl, targetWidth, targetHeight, logoSrc } = args
+
+  const baseThumb = await generateFirstFrameThumbnail({ videoUrl, targetWidth, targetHeight })
+  if (!baseThumb) return null
+
+  // Composite the logo onto the first-frame thumbnail.
+  // If compositing fails (e.g. due to CORS tainting), return the base thumbnail.
+  try {
+    const baseImg = await loadImage(baseThumb)
+    const logoImg = await loadImage(logoSrc)
+
+    const canvas = document.createElement('canvas')
+    canvas.width = targetWidth
+    canvas.height = targetHeight
+    const ctx = canvas.getContext('2d')
+    if (!ctx) return baseThumb
+
+    ctx.drawImage(baseImg, 0, 0, targetWidth, targetHeight)
+
+    const padding = 14
+    const maxLogoBox = Math.round(Math.min(targetWidth, targetHeight) * 0.26)
+    const logoAspect = (logoImg.naturalWidth || 1) / (logoImg.naturalHeight || 1)
+    let drawW = maxLogoBox
+    let drawH = maxLogoBox
+    if (logoAspect > 1) {
+      drawW = maxLogoBox
+      drawH = Math.round(maxLogoBox / logoAspect)
+    } else {
+      drawH = maxLogoBox
+      drawW = Math.round(maxLogoBox * logoAspect)
+    }
+
+    // Soft dark backing so the logo stays readable.
+    ctx.save()
+    ctx.fillStyle = 'rgba(0,0,0,0.35)'
+    ctx.fillRect(padding - 6, padding - 6, drawW + 12, drawH + 12)
+    ctx.drawImage(logoImg, padding, padding, drawW, drawH)
+    ctx.restore()
+
+    return canvas.toDataURL('image/jpeg', 0.9)
+  } catch {
+    return baseThumb
   }
 }
 
