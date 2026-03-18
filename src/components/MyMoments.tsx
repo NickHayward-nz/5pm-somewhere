@@ -52,6 +52,9 @@ async function shareMoment(params: { moment: MomentRow; logoFile: File | null })
   })
   const shareThumbFile = shareThumbDataUrl ? dataUrlToFile(shareThumbDataUrl, '5pm-moment-share.jpg') : null
 
+  // Attempt to share the actual video file (so the share sheet treats it as a video).
+  const videoFile = await getVideoFile(moment.video_url)
+
   const nav: any = navigator
   if (!nav?.share) {
     // Minimal fallback: copy link + text.
@@ -65,31 +68,36 @@ async function shareMoment(params: { moment: MomentRow; logoFile: File | null })
     }
   }
 
-  // Prefer attaching the share thumbnail when supported.
+  // Prefer attaching the video file when supported.
   try {
-    const canShareFiles = nav.canShare?.({ files: shareThumbFile ? [shareThumbFile] : [] })
-    if (shareThumbFile && canShareFiles) {
-      await nav.share({
-        title: '5PM Somewhere',
-        text,
-        url: APP_URL,
-        files: [shareThumbFile],
-      })
-      return
+    if (videoFile) {
+      const canShareVideoOnly = nav.canShare?.({ files: [videoFile] })
+      if (canShareVideoOnly) {
+        // Some platforms can accept multiple attachments; if so, include the overlayed preview thumbnail.
+        const canShareVideoPlusThumb = shareThumbFile ? nav.canShare?.({ files: [videoFile, shareThumbFile] }) : false
+        await nav.share({
+          title: '5PM Somewhere',
+          text,
+          url: APP_URL,
+          files: canShareVideoPlusThumb ? [videoFile, shareThumbFile] : [videoFile],
+        })
+        return
+      }
     }
   } catch {
     // Ignore file-share failures and try text+url share.
   }
 
-  // Fallback: attach the logo file if we can, otherwise just share text+url.
+  // Fallback: if we cannot attach files, share the video URL as the `url` (so the share sheet
+  // can treat it like a video) and include the app link in the text.
   try {
-    const canShareLogoFiles = nav.canShare?.({ files: logoFile ? [logoFile] : [] })
-    if (logoFile && canShareLogoFiles) {
+    const payloadText = `${text}\n${APP_URL}`
+    const canShareUrl = nav.canShare?.({ url: moment.video_url }) !== false
+    if (canShareUrl) {
       await nav.share({
         title: '5PM Somewhere',
-        text,
-        url: APP_URL,
-        files: [logoFile],
+        text: payloadText,
+        url: moment.video_url,
       })
       return
     }
@@ -98,6 +106,19 @@ async function shareMoment(params: { moment: MomentRow; logoFile: File | null })
   }
 
   await nav.share({ title: '5PM Somewhere', text, url: APP_URL })
+}
+
+async function getVideoFile(videoUrl: string): Promise<File | null> {
+  try {
+    const res = await fetch(videoUrl)
+    const blob = await res.blob()
+    if (!blob || blob.size === 0) return null
+    const mime = blob.type || 'video/webm'
+    const ext = mime.includes('mp4') ? 'mp4' : 'webm'
+    return new File([blob], `5pm-moment.${ext}`, { type: mime })
+  } catch {
+    return null
+  }
 }
 
 function formatDuration(seconds: number): string {
