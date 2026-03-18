@@ -5,6 +5,8 @@ import { useEffect, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getSupabase } from '../lib/supabase'
 import {
+  getStreakPriorityForUpload,
+  incrementUploadsToday,
   trackCaptureStarted,
   trackVideoUploaded,
   updateProfileAfterUpload,
@@ -419,7 +421,14 @@ export function RecordMoment(props: Props) {
       // eslint-disable-next-line no-console
       console.log('Public video URL:', videoUrl)
 
-      const insertRow = {
+      const streakDays = profile?.current_streak ?? 0
+      const streakPriority = getStreakPriorityForUpload(streakDays)
+      const boostExpiresAt =
+        streakPriority?.boostHours && streakPriority.boostHours > 0
+          ? now.plus({ hours: streakPriority.boostHours }).toISO()
+          : null
+
+      const insertRow: Record<string, unknown> = {
         user_id: authUserId,
         timezone: userTz,
         city,
@@ -430,6 +439,11 @@ export function RecordMoment(props: Props) {
         pretty_count: 0,
         funny_count: 0,
         cheers_count: 0,
+      }
+      if (streakPriority) {
+        insertRow.uploader_streak_days = streakPriority.days
+        insertRow.uploader_streak_priority = streakPriority.priority
+        insertRow.visibility_boost_expires_at = boostExpiresAt
       }
       // eslint-disable-next-line no-console
       console.log('Using real user_id from auth for insert:', authUserId)
@@ -462,6 +476,7 @@ export function RecordMoment(props: Props) {
         onProfileUpdated()
       }
       trackVideoUploaded({ userId: authUserId, durationSec, isPremium, tz: userTz })
+      incrementUploadsToday(userId, userTz)
       // eslint-disable-next-line no-console
       console.log('=== UPLOAD COMPLETE ===')
       onClose()

@@ -14,6 +14,9 @@ export type MomentRow = {
   pretty_count: number
   funny_count: number
   cheers_count: number
+  uploader_streak_days?: number | null
+  uploader_streak_priority?: number | null
+  visibility_boost_expires_at?: string | null
 }
 
 const FETCH_LIMIT = 20
@@ -95,6 +98,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
       .from('moments')
       .select('*')
       .gte('created_at', cutoff)
+      .order('uploader_streak_priority', { ascending: false })
       .order('created_at', { ascending: false })
       .limit(FETCH_LIMIT)
     loadingMoreRef.current = false
