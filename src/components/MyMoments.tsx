@@ -24,33 +24,9 @@ function buildShareText(city: string): string {
   return `My 5PM moment from ${city} 🌅 Watch it on 5PM Somewhere!`
 }
 
-async function getLogoFile(): Promise<File | null> {
-  try {
-    // Fetch from same origin so it works with Share API file attachments.
-    const res = await fetch('/Logo.png', { cache: 'force-cache' })
-    const blob = await res.blob()
-    if (!blob || blob.size === 0) return null
-    return new File([blob], 'Logo.png', { type: blob.type || 'image/png' })
-  } catch {
-    return null
-  }
-}
-
-async function shareMoment(params: { moment: MomentRow; logoFile: File | null }): Promise<void> {
+async function shareMoment(params: { moment: MomentRow }): Promise<void> {
   const { moment } = params
-  let logoFile = params.logoFile
-  if (!logoFile) {
-    // Ensure logo is available even if user taps Share immediately after opening modal.
-    logoFile = await getLogoFile()
-  }
   const text = buildShareText(moment.city)
-  const shareThumbDataUrl = await generateShareThumbnailWithLogo({
-    videoUrl: moment.video_url,
-    targetWidth: 480,
-    targetHeight: 270,
-    logoSrc: '/Logo.png',
-  })
-  const shareThumbFile = shareThumbDataUrl ? dataUrlToFile(shareThumbDataUrl, '5pm-moment-share.jpg') : null
 
   // Attempt to share the actual video file (so the share sheet treats it as a video).
   const videoFile = await getVideoFile(moment.video_url)
@@ -73,13 +49,11 @@ async function shareMoment(params: { moment: MomentRow; logoFile: File | null })
     if (videoFile) {
       const canShareVideoOnly = nav.canShare?.({ files: [videoFile] })
       if (canShareVideoOnly) {
-        // Some platforms can accept multiple attachments; if so, include the overlayed preview thumbnail.
-        const canShareVideoPlusThumb = shareThumbFile ? nav.canShare?.({ files: [videoFile, shareThumbFile] }) : false
         await nav.share({
           title: '5PM Somewhere',
           text,
           url: APP_URL,
-          files: canShareVideoPlusThumb ? [videoFile, shareThumbFile] : [videoFile],
+          files: [videoFile],
         })
         return
       }
@@ -211,85 +185,6 @@ async function generateFirstFrameThumbnail(args: {
   }
 }
 
-function dataUrlToFile(dataUrl: string, filename: string): File | null {
-  try {
-    // data:[<mediatype>][;base64],<data>
-    const match = dataUrl.match(/^data:(.*);base64,(.*)$/)
-    if (!match) return null
-    const mime = match[1]
-    const b64 = match[2]
-    const binary = atob(b64)
-    const bytes = new Uint8Array(binary.length)
-    for (let i = 0; i < binary.length; i += 1) bytes[i] = binary.charCodeAt(i)
-    const blob = new Blob([bytes], { type: mime })
-    return new File([blob], filename, { type: mime })
-  } catch {
-    return null
-  }
-}
-
-async function loadImage(src: string): Promise<HTMLImageElement> {
-  const img = new Image()
-  img.crossOrigin = 'anonymous'
-  img.src = src
-  await new Promise<void>((resolve, reject) => {
-    img.onload = () => resolve()
-    img.onerror = () => reject(new Error('Image load failed'))
-  })
-  return img
-}
-
-async function generateShareThumbnailWithLogo(args: {
-  videoUrl: string
-  targetWidth: number
-  targetHeight: number
-  logoSrc: string
-}): Promise<string | null> {
-  const { videoUrl, targetWidth, targetHeight, logoSrc } = args
-
-  const baseThumb = await generateFirstFrameThumbnail({ videoUrl, targetWidth, targetHeight })
-  if (!baseThumb) return null
-
-  // Composite the logo onto the first-frame thumbnail.
-  // If compositing fails (e.g. due to CORS tainting), return the base thumbnail.
-  try {
-    const baseImg = await loadImage(baseThumb)
-    const logoImg = await loadImage(logoSrc)
-
-    const canvas = document.createElement('canvas')
-    canvas.width = targetWidth
-    canvas.height = targetHeight
-    const ctx = canvas.getContext('2d')
-    if (!ctx) return baseThumb
-
-    ctx.drawImage(baseImg, 0, 0, targetWidth, targetHeight)
-
-    const padding = 14
-    const maxLogoBox = Math.round(Math.min(targetWidth, targetHeight) * 0.26)
-    const logoAspect = (logoImg.naturalWidth || 1) / (logoImg.naturalHeight || 1)
-    let drawW = maxLogoBox
-    let drawH = maxLogoBox
-    if (logoAspect > 1) {
-      drawW = maxLogoBox
-      drawH = Math.round(maxLogoBox / logoAspect)
-    } else {
-      drawH = maxLogoBox
-      drawW = Math.round(maxLogoBox * logoAspect)
-    }
-
-    // Soft dark backing so the logo stays readable.
-    ctx.save()
-    ctx.fillStyle = 'rgba(0,0,0,0.35)'
-    ctx.fillRect(padding - 6, padding - 6, drawW + 12, drawH + 12)
-    ctx.drawImage(logoImg, padding, padding, drawW, drawH)
-    ctx.restore()
-
-    return canvas.toDataURL('image/jpeg', 0.9)
-  } catch {
-    return baseThumb
-  }
-}
-
 function VideoPlayModal(props: { open: boolean; onClose: () => void; url: string; caption: string | null }) {
   const { open, onClose, url, caption } = props
   if (!open) return null
@@ -332,7 +227,6 @@ export default function MyMoments({ open, onClose, userId }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [moments, setMoments] = useState<MomentRow[]>([])
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({})
-  const [logoFile, setLogoFile] = useState<File | null>(null)
 
   const [playModal, setPlayModal] = useState<{ open: boolean; url: string; caption: string | null }>({
     open: false,
@@ -368,15 +262,6 @@ export default function MyMoments({ open, onClose, userId }: Props) {
       setLoading(false)
     })()
   }, [open, sb, userId])
-
-  useEffect(() => {
-    if (!open) return
-    // Preload logo file once for faster share.
-    ;(async () => {
-      const f = await getLogoFile()
-      setLogoFile(f)
-    })()
-  }, [open])
 
   useEffect(() => {
     if (!open) return
@@ -521,7 +406,7 @@ export default function MyMoments({ open, onClose, userId }: Props) {
                         <button
                           type="button"
                           onClick={() => {
-                            void shareMoment({ moment: m, logoFile })
+                            void shareMoment({ moment: m })
                           }}
                           className="btn-glow-gold text-xs touch-manipulation flex-1"
                         >

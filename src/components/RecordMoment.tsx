@@ -150,6 +150,23 @@ export function RecordMoment(props: Props) {
       const ctx = canvas.getContext('2d')
       if (!ctx) throw new Error('Canvas context not available')
 
+      // Load the app logo once so we can draw it into the recorded video overlay.
+      // Same-origin (/Logo.png) so crossOrigin drawing should work without tainting in most cases.
+      let logoImg: HTMLImageElement | null = null
+      void new Promise<void>((resolve) => {
+        const img = new Image()
+        img.crossOrigin = 'anonymous'
+        img.onload = () => {
+          logoImg = img
+          resolve()
+        }
+        img.onerror = () => {
+          // If the logo fails to load, we still record the overlay text.
+          resolve()
+        }
+        img.src = '/Logo.png'
+      })
+
       function drawFrame() {
         const v = videoRef.current
         if (!v || !canvas || !ctx) return
@@ -165,10 +182,12 @@ export function RecordMoment(props: Props) {
         if (canvas.width === 0 || canvas.height === 0) return
         ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
 
-        // VHS-style timestamp overlay: responsive, wraps long locations into two lines if needed
+        // VHS-style timestamp overlay: responsive, wraps long locations into two lines if needed,
+        // and includes the app logo inside the overlay bar.
         const margin = 16
         const paddingX = 16
-        const paddingY = 8
+        const paddingY = 10
+        const logoPaddingRight = 12
         const maxBarWidth = canvas.width * 0.9
 
         const local = DateTime.now().setZone(userTz)
@@ -180,57 +199,110 @@ export function RecordMoment(props: Props) {
         const makeFont = () =>
           `bold ${fontSize}px "VT323", "DM Mono", ui-monospace, monospace` as const
 
+        // Size the logo relative to the current font size.
+        const getLogoBoxSize = (fs: number) => Math.round(Math.min(44, Math.max(24, fs * 1.7)))
+
+        const measureBarWidth = (textWidth: number, logoBoxSize: number) => {
+          return paddingX * 2 + logoBoxSize + logoPaddingRight + textWidth
+        }
+
         // Try single-line layout first
         ctx.font = makeFont()
         const single = `${timeLabel} • ${placeLabel}`
-        let singleWidth = ctx.measureText(single).width
+        const singleWidth = ctx.measureText(single).width
 
         let lines: string[]
-        if (singleWidth <= maxBarWidth) {
+        let logoBoxSize = getLogoBoxSize(fontSize)
+
+        if (measureBarWidth(singleWidth, logoBoxSize) <= maxBarWidth) {
           lines = [single]
         } else {
           // Fallback: two-line layout (time + city, then country)
           const line1 = `${timeLabel} • ${city}`
           const line2 = country
 
-          // Shrink font until both lines fit or we hit a floor
+          // Shrink font until both lines fit or we hit a floor.
           while (fontSize > 10) {
             ctx.font = makeFont()
+            logoBoxSize = getLogoBoxSize(fontSize)
             const w1 = ctx.measureText(line1).width
             const w2 = ctx.measureText(line2).width
-            if (Math.max(w1, w2) <= maxBarWidth) break
+            const maxLineWidth = Math.max(w1, w2)
+            if (measureBarWidth(maxLineWidth, logoBoxSize) <= maxBarWidth) break
             fontSize -= 1
           }
+
           ctx.font = makeFont()
+          logoBoxSize = getLogoBoxSize(fontSize)
           lines = [line1, line2]
         }
 
         const lineMetrics = lines.map((text) => ctx.measureText(text))
-        const maxLineWidth = Math.min(
-          maxBarWidth,
-          Math.max(...lineMetrics.map((m) => m.width)),
-        )
+        const maxLineWidth = Math.max(...lineMetrics.map((m) => m.width))
         const lineHeight = fontSize + 4
         const barHeight = lineHeight * lines.length + paddingY * 2
-        const barWidth = maxLineWidth + paddingX * 2
+        const barWidth = paddingX * 2 + logoBoxSize + logoPaddingRight + maxLineWidth
         const barX = margin
         const barY = canvas.height - barHeight - margin
 
         ctx.save()
         ctx.textBaseline = 'top'
         ctx.textAlign = 'left'
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.9)'
+
+        // Background bar (rounded + subtle gradient + border)
+        const radius = Math.min(18, Math.round(barHeight * 0.22))
+        const bg = ctx.createLinearGradient(barX, barY, barX, barY + barHeight)
+        bg.addColorStop(0, 'rgba(2, 6, 23, 0.82)')
+        bg.addColorStop(1, 'rgba(0, 0, 0, 0.58)')
+        ctx.fillStyle = bg
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)'
+        ctx.shadowBlur = 10
+
+        const roundRectAvailable = typeof (ctx as any).roundRect === 'function'
+        if (roundRectAvailable) {
+          ctx.beginPath()
+          ;(ctx as any).roundRect(barX, barY, barWidth, barHeight, radius)
+          ctx.fill()
+          ctx.shadowBlur = 0
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'
+          ctx.lineWidth = 2
+          ctx.stroke()
+        } else {
+          ctx.fillRect(barX, barY, barWidth, barHeight)
+        }
+
+        // Logo: inside top-left corner of the bar.
+        if (logoImg) {
+          const logoX = barX + paddingX
+          const logoY = barY + Math.round((barHeight - logoBoxSize) / 2)
+          const logoRadius = Math.min(12, Math.round(logoBoxSize * 0.25))
+
+          ctx.save()
+          ctx.shadowColor = 'rgba(0,0,0,0.55)'
+          ctx.shadowBlur = 12
+          ctx.beginPath()
+          if (roundRectAvailable) {
+            ;(ctx as any).roundRect(logoX, logoY, logoBoxSize, logoBoxSize, logoRadius)
+            ctx.clip()
+          }
+          ctx.drawImage(logoImg, logoX, logoY, logoBoxSize, logoBoxSize)
+          ctx.restore()
+        }
+
+        // Text lines with stroke for readability.
+        const textX = barX + paddingX + logoBoxSize + logoPaddingRight
+        const textYBase = barY + paddingY
+        const strokeWidth = Math.max(2, Math.round(fontSize / 18))
+
+        ctx.lineWidth = strokeWidth
+        ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)'
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.96)'
+        ctx.shadowColor = 'rgba(0,0,0,0.25)'
         ctx.shadowBlur = 6
 
-        // Background bar
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.7)'
-        ctx.fillRect(barX, barY, barWidth, barHeight)
-
-        // Text lines
-        ctx.fillStyle = '#fff'
         lines.forEach((text, index) => {
-          const textX = barX + paddingX
-          const textY = barY + paddingY + index * lineHeight
+          const textY = textYBase + index * lineHeight
+          ctx.strokeText(text, textX, textY)
           ctx.fillText(text, textX, textY)
         })
 
