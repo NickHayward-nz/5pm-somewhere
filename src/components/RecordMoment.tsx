@@ -182,8 +182,8 @@ export function RecordMoment(props: Props) {
         if (canvas.width === 0 || canvas.height === 0) return
         ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
 
-        // VHS-style timestamp overlay: responsive, wraps long locations into two lines if needed,
-        // and includes the app logo inside the overlay bar.
+        // Sunset glass timestamp overlay (matches app typography + polaroid glass look).
+        // Responsive; wraps long locations into two lines; includes the app logo in the bar.
         const margin = 16
         const paddingX = 16
         const paddingY = 10
@@ -194,10 +194,12 @@ export function RecordMoment(props: Props) {
         const timeLabel = local.toFormat('HH:mm')
         const placeLabel = `${city}, ${country}`
 
-        // Start with a base size relative to canvas height
+        // Match tailwind fontFamily.display / sans: Poppins first (loaded in index.html).
         let fontSize = Math.max(14, Math.min(28, canvas.height / 20))
-        const makeFont = () =>
-          `bold ${fontSize}px "VT323", "DM Mono", ui-monospace, monospace` as const
+        const makeFontPrimary = () =>
+          `600 ${fontSize}px Poppins, Inter, system-ui, sans-serif` as const
+        const makeFontSecondary = () =>
+          `500 ${fontSize}px Poppins, Inter, system-ui, sans-serif` as const
 
         // Size the logo relative to the current font size.
         const getLogoBoxSize = (fs: number) => Math.round(Math.min(44, Math.max(24, fs * 1.7)))
@@ -207,7 +209,7 @@ export function RecordMoment(props: Props) {
         }
 
         // Try single-line layout first
-        ctx.font = makeFont()
+        ctx.font = makeFontPrimary()
         const single = `${timeLabel} • ${placeLabel}`
         const singleWidth = ctx.measureText(single).width
 
@@ -223,24 +225,33 @@ export function RecordMoment(props: Props) {
 
           // Shrink font until both lines fit or we hit a floor.
           while (fontSize > 10) {
-            ctx.font = makeFont()
+            ctx.font = makeFontPrimary()
             logoBoxSize = getLogoBoxSize(fontSize)
             const w1 = ctx.measureText(line1).width
+            ctx.font = makeFontSecondary()
             const w2 = ctx.measureText(line2).width
             const maxLineWidth = Math.max(w1, w2)
             if (measureBarWidth(maxLineWidth, logoBoxSize) <= maxBarWidth) break
             fontSize -= 1
           }
 
-          ctx.font = makeFont()
           logoBoxSize = getLogoBoxSize(fontSize)
           lines = [line1, line2]
         }
 
-        const lineMetrics = lines.map((text) => ctx.measureText(text))
+        const lineMetrics = lines.map((text, i) => {
+          ctx.font = lines.length === 2 && i === 1 ? makeFontSecondary() : makeFontPrimary()
+          return ctx.measureText(text)
+        })
         const maxLineWidth = Math.max(...lineMetrics.map((m) => m.width))
-        const lineHeight = fontSize + 4
-        const barHeight = lineHeight * lines.length + paddingY * 2
+        const lineHeightPrimary = fontSize + 4
+        const lineHeightSecondary = fontSize + 3
+        const lineHeight =
+          lines.length === 2
+            ? [lineHeightPrimary, lineHeightSecondary]
+            : [lineHeightPrimary]
+        const barHeight =
+          paddingY * 2 + lineHeight.reduce((sum, h) => sum + h, 0)
         const barWidth = paddingX * 2 + logoBoxSize + logoPaddingRight + maxLineWidth
         const barX = margin
         const barY = canvas.height - barHeight - margin
@@ -249,14 +260,17 @@ export function RecordMoment(props: Props) {
         ctx.textBaseline = 'top'
         ctx.textAlign = 'left'
 
-        // Background bar (rounded + subtle gradient + border)
+        // Background: sunset-on-glass (warm tint + frost + depth, not flat black)
         const radius = Math.min(18, Math.round(barHeight * 0.22))
         const bg = ctx.createLinearGradient(barX, barY, barX, barY + barHeight)
-        bg.addColorStop(0, 'rgba(2, 6, 23, 0.82)')
-        bg.addColorStop(1, 'rgba(0, 0, 0, 0.58)')
+        bg.addColorStop(0, 'rgba(255, 255, 255, 0.22)')
+        bg.addColorStop(0.35, 'rgba(236, 72, 153, 0.16)')
+        bg.addColorStop(0.65, 'rgba(249, 115, 22, 0.12)')
+        bg.addColorStop(1, 'rgba(5, 7, 22, 0.52)')
         ctx.fillStyle = bg
-        ctx.shadowColor = 'rgba(0, 0, 0, 0.35)'
-        ctx.shadowBlur = 10
+        ctx.shadowColor = 'rgba(249, 115, 22, 0.22)'
+        ctx.shadowBlur = 14
+        ctx.shadowOffsetY = 2
 
         const roundRectAvailable = typeof (ctx as any).roundRect === 'function'
         if (roundRectAvailable) {
@@ -264,8 +278,15 @@ export function RecordMoment(props: Props) {
           ;(ctx as any).roundRect(barX, barY, barWidth, barHeight, radius)
           ctx.fill()
           ctx.shadowBlur = 0
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'
-          ctx.lineWidth = 2
+          ctx.shadowOffsetY = 0
+          // Inner frost + warm rim (glass edge)
+          ctx.strokeStyle = 'rgba(255, 224, 194, 0.38)'
+          ctx.lineWidth = 1.5
+          ctx.stroke()
+          ctx.beginPath()
+          ;(ctx as any).roundRect(barX + 1, barY + 1, barWidth - 2, barHeight - 2, Math.max(0, radius - 1))
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
+          ctx.lineWidth = 1
           ctx.stroke()
         } else {
           ctx.fillRect(barX, barY, barWidth, barHeight)
@@ -289,21 +310,40 @@ export function RecordMoment(props: Props) {
           ctx.restore()
         }
 
-        // Text lines with stroke for readability.
+        // Text: primary line = sunset gradient + deep stroke; secondary = soft cream (hierarchy).
         const textX = barX + paddingX + logoBoxSize + logoPaddingRight
         const textYBase = barY + paddingY
-        const strokeWidth = Math.max(2, Math.round(fontSize / 18))
-
-        ctx.lineWidth = strokeWidth
-        ctx.strokeStyle = 'rgba(0, 0, 0, 0.55)'
-        ctx.fillStyle = 'rgba(255, 255, 255, 0.96)'
-        ctx.shadowColor = 'rgba(0,0,0,0.25)'
-        ctx.shadowBlur = 6
+        const strokeWidth = Math.max(1.5, Math.round(fontSize / 20))
+        let yCursor = textYBase
 
         lines.forEach((text, index) => {
-          const textY = textYBase + index * lineHeight
-          ctx.strokeText(text, textX, textY)
-          ctx.fillText(text, textX, textY)
+          const isSecondary = lines.length === 2 && index === 1
+          ctx.font = isSecondary ? makeFontSecondary() : makeFontPrimary()
+          const w = ctx.measureText(text).width
+          const textY = yCursor
+          yCursor += lineHeight[index] ?? lineHeightPrimary
+
+          ctx.shadowColor = 'rgba(5, 7, 22, 0.45)'
+          ctx.shadowBlur = isSecondary ? 3 : 5
+          ctx.lineWidth = isSecondary ? Math.max(1, strokeWidth - 0.5) : strokeWidth
+
+          if (isSecondary) {
+            ctx.strokeStyle = 'rgba(5, 7, 22, 0.5)'
+            ctx.strokeText(text, textX, textY)
+            ctx.shadowBlur = 0
+            ctx.fillStyle = 'rgba(255, 224, 194, 0.95)'
+            ctx.fillText(text, textX, textY)
+          } else {
+            const g = ctx.createLinearGradient(textX, textY, textX + w, textY + fontSize)
+            g.addColorStop(0, '#fff4ec')
+            g.addColorStop(0.45, '#ffc08a')
+            g.addColorStop(1, '#ff9a62')
+            ctx.strokeStyle = 'rgba(5, 7, 22, 0.72)'
+            ctx.strokeText(text, textX, textY)
+            ctx.shadowBlur = 0
+            ctx.fillStyle = g
+            ctx.fillText(text, textX, textY)
+          }
         })
 
         ctx.restore()
