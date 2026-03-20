@@ -182,7 +182,7 @@ export function RecordMoment(props: Props) {
         if (canvas.width === 0 || canvas.height === 0) return
         ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
 
-        // Sunset glass timestamp overlay (matches app typography + polaroid glass look).
+        // Timestamp overlay: centered bottom bar, glassmorphism (polaroid-frame style), Poppins text.
         // Responsive; wraps long locations into two lines; includes the app logo in the bar.
         const margin = 16
         const paddingX = 16
@@ -253,43 +253,83 @@ export function RecordMoment(props: Props) {
         const barHeight =
           paddingY * 2 + lineHeight.reduce((sum, h) => sum + h, 0)
         const barWidth = paddingX * 2 + logoBoxSize + logoPaddingRight + maxLineWidth
-        const barX = margin
+        // Center along bottom (match polaroid glass cards)
+        const barX = Math.max(0, Math.round((canvas.width - barWidth) / 2))
         const barY = canvas.height - barHeight - margin
 
         ctx.save()
         ctx.textBaseline = 'top'
         ctx.textAlign = 'left'
 
-        // Background: sunset-on-glass (warm tint + frost + depth, not flat black)
+        // Glassmorphism box (canvas can’t use backdrop-filter; layered frosted gradients + borders)
         const radius = Math.min(18, Math.round(barHeight * 0.22))
-        const bg = ctx.createLinearGradient(barX, barY, barX, barY + barHeight)
-        bg.addColorStop(0, 'rgba(255, 255, 255, 0.22)')
-        bg.addColorStop(0.35, 'rgba(236, 72, 153, 0.16)')
-        bg.addColorStop(0.65, 'rgba(249, 115, 22, 0.12)')
-        bg.addColorStop(1, 'rgba(5, 7, 22, 0.52)')
-        ctx.fillStyle = bg
-        ctx.shadowColor = 'rgba(249, 115, 22, 0.22)'
-        ctx.shadowBlur = 14
-        ctx.shadowOffsetY = 2
-
         const roundRectAvailable = typeof (ctx as any).roundRect === 'function'
+
+        const drawGlassPanel = () => {
+          if (roundRectAvailable) {
+            ctx.beginPath()
+            ;(ctx as any).roundRect(barX, barY, barWidth, barHeight, radius)
+          } else {
+            ctx.beginPath()
+            ctx.rect(barX, barY, barWidth, barHeight)
+          }
+        }
+
+        // Soft lift shadow (under panel)
+        ctx.shadowColor = 'rgba(0, 0, 0, 0.28)'
+        ctx.shadowBlur = 20
+        ctx.shadowOffsetY = 4
+        drawGlassPanel()
+        ctx.fillStyle = 'rgba(0, 0, 0, 0.15)'
+        ctx.fill()
+        ctx.shadowBlur = 0
+        ctx.shadowOffsetY = 0
+
+        // Clip to rounded rect for frosted layers
+        ctx.save()
+        drawGlassPanel()
+        ctx.clip()
+
+        // Base: polaroid-style frosted stack (see index.css .polaroid-frame)
+        const frost = ctx.createLinearGradient(barX, barY, barX, barY + barHeight)
+        frost.addColorStop(0, 'rgba(255, 255, 255, 0.22)')
+        frost.addColorStop(0.45, 'rgba(255, 255, 255, 0.1)')
+        frost.addColorStop(0.78, 'rgba(236, 72, 153, 0.12)')
+        frost.addColorStop(1, 'rgba(5, 7, 22, 0.42)')
+        ctx.fillStyle = frost
+        ctx.fillRect(barX, barY, barWidth, barHeight)
+
+        // Specular highlight (glass shine, top-left)
+        const cx = barX + barWidth * 0.28
+        const cy = barY + barHeight * 0.18
+        const shine = ctx.createRadialGradient(cx, cy, 0, cx, cy, Math.max(barWidth, barHeight) * 0.55)
+        shine.addColorStop(0, 'rgba(255, 255, 255, 0.38)')
+        shine.addColorStop(0.45, 'rgba(255, 255, 255, 0.08)')
+        shine.addColorStop(1, 'rgba(255, 255, 255, 0)')
+        ctx.fillStyle = shine
+        ctx.fillRect(barX, barY, barWidth, barHeight)
+
+        // Warm sunset wash (subtle, bottom)
+        const sunset = ctx.createLinearGradient(barX, barY + barHeight * 0.35, barX, barY + barHeight)
+        sunset.addColorStop(0, 'rgba(249, 115, 22, 0)')
+        sunset.addColorStop(1, 'rgba(249, 115, 22, 0.14)')
+        ctx.fillStyle = sunset
+        ctx.fillRect(barX, barY, barWidth, barHeight)
+
+        ctx.restore()
+
+        // Outer rim: light glass border
+        drawGlassPanel()
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.22)'
+        ctx.lineWidth = 1.5
+        ctx.stroke()
+        // Inner edge (depth)
         if (roundRectAvailable) {
           ctx.beginPath()
-          ;(ctx as any).roundRect(barX, barY, barWidth, barHeight, radius)
-          ctx.fill()
-          ctx.shadowBlur = 0
-          ctx.shadowOffsetY = 0
-          // Inner frost + warm rim (glass edge)
-          ctx.strokeStyle = 'rgba(255, 224, 194, 0.38)'
-          ctx.lineWidth = 1.5
-          ctx.stroke()
-          ctx.beginPath()
-          ;(ctx as any).roundRect(barX + 1, barY + 1, barWidth - 2, barHeight - 2, Math.max(0, radius - 1))
-          ctx.strokeStyle = 'rgba(255, 255, 255, 0.12)'
+          ;(ctx as any).roundRect(barX + 1.5, barY + 1.5, barWidth - 3, barHeight - 3, Math.max(0, radius - 2))
+          ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
           ctx.lineWidth = 1
           ctx.stroke()
-        } else {
-          ctx.fillRect(barX, barY, barWidth, barHeight)
         }
 
         // Logo: inside top-left corner of the bar.
