@@ -191,7 +191,7 @@ export function RecordMoment(props: Props) {
         const maxBarWidth = canvas.width * 0.9
 
         const local = DateTime.now().setZone(userTz)
-        const timeLabel = local.toFormat('HH:mm')
+        const timeLabel = local.toFormat('h:mm a')
         const placeLabel = `${city}, ${country}`
 
         // Match tailwind fontFamily.display / sans: Poppins first (loaded in index.html).
