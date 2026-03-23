@@ -123,6 +123,8 @@ function App() {
   const maxUploadsPerDay = 1 + extraDailyUploads
   const appTestMode = isAppTestMode()
   const hasUsedDailyQuota = appTestMode ? false : uploadsToday >= maxUploadsPerDay
+  // In test mode: allow capture anytime (ignore daily quota + profile loading gate on the button).
+  const captureButtonDisabled = appTestMode ? false : hasUsedDailyQuota || checkingDailyLimit
 
   const { candidates, bestCandidate } = useMemo(() => {
     if (!CITIES.length) {
@@ -211,11 +213,14 @@ function App() {
       return {
         active: true,
         diffMinutes: 0,
-        label: 'APP TEST MODE — 5 PM window & daily upload limit bypassed',
+        label: 'APP TEST MODE — record anytime; daily quota & loading gate bypassed',
       }
     }
     return computeCaptureWindow(now, userTz, isPremium, currentStreak)
   }, [now, userTz, isPremium, currentStreak, appTestMode])
+
+  const captureButtonGold =
+    appTestMode || (captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit)
 
   const featuredFlag = featured ? countryCodeToFlagEmoji(featured.city.countryCode) : '🏳️'
   const featuredCityName = featured?.city.name ?? 'somewhere'
@@ -349,20 +354,24 @@ function App() {
                 <button
                   type="button"
                   className={
-                    captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit
+                    captureButtonGold
                       ? 'app-btn-landscape btn-glow-gold w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                       : 'app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                   }
-                  disabled={hasUsedDailyQuota || checkingDailyLimit}
-                  title="Upload your 5PM moment during your active window"
+                  disabled={captureButtonDisabled}
+                  title={
+                    appTestMode
+                      ? 'Test mode: record anytime (5 PM window bypassed)'
+                      : 'Upload your 5PM moment during your active window'
+                  }
                   onClick={() => {
-                    if (!captureWindow.active) {
+                    if (!appTestMode && !captureWindow.active) {
                       showToast(
                         "You're outside your personal 5 PM window — come back at 5 PM local time!",
                       )
                       return
                     }
-                    if (hasUsedDailyQuota) {
+                    if (!appTestMode && hasUsedDailyQuota) {
                       trackDailyLimitHit({ userId, tz: userTz })
                       showToast('You have used your daily upload limit for today.')
                       return

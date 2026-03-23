@@ -1,5 +1,6 @@
 /**
- * Temporary QA / reaction-testing mode — disables normal product limits.
+ * Temporary QA / reaction-testing mode — disables normal product limits (5 PM window,
+ * daily upload cap, capture button disabled-while-profile-loads, stream age, record length).
  *
  * Enable either:
  * - `VITE_APP_TEST_MODE=true` in `.env` (rebuild required), or
