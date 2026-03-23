@@ -21,6 +21,8 @@ export type MomentRow = {
 }
 
 const FETCH_LIMIT = 20
+/** In app test mode, load more rows so older clips aren’t cut off by the default cap. */
+const FETCH_LIMIT_TEST_MODE = 200
 const PRELOAD_NEXT = 3
 const LIVE_WINDOW_MINUTES = 35
 
@@ -94,26 +96,34 @@ export function LiveStream({ open, onClose, userId }: Props) {
     const sb = getSupabase()
     if (!sb || loadingMoreRef.current) return []
     loadingMoreRef.current = true
-    const cutoff = isAppTestMode()
-      ? new Date(0).toISOString()
-      : new Date(Date.now() - LIVE_WINDOW_MINUTES * 60 * 1000).toISOString()
-    const { data: videos, error } = await sb
-      .from('moments')
-      .select('*')
-      .gte('created_at', cutoff)
+    const testMode = isAppTestMode()
+    const limit = testMode ? FETCH_LIMIT_TEST_MODE : FETCH_LIMIT
+
+    // Normal mode: only moments from the last 35 minutes. Test mode: any age (no created_at filter).
+    let q = sb.from('moments').select('*')
+    if (!testMode) {
+      const cutoff = new Date(Date.now() - LIVE_WINDOW_MINUTES * 60 * 1000).toISOString()
+      q = q.gte('created_at', cutoff)
+    }
+    const { data: videos, error } = await q
       .order('uploader_streak_priority', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(FETCH_LIMIT)
+      .limit(limit)
+
     loadingMoreRef.current = false
     const list = (videos ?? []) as MomentRow[]
     // eslint-disable-next-line no-console
-    console.log('Stream query returned:', list.length, 'videos')
+    console.log(
+      testMode ? 'Stream query (TEST: no time window, limit ' + limit + '):' : 'Stream query:',
+      list.length,
+      'videos',
+    )
     if (error) {
       // eslint-disable-next-line no-console
       console.error('Stream query error:', error)
       return []
     }
-    if (list.length === 0) {
+    if (list.length === 0 && !testMode) {
       // eslint-disable-next-line no-console
       console.log('No moments in the last', LIVE_WINDOW_MINUTES, 'minutes')
     }
