@@ -6,7 +6,15 @@ import { countryCodeToFlagEmoji } from './lib/flags'
 import { formatClock } from './lib/time'
 import { Globe } from './components/Globe'
 import { getSupabase } from './lib/supabase'
-import { computeCaptureWindow, getStreakTier, getUploadsToday, getUserTimezone, trackDailyLimitHit } from './lib/capture'
+import {
+  computeCaptureWindow,
+  getStreakTier,
+  getUploadsToday,
+  getUserTimezone,
+  trackDailyLimitHit,
+  type CaptureWindowState,
+} from './lib/capture'
+import { isAppTestMode } from './lib/appTestMode'
 import { useProfile } from './hooks/useProfile'
 import { RecordMoment } from './components/RecordMoment'
 import { LiveStream } from './components/LiveStream'
@@ -113,7 +121,8 @@ function App() {
   const uploadsToday = getUploadsToday(userId, userTz)
   const extraDailyUploads = streakTier?.extraDailyUploads ?? 0
   const maxUploadsPerDay = 1 + extraDailyUploads
-  const hasUsedDailyQuota = uploadsToday >= maxUploadsPerDay
+  const appTestMode = isAppTestMode()
+  const hasUsedDailyQuota = appTestMode ? false : uploadsToday >= maxUploadsPerDay
 
   const { candidates, bestCandidate } = useMemo(() => {
     if (!CITIES.length) {
@@ -197,10 +206,16 @@ function App() {
     return bestCandidate
   }, [bestCandidate, candidates, lockedCityId])
 
-  const captureWindow = useMemo(
-    () => computeCaptureWindow(now, userTz, isPremium, currentStreak),
-    [now, userTz, isPremium, currentStreak],
-  )
+  const captureWindow = useMemo((): CaptureWindowState => {
+    if (appTestMode) {
+      return {
+        active: true,
+        diffMinutes: 0,
+        label: 'APP TEST MODE — 5 PM window & daily upload limit bypassed',
+      }
+    }
+    return computeCaptureWindow(now, userTz, isPremium, currentStreak)
+  }, [now, userTz, isPremium, currentStreak, appTestMode])
 
   const featuredFlag = featured ? countryCodeToFlagEmoji(featured.city.countryCode) : '🏳️'
   const featuredCityName = featured?.city.name ?? 'somewhere'
@@ -242,7 +257,18 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden vhs-noise bg-sunset-gradient">
-      <div className="app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-4 lg:py-5">
+      {appTestMode && (
+        <div
+          className="fixed top-0 left-0 right-0 z-[100000] bg-amber-400/95 text-midnight-900 text-center text-[10px] sm:text-xs py-1.5 px-2 font-semibold shadow-md"
+          role="status"
+        >
+          APP TEST MODE — remove <code className="rounded bg-black/10 px-1">fivepm_app_test_mode</code> from
+          localStorage & reload. Env: <code className="rounded bg-black/10 px-1">VITE_APP_TEST_MODE</code>
+        </div>
+      )}
+      <div
+        className={`app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-4 lg:py-5 ${appTestMode ? 'pt-8 sm:pt-9' : ''}`}
+      >
         <header className="app-header-landscape flex-shrink-0 mb-2 sm:mb-4 flex items-start justify-between gap-2 sm:gap-4">
           <div className="flex items-start gap-2 sm:gap-3 min-w-0">
             <div className="flex-shrink-0 flex items-start justify-center min-w-0">

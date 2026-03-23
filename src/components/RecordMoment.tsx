@@ -12,6 +12,7 @@ import {
   updateProfileAfterUpload,
   type ProfileStreak,
 } from '../lib/capture'
+import { isAppTestMode } from '../lib/appTestMode'
 
 type Props = {
   open: boolean
@@ -45,8 +46,9 @@ export function RecordMoment(props: Props) {
   const rafRef = useRef<number | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
-  const MIN_SEC = isPremium ? 5 : 10
-  const MAX_SEC = isPremium ? 30 : 20
+  const appTestMode = isAppTestMode()
+  const MIN_SEC = appTestMode ? 1 : isPremium ? 5 : 10
+  const MAX_SEC = appTestMode ? 86400 : isPremium ? 30 : 20
 
   useEffect(() => {
     // eslint-disable-next-line no-console
@@ -735,7 +737,7 @@ export function RecordMoment(props: Props) {
           {step === 'recording' && (
             <div className="flex items-center justify-between gap-2 sm:gap-4 flex-shrink-0 flex-wrap">
               <div className="text-[10px] sm:text-xs text-sunset-100/80">
-                {isPremium ? '5–30s' : '10–20s'}
+                {appTestMode ? 'TEST: 1s–24h' : isPremium ? '5–30s' : '10–20s'}
               </div>
               <button
                 type="button"

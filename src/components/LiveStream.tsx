@@ -1,6 +1,7 @@
 // FORCE COMMIT - Supabase update logging and row insert fix - 2025-03-13 - remove after testing
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
+import { isAppTestMode } from '../lib/appTestMode'
 
 export type MomentRow = {
   id: string
@@ -93,7 +94,9 @@ export function LiveStream({ open, onClose, userId }: Props) {
     const sb = getSupabase()
     if (!sb || loadingMoreRef.current) return []
     loadingMoreRef.current = true
-    const cutoff = new Date(Date.now() - LIVE_WINDOW_MINUTES * 60 * 1000).toISOString()
+    const cutoff = isAppTestMode()
+      ? new Date(0).toISOString()
+      : new Date(Date.now() - LIVE_WINDOW_MINUTES * 60 * 1000).toISOString()
     const { data: videos, error } = await sb
       .from('moments')
       .select('*')
@@ -126,7 +129,13 @@ export function LiveStream({ open, onClose, userId }: Props) {
     fetchMore().then((rows) => {
       setQueue(rows)
       setLoading(false)
-      if (rows.length === 0) setError('No moments in the last 35 minutes — check back soon.')
+      if (rows.length === 0) {
+        setError(
+          isAppTestMode()
+            ? 'No moments in the feed — check back soon.'
+            : 'No moments in the last 35 minutes — check back soon.',
+        )
+      }
     })
   }, [open, fetchMore])
 
@@ -150,9 +159,13 @@ export function LiveStream({ open, onClose, userId }: Props) {
   const hasPrev = currentIndex > 0
 
   const fetchReactionCounts = useCallback(
-    async (momentId: string) => {
-      // Skip normal fetches for a window after a recent reaction so we don't overwrite optimistic counts with stale data
-      if (Date.now() < fetchFrozenUntil || Date.now() - lastReactionTime < 15000) {
+    async (momentId: string, options?: { force?: boolean }) => {
+      // Skip normal fetches for a window after a recent reaction so we don't overwrite optimistic counts with stale data.
+      // When navigating between videos, pass { force: true } so counts always sync from the server.
+      if (
+        !options?.force &&
+        (Date.now() < fetchFrozenUntil || Date.now() - lastReactionTime < 15000)
+      ) {
         // eslint-disable-next-line no-console
         console.log(
           'Fetch skipped - reaction freeze active until',
@@ -592,7 +605,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
             cheers: hasReacted(current.id, 'cheers_count'),
           },
     )
-    fetchReactionCounts(current.id)
+    fetchReactionCounts(current.id, { force: true })
   }, [current?.id, fetchReactionCounts, userId])
 
   // Realtime: when logged in, sync user_reactions for current moment across devices/tabs
@@ -633,7 +646,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
             }))
           }
           // Refetch global counts so this client sees latest
-          fetchReactionCounts(momentId)
+          fetchReactionCounts(momentId, { force: true })
         },
       )
       .subscribe()
