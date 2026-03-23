@@ -1,7 +1,6 @@
 // FORCE COMMIT - Supabase update logging and row insert fix - 2025-03-13 - remove after testing
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
-import { isAppTestMode } from '../lib/appTestMode'
 
 export type MomentRow = {
   id: string
@@ -36,6 +35,8 @@ type Props = {
   open: boolean
   onClose: () => void
   userId?: string | null
+  /** When true, no created_at filter + higher fetch limit (from App test mode). */
+  appTestMode?: boolean
 }
 
 const POSTER_PLACEHOLDER =
@@ -68,7 +69,7 @@ function hasReacted(momentId: string, field: string): boolean {
   }
 }
 
-export function LiveStream({ open, onClose, userId }: Props) {
+export function LiveStream({ open, onClose, userId, appTestMode = false }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -96,7 +97,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
     const sb = getSupabase()
     if (!sb || loadingMoreRef.current) return []
     loadingMoreRef.current = true
-    const testMode = isAppTestMode()
+    const testMode = appTestMode
     const limit = testMode ? FETCH_LIMIT_TEST_MODE : FETCH_LIMIT
 
     // Normal mode: only moments from the last 35 minutes. Test mode: any age (no created_at filter).
@@ -128,7 +129,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
       console.log('No moments in the last', LIVE_WINDOW_MINUTES, 'minutes')
     }
     return list
-  }, [])
+  }, [appTestMode])
 
   useEffect(() => {
     if (!open) return
@@ -141,13 +142,13 @@ export function LiveStream({ open, onClose, userId }: Props) {
       setLoading(false)
       if (rows.length === 0) {
         setError(
-          isAppTestMode()
+          appTestMode
             ? 'No moments in the feed — check back soon.'
             : 'No moments in the last 35 minutes — check back soon.',
         )
       }
     })
-  }, [open, fetchMore])
+  }, [open, fetchMore, appTestMode])
 
   useEffect(() => {
     if (!open || queue.length === 0) return

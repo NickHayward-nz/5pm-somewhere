@@ -24,12 +24,14 @@ type Props = {
   isPremium: boolean
   profile: ProfileStreak | null
   onProfileUpdated: () => void
+  /** When true, relaxed min/max record length (from App test mode). */
+  appTestMode?: boolean
 }
 
 type Step = 'idle' | 'countdown' | 'recording' | 'preview' | 'uploading' | 'error'
 
 export function RecordMoment(props: Props) {
-  const { open, onClose, userId, userTz, city, country, isPremium, profile, onProfileUpdated } = props
+  const { open, onClose, userId, userTz, city, country, isPremium, profile, onProfileUpdated, appTestMode: appTestModeProp } = props
   const [step, setStep] = useState<Step>('idle')
   const [countdown, setCountdown] = useState(3)
   const [error, setError] = useState<string | null>(null)
@@ -46,7 +48,7 @@ export function RecordMoment(props: Props) {
   const rafRef = useRef<number | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
-  const appTestMode = isAppTestMode()
+  const appTestMode = appTestModeProp ?? isAppTestMode()
   const MIN_SEC = appTestMode ? 1 : isPremium ? 5 : 10
   const MAX_SEC = appTestMode ? 86400 : isPremium ? 30 : 20
 

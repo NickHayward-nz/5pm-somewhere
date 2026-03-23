@@ -14,7 +14,7 @@ import {
   trackDailyLimitHit,
   type CaptureWindowState,
 } from './lib/capture'
-import { isAppTestMode } from './lib/appTestMode'
+import { APP_TEST_MODE_STORAGE_KEY, isAppTestMode } from './lib/appTestMode'
 import { useProfile } from './hooks/useProfile'
 import { RecordMoment } from './components/RecordMoment'
 import { LiveStream } from './components/LiveStream'
@@ -121,7 +121,33 @@ function App() {
   const uploadsToday = getUploadsToday(userId, userTz)
   const extraDailyUploads = streakTier?.extraDailyUploads ?? 0
   const maxUploadsPerDay = 1 + extraDailyUploads
-  const appTestMode = isAppTestMode()
+  /** Re-read whenever modals open or URL/storage may have changed (see effects below). */
+  const [appTestMode, setAppTestMode] = useState(() => isAppTestMode())
+
+  useEffect(() => {
+    setAppTestMode(isAppTestMode())
+  }, [])
+
+  useEffect(() => {
+    const sync = () => setAppTestMode(isAppTestMode())
+    window.addEventListener('popstate', sync)
+    window.addEventListener('hashchange', sync)
+    const onStorage = (e: StorageEvent) => {
+      if (e.key === APP_TEST_MODE_STORAGE_KEY || e.key === null) sync()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => {
+      window.removeEventListener('popstate', sync)
+      window.removeEventListener('hashchange', sync)
+      window.removeEventListener('storage', onStorage)
+    }
+  }, [])
+
+  // Re-sync when opening capture or stream so ?test=1 / localStorage apply without full reload edge cases.
+  useEffect(() => {
+    if (recordOpen || liveStreamOpen) setAppTestMode(isAppTestMode())
+  }, [recordOpen, liveStreamOpen])
+
   const hasUsedDailyQuota = appTestMode ? false : uploadsToday >= maxUploadsPerDay
   // In test mode: allow capture anytime (ignore daily quota + profile loading gate on the button).
   const captureButtonDisabled = appTestMode ? false : hasUsedDailyQuota || checkingDailyLimit
@@ -267,8 +293,9 @@ function App() {
           className="fixed top-0 left-0 right-0 z-[100000] bg-amber-400/95 text-midnight-900 text-center text-[10px] sm:text-xs py-1.5 px-2 font-semibold shadow-md"
           role="status"
         >
-          APP TEST MODE — remove <code className="rounded bg-black/10 px-1">fivepm_app_test_mode</code> from
-          localStorage & reload. Env: <code className="rounded bg-black/10 px-1">VITE_APP_TEST_MODE</code>
+          APP TEST MODE — add <code className="rounded bg-black/10 px-1">?test=1</code> to URL or{' '}
+          <code className="rounded bg-black/10 px-1">localStorage fivepm_app_test_mode=1</code>. Turn off:{' '}
+          <code className="rounded bg-black/10 px-1">?test=0</code> or remove key & reload.
         </div>
       )}
       <div
@@ -424,9 +451,15 @@ function App() {
           isPremium={isPremium}
           profile={profile ? { last_post_date: profile.last_post_date, current_streak: profile.current_streak, longest_streak: profile.longest_streak } : null}
           onProfileUpdated={refetchProfile}
+          appTestMode={appTestMode}
         />
       )}
-      <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} userId={userId} />
+      <LiveStream
+        open={liveStreamOpen}
+        onClose={() => setLiveStreamOpen(false)}
+        userId={userId}
+        appTestMode={appTestMode}
+      />
       {userId && (
         <MyMoments open={myMomentsOpen} onClose={() => setMyMomentsOpen(false)} userId={userId} />
       )}
