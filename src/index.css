@@ -119,6 +119,22 @@ body {
   opacity: 0.8;
 }
 
+/* Capture CTA: soft sunset rim when user is in window and still has uploads left */
+.app-btn-capture-sunset.btn-glow-gold {
+  border-color: rgba(251, 191, 36, 0.45);
+  box-shadow:
+    0 0 18px rgba(251, 146, 60, 0.35),
+    0 0 32px rgba(236, 72, 153, 0.18),
+    0 0 20px rgba(0, 0, 0, 0.1);
+}
+
+.app-btn-capture-sunset.btn-glow-gold:hover {
+  box-shadow:
+    0 0 22px rgba(249, 115, 22, 0.45),
+    0 0 36px rgba(244, 114, 182, 0.22),
+    0 0 24px rgba(0, 0, 0, 0.12);
+}
+
 /* Globe panel: footer text + overlay pills (Drag · time) */
 .app-globe-panel [class*="text-sunset"],
 .app-globe-panel .text-\[10px\],

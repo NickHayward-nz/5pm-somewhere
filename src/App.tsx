@@ -63,6 +63,7 @@ function App() {
   const [liveStreamOpen, setLiveStreamOpen] = useState(false)
   const [myMomentsOpen, setMyMomentsOpen] = useState(false)
   const [streakOpen, setStreakOpen] = useState(false)
+  const [dailyLimitModalOpen, setDailyLimitModalOpen] = useState(false)
   const recordOpenRef = useRef(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
@@ -120,9 +121,9 @@ function App() {
   const streakTier = getStreakTier(currentStreak)
   const uploadsToday = getUploadsToday(userId, userTz)
   const extraDailyUploads = streakTier?.extraDailyUploads ?? 0
-  const maxUploadsPerDay = 1 + extraDailyUploads
+  const maxUploadsPerDay = isPremium ? 3 : 1 + extraDailyUploads
   const hasUsedDailyQuota = uploadsToday >= maxUploadsPerDay
-  const captureButtonDisabled = hasUsedDailyQuota || checkingDailyLimit
+  const captureButtonDisabled = checkingDailyLimit
 
   const { candidates, bestCandidate } = useMemo(() => {
     if (!CITIES.length) {
@@ -336,7 +337,7 @@ function App() {
                   type="button"
                   className={
                     captureButtonGold
-                      ? 'app-btn-landscape btn-glow-gold w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
+                      ? 'app-btn-landscape app-btn-capture-sunset btn-glow-gold w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                       : 'app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                   }
                   disabled={captureButtonDisabled}
@@ -350,7 +351,7 @@ function App() {
                     }
                     if (hasUsedDailyQuota) {
                       trackDailyLimitHit({ userId, tz: userTz })
-                      showToast('You have used your daily upload limit for today.')
+                      setDailyLimitModalOpen(true)
                       return
                     }
                     if (!userId) {
@@ -407,6 +408,64 @@ function App() {
       <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} userId={userId} />
       {userId && (
         <MyMoments open={myMomentsOpen} onClose={() => setMyMomentsOpen(false)} userId={userId} />
+      )}
+      {dailyLimitModalOpen && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="daily-limit-title"
+          onClick={() => setDailyLimitModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-midnight-900/95 p-4 shadow-xl border border-sunset-500/40"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div
+                id="daily-limit-title"
+                className="text-xs font-semibold tracking-[0.14em] uppercase text-sunset-100/80"
+              >
+                Daily limit
+              </div>
+              <button
+                type="button"
+                onClick={() => setDailyLimitModalOpen(false)}
+                className="text-[11px] text-sunset-100/70 hover:text-sunset-50"
+              >
+                Close
+              </button>
+            </div>
+            <p className="text-sm text-sunset-100/90 mb-4">
+              You&apos;ve already posted your 5PM moment for today. Premium includes up to 3 moments per
+              day — upgrade to capture more.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setDailyLimitModalOpen(false)}
+                className="btn-glow-muted w-full sm:w-auto min-h-[44px] px-4 text-sm touch-manipulation"
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  try {
+                    const u = new URL(window.location.href)
+                    u.searchParams.set('premium', '1')
+                    window.location.href = u.toString()
+                  } catch {
+                    window.location.search = '?premium=1'
+                  }
+                }}
+                className="btn-glow-gold w-full sm:w-auto min-h-[44px] px-4 text-sm touch-manipulation"
+              >
+                Upgrade
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {streakOpen && streakTier && (
         <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4">
