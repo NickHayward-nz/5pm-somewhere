@@ -51,7 +51,12 @@ export function Globe({ now, cities }: Props) {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
-    el.appendChild(renderer.domElement)
+    const canvas = renderer.domElement
+    canvas.style.display = 'block'
+    canvas.style.margin = '0'
+    canvas.style.padding = '0'
+    canvas.style.verticalAlign = 'top'
+    el.appendChild(canvas)
 
     const scene = new THREE.Scene()
     const camera = new THREE.PerspectiveCamera(45, 1, 0.1, 50)
@@ -170,15 +175,23 @@ export function Globe({ now, cities }: Props) {
     const baseColor = new THREE.Color()
 
     function resize() {
-      const w = el.clientWidth ?? 0
-      const h = el.clientHeight || Math.round(w * 0.78)
-      const height = Math.max(120, h)
+      const rect = el.getBoundingClientRect()
+      let w = Math.max(1, Math.floor(rect.width))
+      let h = Math.max(1, Math.floor(rect.height))
+      // Flex can report 0 height before layout; fall back until ResizeObserver refires
+      if (h <= 1 && w > 1) {
+        h = Math.max(120, Math.round(w * 0.75))
+      }
       el.style.background = 'transparent'
-      renderer.setSize(w, height, false)
-      camera.aspect = w / height
+      renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
+      // `true` updates canvas CSS width/height so the drawing buffer matches what’s shown (false caused quadrant/misalignment)
+      renderer.setSize(w, h, true)
+      camera.aspect = w / h
       camera.updateProjectionMatrix()
+      controls.update()
     }
     resize()
+    requestAnimationFrame(() => resize())
     const ro = new ResizeObserver(resize)
     ro.observe(el)
 
@@ -314,7 +327,7 @@ export function Globe({ now, cities }: Props) {
       if (el.contains(zoomInBtn)) el.removeChild(zoomInBtn)
       if (el.contains(zoomOutBtn)) el.removeChild(zoomOutBtn)
       renderer.dispose()
-      if (el.contains(renderer.domElement)) el.removeChild(renderer.domElement)
+      if (el.contains(canvas)) el.removeChild(canvas)
     }
   }, [cityPositions])
 
@@ -323,7 +336,7 @@ export function Globe({ now, cities }: Props) {
       <div className="flex min-h-0 w-full flex-1 flex-col items-stretch justify-center overflow-hidden p-0">
         <div
           ref={hostRef}
-          className="globe-host globe-host-portrait h-full min-h-0 w-full min-w-0 flex-1 touch-none select-none overflow-hidden"
+          className="globe-host globe-host-portrait relative h-full min-h-0 w-full min-w-0 flex-1 touch-none select-none overflow-hidden"
           style={{ touchAction: 'none' }}
         />
       </div>
