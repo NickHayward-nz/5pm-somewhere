@@ -319,66 +319,12 @@ export function Globe({ now, cities }: Props) {
   }, [cityPositions])
 
   return (
-    <div className="relative flex-1 min-h-0 flex flex-col overflow-visible min-w-0 !overflow-visible">
-      <style>{`
-        @media (max-width: 640px) {
-          .globe-portrait-fill {
-            width: 100% !important;
-            height: auto !important;
-            max-height: 80vh !important;
-            margin: 0 auto !important;
-            padding: 0 !important;
-            overflow: visible !important;
-            clip-path: none !important;
-            display: flex !important;
-            align-items: center !important;
-            justify-content: center !important;
-          }
-          .globe-host-portrait {
-            width: 100% !important;
-            height: auto !important;
-            max-height: 80vh !important;
-            transform: scale(1.3) !important;
-            transform-origin: center center !important;
-            position: relative !important;
-            left: 0 !important;
-            margin-left: 0 !important;
-            margin-right: 0 !important;
-            padding-left: 0 !important;
-            overflow: visible !important;
-            clip-path: none !important;
-            object-fit: contain !important;
-            object-position: center !important;
-          }
-          .globe-host-portrait canvas {
-            width: 100% !important;
-            height: auto !important;
-            position: relative !important;
-            left: 0 !important;
-            margin-left: 0 !important;
-            padding-left: 0 !important;
-            overflow: visible !important;
-            clip-path: none !important;
-            object-fit: contain !important;
-            object-position: center !important;
-          }
-        }
-        @media (min-width: 641px) {
-          .globe-host-portrait {
-            transform: none !important;
-          }
-        }
-      `}</style>
-      <div className="globe-portrait-fill flex-1 min-h-0 flex items-center justify-center overflow-visible p-0 w-full max-h-[80vh] sm:max-h-none mx-auto !overflow-visible">
+    <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
+      <div className="flex min-h-0 w-full flex-1 flex-col items-stretch justify-center overflow-hidden p-0">
         <div
           ref={hostRef}
-          className="globe-host globe-host-portrait w-full h-[80vh] max-h-[80vh] min-h-0 flex-none overflow-visible sm:h-full sm:max-h-none sm:flex-1 select-none touch-none !overflow-visible"
-          style={{
-            touchAction: 'none',
-            clipPath: 'none',
-            overflow: 'visible',
-            marginLeft: 0,
-          }}
+          className="globe-host globe-host-portrait h-full min-h-0 w-full min-w-0 flex-1 touch-none select-none overflow-hidden"
+          style={{ touchAction: 'none' }}
         />
       </div>
       <div className="pointer-events-none absolute inset-0 rounded-[1.35rem] ring-1 ring-white/5" />

@@ -254,22 +254,22 @@ function App() {
   }, [now])
 
   return (
-    <div className="min-h-screen flex flex-col overflow-x-hidden vhs-noise bg-sunset-gradient">
-      <div className="app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-4 lg:py-5">
-        <header className="app-header-landscape flex-shrink-0 mb-2 sm:mb-4 flex items-start justify-between gap-2 sm:gap-4">
+    <div className="app-one-screen-root flex flex-col overflow-hidden vhs-noise bg-sunset-gradient">
+      <div className="app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl max-h-full px-3 py-2 sm:px-4 sm:py-3 lg:py-5">
+        <header className="app-header-landscape flex-shrink-0 mb-1.5 sm:mb-4 flex items-start justify-between gap-2 sm:gap-4">
           <div className="flex items-start gap-2 sm:gap-3 min-w-0">
             <div className="flex-shrink-0 flex items-start justify-center min-w-0">
               <img
                 src="/Logo.png"
                 alt="5PM Somewhere Logo"
-                className="block h-20 w-auto max-w-full min-h-[80px] sm:h-24 md:h-28 lg:h-32 object-contain"
+                className="block h-14 w-auto max-w-full max-h-[56px] object-contain sm:h-24 sm:max-h-none md:h-28 lg:h-32"
                 onLoad={() => {
                   // eslint-disable-next-line no-console
                   console.log('Custom logo loaded')
                 }}
               />
             </div>
-            <div className="leading-tight min-w-0 overflow-visible mt-4 sm:mt-5 md:mt-6 lg:mt-7">
+            <div className="leading-tight min-w-0 overflow-visible mt-2 sm:mt-5 md:mt-6 lg:mt-7">
               <div className="text-[9px] sm:text-sm uppercase tracking-[0.15em] sm:tracking-[0.24em] text-sunset-100/80 whitespace-nowrap overflow-visible [text-overflow:clip]">
                 5PM Somewhere
               </div>
@@ -297,20 +297,20 @@ function App() {
           </div>
         </header>
 
-        <main className="app-main-landscape flex-1 min-h-0 grid grid-cols-1 lg:grid-cols-[1.05fr_0.95fr] gap-3 sm:gap-4 lg:gap-6 lg:items-stretch content-stretch">
-          <section className="app-card-landscape app-clock-panel polaroid-frame p-2 sm:p-4 lg:p-5 min-h-0 flex flex-col overflow-hidden">
-            <div className="polaroid-inner p-3 sm:p-5 lg:p-6 flex-1 min-h-0 overflow-hidden flex flex-col">
+        <main className="app-main-landscape flex-1 min-h-0 grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[1.05fr_0.95fr] lg:grid-rows-1 gap-2 sm:gap-4 lg:gap-6 lg:items-stretch content-stretch">
+          <section className="app-card-landscape app-clock-panel polaroid-frame p-2 sm:p-4 lg:p-5 min-h-0 flex flex-col overflow-hidden max-lg:flex-shrink-0">
+            <div className="polaroid-inner p-2.5 sm:p-5 lg:p-6 flex min-h-0 flex-1 flex-col overflow-hidden max-lg:min-h-0">
               <div
-                className="uppercase tracking-[0.34em] text-sunset-100/70 text-center"
-                style={{ fontSize: 'clamp(1.4rem, 4.5vw, 1.8rem)', marginBottom: '26px' }}
+                className="uppercase tracking-[0.34em] text-sunset-100/70 text-center shrink-0 mb-2 sm:mb-[26px]"
+                style={{ fontSize: 'clamp(1rem, 4vw, 1.8rem)' }}
               >
                 Live golden hour
               </div>
 
               {featured && (
                 <div
-                  className="mt-1 sm:mt-2 lg:mt-3 mb-8 sm:mb-0 uppercase text-balance font-semibold leading-tight text-center"
-                  style={{ fontSize: 'clamp(1.4rem, 5vw, 2rem)' }}
+                  className="mt-0.5 sm:mt-2 lg:mt-3 mb-3 sm:mb-5 lg:mb-6 uppercase text-balance font-semibold leading-snug text-center shrink-0"
+                  style={{ fontSize: 'clamp(0.9rem, 3.8vw, 2rem)' }}
                 >
                   It’s{' '}
                   <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
@@ -332,7 +332,7 @@ function App() {
                 </div>
               )}
 
-              <div className="mt-3 sm:mt-5 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center flex-shrink-0">
+              <div className="mt-2 sm:mt-5 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center flex-shrink-0">
                 <button
                   type="button"
                   className={
@@ -376,21 +376,21 @@ function App() {
             </div>
           </section>
 
-          <section className="app-card-landscape app-globe-landscape app-globe-panel polaroid-frame p-2 sm:p-4 lg:p-5 min-h-0 flex flex-col overflow-hidden">
-            <div className="polaroid-inner flex-1 min-h-0 flex flex-col overflow-hidden">
-              <div className="app-globe-container-landscape min-h-0 flex-1 flex flex-col">
+          <section className="app-card-landscape app-globe-landscape app-globe-panel polaroid-frame p-2 sm:p-4 lg:p-5 min-h-0 flex flex-col overflow-hidden max-lg:min-h-0">
+            <div className="polaroid-inner flex min-h-0 flex-1 flex-col overflow-hidden">
+              <div className="app-globe-container-landscape min-h-0 flex-1 flex flex-col overflow-hidden">
                 <Globe
                   now={now}
                   cities={CITIES}
                 />
               </div>
-              <div className="text-[10px] sm:text-xs text-sunset-500/90 text-center py-1.5 sm:py-2 flex-shrink-0">
+              <div className="text-[10px] sm:text-xs text-sunset-500/90 text-center py-1 sm:py-2 flex-shrink-0">
                 Cities at 5PM glow brightest (Range: {Math.round(dayRange.length('hours'))}h)
               </div>
             </div>
           </section>
         </main>
-        <CopyrightFooter variant="main" />
+        <CopyrightFooter variant="main" className="shrink-0" />
       </div>
       {recordOpen && userId && (
         <RecordMoment
