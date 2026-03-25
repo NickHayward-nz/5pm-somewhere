@@ -1,6 +1,9 @@
 // © 2026 Chromatic Productions Ltd. All rights reserved.
 import { DateTime } from 'luxon'
 
+/** Cities on the globe show a marker only when local time is within this many minutes of 17:00. */
+export const NEAR_FIVE_PM_VISIBLE_MINUTES = 90
+
 export type CityTimeInfo = {
   now: DateTime
   minutesFromFivePm: number // 0 at exactly 17:00, positive = after, negative = before

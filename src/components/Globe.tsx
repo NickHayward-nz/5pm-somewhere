@@ -5,7 +5,7 @@ import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { City } from '../data/cities'
 import { latLonToVector3 } from '../lib/geo'
-import { getCityTimeInfo } from '../lib/time'
+import { getCityTimeInfo, NEAR_FIVE_PM_VISIBLE_MINUTES } from '../lib/time'
 
 const DAY_MAP_URL =
   'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg'
@@ -117,11 +117,12 @@ export function Globe({ now, cities }: Props) {
     )
     group.add(atmo)
 
-    const markerGeo = new THREE.SphereGeometry(0.012, 8, 8)
+    // Small solid core (city pin) — size stays compact so land stays visible
+    const markerGeo = new THREE.SphereGeometry(0.007, 10, 10)
     const markerMat = new THREE.MeshBasicMaterial({
       color: 0xff9a62,
       transparent: true,
-      opacity: 0.85,
+      opacity: 0.92,
       blending: THREE.AdditiveBlending,
       depthTest: true,
       depthWrite: false,
@@ -130,39 +131,40 @@ export function Globe({ now, cities }: Props) {
     markers.instanceMatrix.setUsage(THREE.DynamicDrawUsage)
     group.add(markers)
 
+    // Soft ring: transparent center (map shows through), bright annulus, soft outer falloff
     const spriteCanvas = document.createElement('canvas')
     spriteCanvas.width = 128
     spriteCanvas.height = 128
     const ctx = spriteCanvas.getContext('2d')
     if (ctx) {
-      // Tighter gradient so glow is contained (no large halo)
-      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 24)
-      g.addColorStop(0, 'rgba(255,220,160,1)')
-      g.addColorStop(0.5, 'rgba(255,160,90,0.6)')
-      g.addColorStop(1, 'rgba(255,120,60,0)')
+      const g = ctx.createRadialGradient(64, 64, 0, 64, 64, 62)
+      g.addColorStop(0, 'rgba(255, 200, 140, 0)')
+      g.addColorStop(0.28, 'rgba(255, 200, 140, 0)')
+      g.addColorStop(0.38, 'rgba(255, 190, 120, 0.55)')
+      g.addColorStop(0.52, 'rgba(255, 150, 85, 0.75)')
+      g.addColorStop(0.72, 'rgba(255, 120, 70, 0.35)')
+      g.addColorStop(1, 'rgba(255, 100, 50, 0)')
       ctx.fillStyle = g
       ctx.fillRect(0, 0, 128, 128)
     }
     const spriteTex = new THREE.CanvasTexture(spriteCanvas)
     const spriteMat = new THREE.SpriteMaterial({
       map: spriteTex,
-      color: 0xffb56b,
+      color: 0xffffff,
       transparent: true,
-      opacity: 0.9,
+      opacity: 1,
       blending: THREE.AdditiveBlending,
       depthTest: true,
       depthWrite: false,
     })
 
-    const sprites: THREE.Sprite[] = []
+    const ringSprites: THREE.Sprite[] = []
     for (let i = 0; i < cityPositions.length; i++) {
       const s = new THREE.Sprite(spriteMat.clone())
-      s.scale.setScalar(0.1)
+      s.scale.setScalar(0.12)
       group.add(s)
-      sprites.push(s)
+      ringSprites.push(s)
     }
-    // eslint-disable-next-line no-console
-    console.log('Dot glow restored - additive blending, opacity 0.9')
 
     const tmpObj = new THREE.Object3D()
     const baseColor = new THREE.Color()
@@ -261,19 +263,37 @@ export function Globe({ now, cities }: Props) {
         const { city, pos } = cityPositions[i]
         const info = getCityTimeInfo(city.tz, timeForDots)
         const intensity = info.intensity
+        const withinWindow = info.absMinutesFromFivePm <= NEAR_FIVE_PM_VISIBLE_MINUTES
+        // 1 at exactly 5pm, 0 at ±90 min — drives ring size
+        const proximityToFive =
+          withinWindow ? 1 - info.absMinutesFromFivePm / NEAR_FIVE_PM_VISIBLE_MINUTES : 0
 
         tmpObj.position.set(pos.x, pos.y, pos.z)
-        tmpObj.scale.setScalar(0.65 + intensity * 1.85)
+        if (withinWindow) {
+          // Tiny solid core; slight brightening at peak (does not grow huge)
+          tmpObj.scale.setScalar(0.88 + intensity * 0.14)
+        } else {
+          tmpObj.scale.setScalar(0)
+        }
         tmpObj.updateMatrix()
         markers.setMatrixAt(i, tmpObj.matrix)
 
         baseColor.copy(intensityToColor(intensity))
         markers.setColorAt(i, baseColor)
 
-        const spr = sprites[i]
+        const spr = ringSprites[i]
         spr.position.set(pos.x, pos.y, pos.z)
-        spr.scale.setScalar(0.06 + intensity * 0.12)
-        ;(spr.material as THREE.SpriteMaterial).opacity = Math.max(0, Math.min(1, 0.4 + intensity * 0.6))
+        if (withinWindow) {
+          // Large soft ring grows as we approach 5pm (proximityToFive → 1)
+          const ringScale = 0.055 + proximityToFive * 0.2
+          spr.scale.setScalar(ringScale)
+          const mat = spr.material as THREE.SpriteMaterial
+          mat.opacity = Math.max(0, Math.min(1, 0.28 + proximityToFive * 0.62))
+          mat.color.copy(intensityToColor(intensity))
+        } else {
+          spr.scale.setScalar(0)
+          ;(spr.material as THREE.SpriteMaterial).opacity = 0
+        }
       }
 
       if (markers.instanceColor) markers.instanceColor.needsUpdate = true
