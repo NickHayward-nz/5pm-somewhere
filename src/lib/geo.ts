@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 export type LatLon = { lat: number; lon: number }
 
 export function latLonToVector3(lat: number, lon: number, radius: number) {

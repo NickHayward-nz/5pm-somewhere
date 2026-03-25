@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { createClient, type SupabaseClient } from '@supabase/supabase-js'
 
 let client: SupabaseClient | null = null

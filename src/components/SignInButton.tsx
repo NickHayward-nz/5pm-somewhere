@@ -1,5 +1,7 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useState } from 'react'
 import { getSupabase } from '../lib/supabase'
+import { CopyrightFooter } from './CopyrightFooter'
 
 type Props = {
   userEmail: string | null
@@ -147,6 +149,7 @@ export default function SignInButton({ userEmail, onUsernameClick }: Props) {
               Send Magic Link
             </button>
           </div>
+          <CopyrightFooter variant="overlay" />
         </div>
       )}
     </>

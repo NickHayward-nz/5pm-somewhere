@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 /** @type {import('tailwindcss').Config} */
 module.exports = {
   content: ['./index.html', './src/**/*.{ts,tsx,js,jsx}'],

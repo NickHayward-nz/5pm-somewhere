@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 export type Profile = {
   id: string
   is_premium: boolean

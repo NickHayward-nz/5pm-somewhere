@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DateTime, Interval } from 'luxon'
 import { CITIES, type City } from './data/cities'
@@ -12,14 +13,13 @@ import {
   getUploadsToday,
   getUserTimezone,
   trackDailyLimitHit,
-  type CaptureWindowState,
 } from './lib/capture'
-import { APP_TEST_MODE_STORAGE_KEY, isAppTestMode } from './lib/appTestMode'
 import { useProfile } from './hooks/useProfile'
 import { RecordMoment } from './components/RecordMoment'
 import { LiveStream } from './components/LiveStream'
 import MyMoments from './components/MyMoments'
 import SignInButton from './components/SignInButton'
+import { CopyrightFooter } from './components/CopyrightFooter'
 
 type FeaturedCity = {
   city: City
@@ -121,36 +121,8 @@ function App() {
   const uploadsToday = getUploadsToday(userId, userTz)
   const extraDailyUploads = streakTier?.extraDailyUploads ?? 0
   const maxUploadsPerDay = 1 + extraDailyUploads
-  /** Re-read whenever modals open or URL/storage may have changed (see effects below). */
-  const [appTestMode, setAppTestMode] = useState(() => isAppTestMode())
-
-  useEffect(() => {
-    setAppTestMode(isAppTestMode())
-  }, [])
-
-  useEffect(() => {
-    const sync = () => setAppTestMode(isAppTestMode())
-    window.addEventListener('popstate', sync)
-    window.addEventListener('hashchange', sync)
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === APP_TEST_MODE_STORAGE_KEY || e.key === null) sync()
-    }
-    window.addEventListener('storage', onStorage)
-    return () => {
-      window.removeEventListener('popstate', sync)
-      window.removeEventListener('hashchange', sync)
-      window.removeEventListener('storage', onStorage)
-    }
-  }, [])
-
-  // Re-sync when opening capture or stream so ?test=1 / localStorage apply without full reload edge cases.
-  useEffect(() => {
-    if (recordOpen || liveStreamOpen) setAppTestMode(isAppTestMode())
-  }, [recordOpen, liveStreamOpen])
-
-  const hasUsedDailyQuota = appTestMode ? false : uploadsToday >= maxUploadsPerDay
-  // In test mode: allow capture anytime (ignore daily quota + profile loading gate on the button).
-  const captureButtonDisabled = appTestMode ? false : hasUsedDailyQuota || checkingDailyLimit
+  const hasUsedDailyQuota = uploadsToday >= maxUploadsPerDay
+  const captureButtonDisabled = hasUsedDailyQuota || checkingDailyLimit
 
   const { candidates, bestCandidate } = useMemo(() => {
     if (!CITIES.length) {
@@ -234,19 +206,13 @@ function App() {
     return bestCandidate
   }, [bestCandidate, candidates, lockedCityId])
 
-  const captureWindow = useMemo((): CaptureWindowState => {
-    if (appTestMode) {
-      return {
-        active: true,
-        diffMinutes: 0,
-        label: 'APP TEST MODE — record anytime; daily quota & loading gate bypassed',
-      }
-    }
-    return computeCaptureWindow(now, userTz, isPremium, currentStreak)
-  }, [now, userTz, isPremium, currentStreak, appTestMode])
+  const captureWindow = useMemo(
+    () => computeCaptureWindow(now, userTz, isPremium, currentStreak),
+    [now, userTz, isPremium, currentStreak],
+  )
 
   const captureButtonGold =
-    appTestMode || (captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit)
+    captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit
 
   const featuredFlag = featured ? countryCodeToFlagEmoji(featured.city.countryCode) : '🏳️'
   const featuredCityName = featured?.city.name ?? 'somewhere'
@@ -288,19 +254,7 @@ function App() {
 
   return (
     <div className="min-h-screen flex flex-col overflow-x-hidden vhs-noise bg-sunset-gradient">
-      {appTestMode && (
-        <div
-          className="fixed top-0 left-0 right-0 z-[100000] bg-amber-400/95 text-midnight-900 text-center text-[10px] sm:text-xs py-1.5 px-2 font-semibold shadow-md"
-          role="status"
-        >
-          APP TEST MODE — add <code className="rounded bg-black/10 px-1">?test=1</code> to URL or{' '}
-          <code className="rounded bg-black/10 px-1">localStorage fivepm_app_test_mode=1</code>. Turn off:{' '}
-          <code className="rounded bg-black/10 px-1">?test=0</code> or remove key & reload.
-        </div>
-      )}
-      <div
-        className={`app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-4 lg:py-5 ${appTestMode ? 'pt-8 sm:pt-9' : ''}`}
-      >
+      <div className="app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl px-3 py-3 sm:px-4 sm:py-4 lg:py-5">
         <header className="app-header-landscape flex-shrink-0 mb-2 sm:mb-4 flex items-start justify-between gap-2 sm:gap-4">
           <div className="flex items-start gap-2 sm:gap-3 min-w-0">
             <div className="flex-shrink-0 flex items-start justify-center min-w-0">
@@ -386,19 +340,15 @@ function App() {
                       : 'app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                   }
                   disabled={captureButtonDisabled}
-                  title={
-                    appTestMode
-                      ? 'Test mode: record anytime (5 PM window bypassed)'
-                      : 'Upload your 5PM moment during your active window'
-                  }
+                  title="Upload your 5PM moment during your active window"
                   onClick={() => {
-                    if (!appTestMode && !captureWindow.active) {
+                    if (!captureWindow.active) {
                       showToast(
                         "You're outside your personal 5 PM window — come back at 5 PM local time!",
                       )
                       return
                     }
-                    if (!appTestMode && hasUsedDailyQuota) {
+                    if (hasUsedDailyQuota) {
                       trackDailyLimitHit({ userId, tz: userTz })
                       showToast('You have used your daily upload limit for today.')
                       return
@@ -439,6 +389,7 @@ function App() {
             </div>
           </section>
         </main>
+        <CopyrightFooter variant="main" />
       </div>
       {recordOpen && userId && (
         <RecordMoment
@@ -451,15 +402,9 @@ function App() {
           isPremium={isPremium}
           profile={profile ? { last_post_date: profile.last_post_date, current_streak: profile.current_streak, longest_streak: profile.longest_streak } : null}
           onProfileUpdated={refetchProfile}
-          appTestMode={appTestMode}
         />
       )}
-      <LiveStream
-        open={liveStreamOpen}
-        onClose={() => setLiveStreamOpen(false)}
-        userId={userId}
-        appTestMode={appTestMode}
-      />
+      <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} userId={userId} />
       {userId && (
         <MyMoments open={myMomentsOpen} onClose={() => setMyMomentsOpen(false)} userId={userId} />
       )}
@@ -500,6 +445,7 @@ function App() {
               Keep posting every day at 5PM local time to climb to the next tier and unlock more
               boosts.
             </div>
+            <CopyrightFooter variant="card" />
           </div>
         </div>
       )}

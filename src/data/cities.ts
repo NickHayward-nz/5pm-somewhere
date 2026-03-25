@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 // Expanded city list - March 2025 - added to fill time zone gaps
 export type City = {
   id: string

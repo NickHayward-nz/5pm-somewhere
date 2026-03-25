@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useEffect, useMemo, useRef } from 'react'
 import { DateTime } from 'luxon'
 import * as THREE from 'three'

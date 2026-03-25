@@ -1,6 +1,7 @@
-// FORCE COMMIT - Supabase update logging and row insert fix - 2025-03-13 - remove after testing
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
+import { CopyrightFooter } from './CopyrightFooter'
 
 export type MomentRow = {
   id: string
@@ -20,8 +21,6 @@ export type MomentRow = {
 }
 
 const FETCH_LIMIT = 20
-/** In app test mode, load more rows so older clips aren’t cut off by the default cap. */
-const FETCH_LIMIT_TEST_MODE = 200
 const PRELOAD_NEXT = 3
 const LIVE_WINDOW_MINUTES = 35
 
@@ -35,8 +34,6 @@ type Props = {
   open: boolean
   onClose: () => void
   userId?: string | null
-  /** When true, no created_at filter + higher fetch limit (from App test mode). */
-  appTestMode?: boolean
 }
 
 const POSTER_PLACEHOLDER =
@@ -69,7 +66,7 @@ function hasReacted(momentId: string, field: string): boolean {
   }
 }
 
-export function LiveStream({ open, onClose, userId, appTestMode = false }: Props) {
+export function LiveStream({ open, onClose, userId }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -97,39 +94,29 @@ export function LiveStream({ open, onClose, userId, appTestMode = false }: Props
     const sb = getSupabase()
     if (!sb || loadingMoreRef.current) return []
     loadingMoreRef.current = true
-    const testMode = appTestMode
-    const limit = testMode ? FETCH_LIMIT_TEST_MODE : FETCH_LIMIT
-
-    // Normal mode: only moments from the last 35 minutes. Test mode: any age (no created_at filter).
-    let q = sb.from('moments').select('*')
-    if (!testMode) {
-      const cutoff = new Date(Date.now() - LIVE_WINDOW_MINUTES * 60 * 1000).toISOString()
-      q = q.gte('created_at', cutoff)
-    }
-    const { data: videos, error } = await q
+    const cutoff = new Date(Date.now() - LIVE_WINDOW_MINUTES * 60 * 1000).toISOString()
+    const { data: videos, error } = await sb
+      .from('moments')
+      .select('*')
+      .gte('created_at', cutoff)
       .order('uploader_streak_priority', { ascending: false })
       .order('created_at', { ascending: false })
-      .limit(limit)
-
+      .limit(FETCH_LIMIT)
     loadingMoreRef.current = false
     const list = (videos ?? []) as MomentRow[]
     // eslint-disable-next-line no-console
-    console.log(
-      testMode ? 'Stream query (TEST: no time window, limit ' + limit + '):' : 'Stream query:',
-      list.length,
-      'videos',
-    )
+    console.log('Stream query returned:', list.length, 'videos')
     if (error) {
       // eslint-disable-next-line no-console
       console.error('Stream query error:', error)
       return []
     }
-    if (list.length === 0 && !testMode) {
+    if (list.length === 0) {
       // eslint-disable-next-line no-console
       console.log('No moments in the last', LIVE_WINDOW_MINUTES, 'minutes')
     }
     return list
-  }, [appTestMode])
+  }, [])
 
   useEffect(() => {
     if (!open) return
@@ -141,14 +128,10 @@ export function LiveStream({ open, onClose, userId, appTestMode = false }: Props
       setQueue(rows)
       setLoading(false)
       if (rows.length === 0) {
-        setError(
-          appTestMode
-            ? 'No moments in the feed — check back soon.'
-            : 'No moments in the last 35 minutes — check back soon.',
-        )
+        setError('No moments in the last 35 minutes — check back soon.')
       }
     })
-  }, [open, fetchMore, appTestMode])
+  }, [open, fetchMore])
 
   useEffect(() => {
     if (!open || queue.length === 0) return
@@ -194,6 +177,28 @@ export function LiveStream({ open, onClose, userId, appTestMode = false }: Props
           .select('pretty_count, funny_count, cheers_count')
           .eq('id', momentId)
           .single()
+        // #region agent log
+        fetch('http://127.0.0.1:7306/ingest/4ef3a4f4-1ac2-4982-a81c-532fdf430f25', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '75762d' },
+          body: JSON.stringify({
+            sessionId: '75762d',
+            location: 'LiveStream.tsx:fetchReactionCounts',
+            message: 'moments select reaction columns',
+            data: {
+              momentId,
+              errCode: error?.code ?? null,
+              errMsg: error?.message ?? null,
+              rowKeys: data ? Object.keys(data as Record<string, unknown>) : [],
+              pretty_count: (data as { pretty_count?: number } | null)?.pretty_count,
+              funny_count: (data as { funny_count?: number } | null)?.funny_count,
+              cheers_count: (data as { cheers_count?: number } | null)?.cheers_count,
+            },
+            timestamp: Date.now(),
+            hypothesisId: 'H1',
+          }),
+        }).catch(() => {})
+        // #endregion
         if (error) {
           // eslint-disable-next-line no-console
           console.error('Failed to fetch reaction counts:', error)
@@ -268,6 +273,20 @@ export function LiveStream({ open, onClose, userId, appTestMode = false }: Props
 
       const currentVideoId = current?.id
       if (momentId !== currentVideoId) return
+      // #region agent log
+      fetch('http://127.0.0.1:7306/ingest/4ef3a4f4-1ac2-4982-a81c-532fdf430f25', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '75762d' },
+        body: JSON.stringify({
+          sessionId: '75762d',
+          location: 'LiveStream.tsx:toggleReaction:start',
+          message: 'toggle reaction',
+          data: { momentId, field, hasUserId: !!userId },
+          timestamp: Date.now(),
+          hypothesisId: 'H2',
+        }),
+      }).catch(() => {})
+      // #endregion
 
       let alreadyReacted: boolean
       if (userId) {
@@ -456,6 +475,25 @@ export function LiveStream({ open, onClose, userId, appTestMode = false }: Props
           moment_id: momentId,
           reaction_type: REACTION_FIELD_TO_TYPE[field],
         })
+        // #region agent log
+        fetch('http://127.0.0.1:7306/ingest/4ef3a4f4-1ac2-4982-a81c-532fdf430f25', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '75762d' },
+          body: JSON.stringify({
+            sessionId: '75762d',
+            location: 'LiveStream.tsx:user_reactions insert',
+            message: insertErr ? 'insert failed' : 'insert ok',
+            data: {
+              field,
+              errCode: insertErr?.code ?? null,
+              errMsg: insertErr?.message ?? null,
+              reactionType: REACTION_FIELD_TO_TYPE[field],
+            },
+            timestamp: Date.now(),
+            hypothesisId: 'H3',
+          }),
+        }).catch(() => {})
+        // #endregion
         if (insertErr) {
           // eslint-disable-next-line no-console
           console.error('user_reactions insert failed:', insertErr)
@@ -480,6 +518,27 @@ export function LiveStream({ open, onClose, userId, appTestMode = false }: Props
       }
       try {
         const { error } = await sb.from('moments').update({ [field]: optimisticCount }).eq('id', momentId)
+        // #region agent log
+        fetch('http://127.0.0.1:7306/ingest/4ef3a4f4-1ac2-4982-a81c-532fdf430f25', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '75762d' },
+          body: JSON.stringify({
+            sessionId: '75762d',
+            location: 'LiveStream.tsx:moments.update add',
+            message: error ? 'moments update failed' : 'moments update ok',
+            data: {
+              field,
+              optimisticCount,
+              errCode: error?.code ?? null,
+              errMsg: error?.message ?? null,
+              errDetails: error?.details ?? null,
+              errHint: error?.hint ?? null,
+            },
+            timestamp: Date.now(),
+            hypothesisId: 'H4',
+          }),
+        }).catch(() => {})
+        // #endregion
         if (error) {
           // eslint-disable-next-line no-console
           console.error('Supabase reaction update failed:', error)
@@ -1058,6 +1117,7 @@ export function LiveStream({ open, onClose, userId, appTestMode = false }: Props
           Close
         </button>
       </div>
+      <CopyrightFooter variant="overlay" />
     </div>
   )
 }

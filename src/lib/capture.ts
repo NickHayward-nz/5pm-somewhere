@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { DateTime } from 'luxon'
 import { getSupabase } from './supabase'
 import { captureEvent } from './analytics'

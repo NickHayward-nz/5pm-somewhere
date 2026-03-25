@@ -1,6 +1,4 @@
-// FORCE COMMIT - user_id fix - 2025-03-13 - delete me after push
-// FORCE COMMIT - user_id fix - 2025-03-13 - delete me after push
-// FORCE COMMIT - user_id fix - 2025-03-13 - delete me after push
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useEffect, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getSupabase } from '../lib/supabase'
@@ -12,7 +10,7 @@ import {
   updateProfileAfterUpload,
   type ProfileStreak,
 } from '../lib/capture'
-import { isAppTestMode } from '../lib/appTestMode'
+import { CopyrightFooter } from './CopyrightFooter'
 
 type Props = {
   open: boolean
@@ -24,14 +22,12 @@ type Props = {
   isPremium: boolean
   profile: ProfileStreak | null
   onProfileUpdated: () => void
-  /** When true, relaxed min/max record length (from App test mode). */
-  appTestMode?: boolean
 }
 
 type Step = 'idle' | 'countdown' | 'recording' | 'preview' | 'uploading' | 'error'
 
 export function RecordMoment(props: Props) {
-  const { open, onClose, userId, userTz, city, country, isPremium, profile, onProfileUpdated, appTestMode: appTestModeProp } = props
+  const { open, onClose, userId, userTz, city, country, isPremium, profile, onProfileUpdated } = props
   const [step, setStep] = useState<Step>('idle')
   const [countdown, setCountdown] = useState(3)
   const [error, setError] = useState<string | null>(null)
@@ -48,9 +44,8 @@ export function RecordMoment(props: Props) {
   const rafRef = useRef<number | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
-  const appTestMode = appTestModeProp ?? isAppTestMode()
-  const MIN_SEC = appTestMode ? 1 : isPremium ? 5 : 10
-  const MAX_SEC = appTestMode ? 86400 : isPremium ? 30 : 20
+  const MIN_SEC = isPremium ? 5 : 10
+  const MAX_SEC = isPremium ? 30 : 20
 
   useEffect(() => {
     // eslint-disable-next-line no-console
@@ -739,7 +734,7 @@ export function RecordMoment(props: Props) {
           {step === 'recording' && (
             <div className="flex items-center justify-between gap-2 sm:gap-4 flex-shrink-0 flex-wrap">
               <div className="text-[10px] sm:text-xs text-sunset-100/80">
-                {appTestMode ? 'TEST: 1s–24h' : isPremium ? '5–30s' : '10–20s'}
+                {isPremium ? '5–30s' : '10–20s'}
               </div>
               <button
                 type="button"
@@ -795,6 +790,7 @@ export function RecordMoment(props: Props) {
           )}
         </div>
       </div>
+      <CopyrightFooter variant="embedded" />
     </div>
   )
 }

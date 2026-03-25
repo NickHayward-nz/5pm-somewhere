@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useEffect, useState, useCallback } from 'react'
 import { getSupabase } from '../lib/supabase'
 import type { Profile } from '../types/profile'

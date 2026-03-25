@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 export function countryCodeToFlagEmoji(countryCode: string) {
   const code = countryCode.trim().toUpperCase()
   if (!/^[A-Z]{2}$/.test(code)) return '🏳️'

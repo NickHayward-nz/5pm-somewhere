@@ -1,6 +1,8 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useEffect, useMemo, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getSupabase } from '../lib/supabase'
+import { CopyrightFooter } from './CopyrightFooter'
 
 type MomentRow = {
   id: string
@@ -216,6 +218,7 @@ function VideoPlayModal(props: { open: boolean; onClose: () => void; url: string
           className="w-full aspect-video bg-black"
         />
         {caption && <div className="px-4 py-3 text-sm text-white/80">{caption}</div>}
+        <CopyrightFooter variant="card" />
       </div>
     </div>
   )
@@ -421,6 +424,7 @@ export default function MyMoments({ open, onClose, userId }: Props) {
           )}
         </div>
       </div>
+      <CopyrightFooter variant="overlay" />
 
       <VideoPlayModal
         open={playModal.open}

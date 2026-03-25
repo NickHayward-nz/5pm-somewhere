@@ -1,3 +1,4 @@
+// © 2026 Chromatic Productions Ltd. All rights reserved.
 import { getSupabase } from './supabase'
 
 export type StreamStatus =
