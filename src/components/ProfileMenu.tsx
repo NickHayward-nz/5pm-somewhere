@@ -172,11 +172,11 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
                   }
                   setMontageOpen('weekly')
                 }}
-                className="btn-glow-muted min-h-[44px] w-full text-left text-sm touch-manipulation"
+                className="btn-glow-muted flex min-h-[44px] w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm touch-manipulation"
               >
-                Watch my Weekly Montage
+                <span>Watch my Weekly Montage</span>
                 {!isPremium ? (
-                  <span className="ml-2 text-[10px] font-semibold uppercase text-amber-300/90">Premium</span>
+                  <span className="text-[10px] font-semibold uppercase text-amber-300/90">Premium</span>
                 ) : null}
               </button>
 
@@ -190,11 +190,11 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
                   }
                   setMontageOpen('monthly')
                 }}
-                className="btn-glow-muted min-h-[44px] w-full text-left text-sm touch-manipulation"
+                className="btn-glow-muted flex min-h-[44px] w-full flex-wrap items-center justify-center gap-x-2 gap-y-1 text-center text-sm touch-manipulation"
               >
-                Watch my Monthly Highlights
+                <span>Watch my Monthly Highlights</span>
                 {!isPremium ? (
-                  <span className="ml-2 text-[10px] font-semibold uppercase text-amber-300/90">Premium</span>
+                  <span className="text-[10px] font-semibold uppercase text-amber-300/90">Premium</span>
                 ) : null}
               </button>
 
