@@ -24,7 +24,7 @@ type Props = {
   onProfileUpdated: () => void
 }
 
-type Step = 'idle' | 'countdown' | 'recording' | 'preview' | 'uploading' | 'error'
+type Step = 'idle' | 'countdown' | 'recording' | 'preview' | 'uploading' | 'success' | 'error'
 
 export function RecordMoment(props: Props) {
   const { open, onClose, userId, userTz, city, country, isPremium, profile, onProfileUpdated } = props
@@ -608,12 +608,10 @@ export function RecordMoment(props: Props) {
         if (error) throw error
         // eslint-disable-next-line no-console
         console.log('Row insert success:', data)
-        window.alert('Upload and row insert successful!')
       } catch (err) {
         const e = err as Error & { message?: string }
         // eslint-disable-next-line no-console
         console.error('Row insert failed:', e.message, err)
-        window.alert('Row insert failed: ' + (e.message ?? 'Unknown error'))
         throw e
       }
 
@@ -630,7 +628,7 @@ export function RecordMoment(props: Props) {
       incrementUploadsToday(userId, userTz)
       // eslint-disable-next-line no-console
       console.log('=== UPLOAD COMPLETE ===')
-      onClose()
+      setStep('success')
     } catch (e) {
       const err = e as Error & { name?: string; message?: string; stack?: string }
       // eslint-disable-next-line no-console
@@ -655,7 +653,7 @@ export function RecordMoment(props: Props) {
         <div className="polaroid-inner p-3 sm:p-4 space-y-2 sm:space-y-4 flex flex-col min-h-0 overflow-hidden flex-1">
           <div className="flex items-center justify-between flex-shrink-0 gap-2">
             <h2 className="text-sm sm:text-lg font-semibold tracking-[0.12em] sm:tracking-[0.18em] uppercase text-sunset-100 truncate">
-              Capture your 5PM moment
+              {step === 'success' ? 'You’re live' : 'Capture your 5PM moment'}
             </h2>
             <button
               type="button"
@@ -717,6 +715,30 @@ export function RecordMoment(props: Props) {
                 <span className="text-[10px] sm:text-xs font-mono text-sunset-50">
                   REC • {durationSec.toString().padStart(2, '0')}s
                 </span>
+              </div>
+            )}
+
+            {step === 'success' && (
+              <div
+                className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-midnight-950/92 px-5 py-8 text-center backdrop-blur-[2px]"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="rounded-full border border-amber-400/50 bg-amber-500/15 p-4 shadow-[0_0_32px_rgba(251,191,36,0.25)]">
+                  <span className="text-4xl" aria-hidden>
+                    ✨
+                  </span>
+                </div>
+                <p className="max-w-md text-balance text-lg font-semibold leading-snug text-sunset-50 sm:text-xl">
+                  Your 5PM moment is live—thanks for sharing!
+                </p>
+                <button
+                  type="button"
+                  onClick={onClose}
+                  className="btn-glow-gold min-h-[48px] w-full max-w-xs touch-manipulation px-8 text-base"
+                >
+                  Done
+                </button>
               </div>
             )}
           </div>
