@@ -50,24 +50,25 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
 
   return (
     <>
-      <div className="flex max-w-[min(100%,20rem)] flex-row items-center justify-end gap-2">
-        <button
-          type="button"
-          onClick={() => setProfileOpen(true)}
-          className={glassBtn}
-          aria-expanded={profileOpen}
-          aria-haspopup="dialog"
-        >
-          Profile
-        </button>
+      {/* Username to the left of Profile; full-width row so Profile sits on the right edge */}
+      <div className="flex w-full min-w-0 flex-row items-center justify-end gap-2">
         {userEmail ? (
           <span
-            className="max-w-[min(8rem,28vw)] truncate font-mono text-[10px] text-sunset-200/90 sm:max-w-[11rem] sm:text-xs"
+            className="max-w-[min(10rem,32vw)] shrink truncate text-right font-mono text-[10px] text-sunset-200/90 sm:max-w-[13rem] sm:text-xs"
             title={userEmail}
           >
             {displayName}
           </span>
         ) : null}
+        <button
+          type="button"
+          onClick={() => setProfileOpen(true)}
+          className={`${glassBtn} shrink-0`}
+          aria-expanded={profileOpen}
+          aria-haspopup="dialog"
+        >
+          Profile
+        </button>
       </div>
 
       {profileOpen && (
