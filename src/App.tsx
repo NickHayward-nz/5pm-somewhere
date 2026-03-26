@@ -20,6 +20,7 @@ import { LiveStream } from './components/LiveStream'
 import MyMoments from './components/MyMoments'
 import { ProfileMenu } from './components/ProfileMenu'
 import { CopyrightFooter } from './components/CopyrightFooter'
+import { FirstUploadConsentModal } from './components/FirstUploadConsentModal'
 
 type FeaturedCity = {
   city: City
@@ -64,6 +65,7 @@ function App() {
   const [myMomentsOpen, setMyMomentsOpen] = useState(false)
   const [streakOpen, setStreakOpen] = useState(false)
   const [dailyLimitModalOpen, setDailyLimitModalOpen] = useState(false)
+  const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
   const recordOpenRef = useRef(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
@@ -363,6 +365,10 @@ function App() {
                       window.alert('Sign in to capture your 5PM moment.')
                       return
                     }
+                    if (!profile?.upload_terms_accepted_at) {
+                      setUploadConsentOpen(true)
+                      return
+                    }
                     setRecordOpen(true)
                   }}
                 >
@@ -397,6 +403,25 @@ function App() {
         </main>
         <CopyrightFooter variant="main" className="shrink-0" />
       </div>
+      <FirstUploadConsentModal
+        open={uploadConsentOpen}
+        onClose={() => setUploadConsentOpen(false)}
+        onAccepted={async () => {
+          const sb = getSupabase()
+          if (!sb || !userId) return
+          const { error } = await sb
+            .from('profiles')
+            .update({ upload_terms_accepted_at: new Date().toISOString() })
+            .eq('id', userId)
+          if (error) {
+            window.alert(error.message ?? 'Could not save your agreement. Please try again.')
+            return
+          }
+          await refetchProfile()
+          setUploadConsentOpen(false)
+          setRecordOpen(true)
+        }}
+      />
       {recordOpen && userId && (
         <RecordMoment
           open={recordOpen}

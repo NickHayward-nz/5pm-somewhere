@@ -25,7 +25,9 @@ export function useProfile(userId: string | null) {
     try {
       const { data, error: e } = await sb
         .from('profiles')
-        .select('id, is_premium, timezone, current_streak, longest_streak, last_post_date')
+        .select(
+          'id, is_premium, timezone, current_streak, longest_streak, last_post_date, upload_terms_accepted_at',
+        )
         .eq('id', userId)
         .single()
       if (e) {
@@ -37,6 +39,7 @@ export function useProfile(userId: string | null) {
             current_streak: 0,
             longest_streak: 0,
             last_post_date: null,
+            upload_terms_accepted_at: null,
           }
           await sb.from('profiles').upsert(defaultProfile, { onConflict: 'id' })
           setProfile(defaultProfile)
@@ -51,6 +54,7 @@ export function useProfile(userId: string | null) {
         current_streak: Number(data.current_streak) ?? 0,
         longest_streak: Number(data.longest_streak) ?? 0,
         last_post_date: (data.last_post_date as string | null) ?? null,
+        upload_terms_accepted_at: (data.upload_terms_accepted_at as string | null) ?? null,
       })
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load profile'))
