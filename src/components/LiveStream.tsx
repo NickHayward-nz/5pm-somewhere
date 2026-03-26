@@ -22,7 +22,8 @@ export type MomentRow = {
 
 const FETCH_LIMIT = 20
 const PRELOAD_NEXT = 3
-const LIVE_WINDOW_MINUTES = 35
+/** How far back (from now) uploads stay eligible for the live stream queue */
+const LIVE_WINDOW_MINUTES = 90
 
 const REACTION_FIELD_TO_TYPE: Record<'pretty_count' | 'funny_count' | 'cheers_count', 'pretty' | 'funny' | 'cheers'> = {
   pretty_count: 'pretty',
@@ -128,7 +129,9 @@ export function LiveStream({ open, onClose, userId }: Props) {
       setQueue(rows)
       setLoading(false)
       if (rows.length === 0) {
-        setError('No moments in the last 35 minutes — check back soon.')
+        setError(
+          `No moments in the last ${LIVE_WINDOW_MINUTES} minutes (1.5 hours) — check back soon.`,
+        )
       }
     })
   }, [open, fetchMore])
