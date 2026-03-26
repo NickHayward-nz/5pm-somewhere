@@ -18,7 +18,7 @@ import { useProfile } from './hooks/useProfile'
 import { RecordMoment } from './components/RecordMoment'
 import { LiveStream } from './components/LiveStream'
 import MyMoments from './components/MyMoments'
-import SignInButton from './components/SignInButton'
+import { ProfileMenu } from './components/ProfileMenu'
 import { CopyrightFooter } from './components/CopyrightFooter'
 
 type FeaturedCity = {
@@ -292,7 +292,12 @@ function App() {
                   🔥 {currentStreak}
                 </button>
               )}
-              <SignInButton userEmail={userEmail} onUsernameClick={userId ? () => setMyMomentsOpen(true) : undefined} />
+              <ProfileMenu
+                userEmail={userEmail}
+                userId={userId}
+                isPremium={isPremium}
+                onOpenMyMoments={() => setMyMomentsOpen(true)}
+              />
             </div>
           </div>
         </header>
