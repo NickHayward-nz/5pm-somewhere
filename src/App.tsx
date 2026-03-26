@@ -3,7 +3,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { DateTime, Interval } from 'luxon'
 import { CITIES, type City } from './data/cities'
 import { useNow } from './hooks/useNow'
-import { countryCodeToFlagEmoji } from './lib/flags'
 import { formatClock } from './lib/time'
 import { Globe } from './components/Globe'
 import { getSupabase } from './lib/supabase'
@@ -217,7 +216,6 @@ function App() {
   const captureButtonGold =
     captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit
 
-  const featuredFlag = featured ? countryCodeToFlagEmoji(featured.city.countryCode) : '🏳️'
   const featuredCityName = featured?.city.name ?? 'somewhere'
   const featuredCountryName = featured
     ? (() => {
@@ -307,35 +305,31 @@ function App() {
         <main className="app-main-landscape flex-1 min-h-0 grid grid-cols-1 grid-rows-[auto_minmax(0,1fr)] lg:grid-cols-[1.05fr_0.95fr] lg:grid-rows-1 gap-2 sm:gap-4 lg:gap-6 lg:items-stretch content-stretch">
           <section className="app-card-landscape app-clock-panel polaroid-frame p-2 sm:p-4 lg:p-5 min-h-0 flex flex-col overflow-hidden max-lg:flex-shrink-0">
             <div className="polaroid-inner p-2.5 sm:p-5 lg:p-6 flex min-h-0 flex-1 flex-col overflow-hidden max-lg:min-h-0">
-              <div
-                className="uppercase tracking-[0.34em] text-sunset-100/70 text-center shrink-0 mb-2 sm:mb-[26px]"
-                style={{ fontSize: 'clamp(1rem, 4vw, 1.8rem)' }}
-              >
-                Live golden hour
-              </div>
-
               {featured && (
-                <div
-                  className="mt-0.5 sm:mt-2 lg:mt-3 mb-3 sm:mb-5 lg:mb-6 uppercase text-balance font-semibold leading-snug text-center shrink-0"
-                  style={{ fontSize: 'clamp(0.9rem, 3.8vw, 2rem)' }}
-                >
-                  It’s{' '}
-                  <span className="text-sunset-200 drop-shadow-[0_0_18px_rgba(255,190,120,0.35)]">
-                    5PM
-                  </span>{' '}
-                  in{' '}
-                  <span className="whitespace-nowrap">
-                    {featuredFlag} {featuredCityName}
-                  </span>{' '}
-                  <span className="whitespace-nowrap">{featuredCityTime.toFormat('HH:mm')}</span>{' '}
-                  <span className="whitespace-nowrap">{featuredCityTime.toFormat('ccc')}</span>,{' '}
-                  <span className="whitespace-nowrap">{featuredCityTime.toFormat('LLL d')}</span>
-                  {featuredCountryName && (
-                    <>
-                      {' '}
+                <div className="flex flex-col items-center gap-4 sm:gap-5 lg:gap-6 text-center shrink-0 mb-3 sm:mb-5 lg:mb-6">
+                  <div
+                    className="uppercase tracking-[0.34em] text-sunset-100/70"
+                    style={{ fontSize: 'clamp(1rem, 4vw, 1.8rem)' }}
+                  >
+                    ITS 5PM IN
+                  </div>
+                  <div
+                    className="uppercase font-semibold tracking-[0.22em] text-sunset-100 text-balance leading-tight drop-shadow-[0_0_18px_rgba(255,160,80,0.55)] [text-shadow:0_0_28px_rgba(255,120,60,0.45),0_0_48px_rgba(255,90,40,0.2)]"
+                    style={{ fontSize: 'clamp(1.45rem, 5.5vw, 2.85rem)' }}
+                  >
+                    {featuredCityName}
+                  </div>
+                  <div
+                    className="flex flex-wrap justify-center items-baseline gap-x-3 sm:gap-x-4 gap-y-1 uppercase tracking-[0.12em] text-sunset-100/75"
+                    style={{ fontSize: 'clamp(0.8rem, 2vw, 1.05rem)' }}
+                  >
+                    <span className="whitespace-nowrap">{featuredCityTime.toFormat('HH:mm')}</span>
+                    <span className="whitespace-nowrap">{featuredCityTime.toFormat('ccc')}</span>
+                    <span className="whitespace-nowrap">{featuredCityTime.toFormat('LLL d')}</span>
+                    {featuredCountryName ? (
                       <span className="whitespace-nowrap">{featuredCountryName}</span>
-                    </>
-                  )}
+                    ) : null}
+                  </div>
                 </div>
               )}
 
