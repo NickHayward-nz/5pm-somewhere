@@ -724,10 +724,12 @@ export function RecordMoment(props: Props) {
                 role="status"
                 aria-live="polite"
               >
-                <div className="rounded-full border border-amber-400/50 bg-amber-500/15 p-4 shadow-[0_0_32px_rgba(251,191,36,0.25)]">
-                  <span className="text-4xl" aria-hidden>
-                    ✨
-                  </span>
+                <div className="rounded-2xl border border-amber-400/50 bg-amber-500/15 px-6 py-4 shadow-[0_0_32px_rgba(251,191,36,0.25)]">
+                  <img
+                    src="/Logo.png"
+                    alt="5PM Somewhere"
+                    className="mx-auto h-14 w-auto max-w-[min(220px,72vw)] object-contain sm:h-16"
+                  />
                 </div>
                 <p className="max-w-md text-balance text-lg font-semibold leading-snug text-sunset-50 sm:text-xl">
                   Your 5PM moment is live—thanks for sharing!
