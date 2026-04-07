@@ -4,6 +4,7 @@ import { DateTime } from 'luxon'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { City } from '../data/cities'
+import { countryLabelsFromCities } from '../lib/countryLabels'
 import { latLonToVector3 } from '../lib/geo'
 import { getCityTimeInfo, NEAR_FIVE_PM_VISIBLE_MINUTES } from '../lib/time'
 
@@ -12,6 +13,12 @@ const DAY_MAP_URL =
 
 const DOT_UPDATE_INTERVAL_MS = 120000
 const SPHERE_SEGMENTS = 64
+/** Country name labels sit slightly outside city pins */
+const COUNTRY_LABEL_RADIUS = 1.068
+/** Camera distance (orbit target = origin): hide labels when zoomed out */
+const LABEL_ZOOM_DIST_FULL = 3.45
+/** Show labels fully when zoomed in at least this much */
+const LABEL_ZOOM_DIST_NONE = 2.02
 
 type Props = {
   now: DateTime
@@ -43,6 +50,8 @@ export function Globe({ now, cities }: Props) {
       pos: latLonToVector3(c.lat, c.lon, radius),
     }))
   }, [cities])
+
+  const countryLabels = useMemo(() => countryLabelsFromCities(cities), [cities])
 
   useEffect(() => {
     const hostEl = hostRef.current
@@ -169,6 +178,67 @@ export function Globe({ now, cities }: Props) {
       s.scale.setScalar(0.12)
       group.add(s)
       ringSprites.push(s)
+    }
+
+    function makeCountryLabelSprite(text: string): THREE.Sprite {
+      const cw = 512
+      const ch = 120
+      const canvas = document.createElement('canvas')
+      canvas.width = cw
+      canvas.height = ch
+      const ctx = canvas.getContext('2d')
+      if (!ctx) {
+        const empty = new THREE.CanvasTexture(document.createElement('canvas'))
+        return new THREE.Sprite(new THREE.SpriteMaterial({ map: empty, transparent: true, opacity: 0 }))
+      }
+      ctx.clearRect(0, 0, cw, ch)
+      const fontPx = 30
+      ctx.font = `600 ${fontPx}px Poppins, Inter, system-ui, sans-serif`
+      let display = text
+      const maxTextW = cw - 56
+      while (display.length > 4 && ctx.measureText(display).width > maxTextW) {
+        display = display.slice(0, -2).trimEnd() + '…'
+      }
+      const tw = ctx.measureText(display).width
+      const bw = Math.min(cw - 28, tw + 44)
+      const bh = 58
+      const bx = (cw - bw) / 2
+      const by = (ch - bh) / 2
+      const r = 14
+      ctx.fillStyle = 'rgba(14, 12, 32, 0.82)'
+      ctx.beginPath()
+      ctx.roundRect(bx, by, bw, bh, r)
+      ctx.fill()
+      ctx.strokeStyle = 'rgba(255, 170, 110, 0.55)'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.fillStyle = 'rgba(255, 240, 220, 0.98)'
+      ctx.textAlign = 'center'
+      ctx.textBaseline = 'middle'
+      ctx.fillText(display, cw / 2, by + bh / 2)
+      const tex = new THREE.CanvasTexture(canvas)
+      tex.colorSpace = THREE.SRGBColorSpace
+      tex.needsUpdate = true
+      const mat = new THREE.SpriteMaterial({
+        map: tex,
+        transparent: true,
+        opacity: 0,
+        depthTest: true,
+        depthWrite: false,
+      })
+      const sprite = new THREE.Sprite(mat)
+      sprite.scale.setScalar(0.2)
+      return sprite
+    }
+
+    const countryLabelSprites: THREE.Sprite[] = []
+    for (const cl of countryLabels) {
+      const v = latLonToVector3(cl.lat, cl.lon, COUNTRY_LABEL_RADIUS)
+      const spr = makeCountryLabelSprite(cl.name)
+      spr.position.set(v.x, v.y, v.z)
+      spr.visible = false
+      group.add(spr)
+      countryLabelSprites.push(spr)
     }
 
     const tmpObj = new THREE.Object3D()
@@ -312,6 +382,21 @@ export function Globe({ now, cities }: Props) {
       if (markers.instanceColor) markers.instanceColor.needsUpdate = true
       markers.instanceMatrix.needsUpdate = true
 
+      const camDist = camera.position.distanceTo(controls.target)
+      const labelT = THREE.MathUtils.clamp(
+        (LABEL_ZOOM_DIST_FULL - camDist) / (LABEL_ZOOM_DIST_FULL - LABEL_ZOOM_DIST_NONE),
+        0,
+        1,
+      )
+      const labelOpacity = labelT * 0.94
+      const labelScale = 0.16 + labelT * 0.1
+      for (const spr of countryLabelSprites) {
+        spr.visible = labelOpacity > 0.02
+        spr.scale.setScalar(labelScale)
+        const m = spr.material as THREE.SpriteMaterial
+        m.opacity = labelOpacity
+      }
+
       renderer.render(scene, camera)
       rafRef.current = requestAnimationFrame(tick)
     }
@@ -324,12 +409,18 @@ export function Globe({ now, cities }: Props) {
       rafRef.current = null
       ro.disconnect()
       controls.dispose()
+      for (const spr of countryLabelSprites) {
+        const m = spr.material as THREE.SpriteMaterial
+        m.map?.dispose()
+        m.dispose()
+        group.remove(spr)
+      }
       if (el.contains(zoomInBtn)) el.removeChild(zoomInBtn)
       if (el.contains(zoomOutBtn)) el.removeChild(zoomOutBtn)
       renderer.dispose()
       if (el.contains(canvas)) el.removeChild(canvas)
     }
-  }, [cityPositions])
+  }, [cityPositions, countryLabels])
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
