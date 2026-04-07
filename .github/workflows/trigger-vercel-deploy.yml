@@ -1,0 +1,28 @@
+# Backup when Vercel’s Git integration does not start a deployment after push to main.
+#
+# 1. Vercel → Project → Settings → Git → Deploy Hooks → Create Hook (branch: main).
+# 2. GitHub → Repo → Settings → Secrets and variables → Actions → New repository secret:
+#    Name: VERCEL_DEPLOY_HOOK_URL   Value: (paste the hook URL)
+#
+# Pushes to main will POST the hook and queue a production deploy even if the GitHub app missed the event.
+
+name: Trigger Vercel deploy
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  deploy-hook:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Ping Vercel deploy hook
+        env:
+          HOOK: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+        run: |
+          if [ -z "$HOOK" ]; then
+            echo "VERCEL_DEPLOY_HOOK_URL is not set — add a Deploy Hook secret (see workflow comments). Exiting OK."
+            exit 0
+          fi
+          curl -fsS -X POST "$HOOK"
+          echo "Deploy hook triggered."
