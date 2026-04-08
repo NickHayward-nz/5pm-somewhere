@@ -36,6 +36,14 @@ Set on the **host where the worker runs** (not in the browser):
 
 Local: copy env into `.env` and run `npm run montage-worker`.
 
+### Railway
+
+1. **Service** connected to `NickHayward-nz/5pm-somewhere`, branch `main`. Root `railway.json` installs deps with `npm ci --legacy-peer-deps` and starts `node workers/montage-worker.mjs` (overrides dashboard start/build if both are set).
+2. **Variables** (service): `SUPABASE_URL` (project URL, e.g. `https://xxxx.supabase.co` — same value as `VITE_SUPABASE_URL`, but the name must be **`SUPABASE_URL`** for Node), `SUPABASE_SERVICE_ROLE_KEY`, `MONTAGE_WORKER_SECRET`, `MUX_TOKEN_ID`, `MUX_TOKEN_SECRET`. Optional: `MONTAGE_MAX_USERS`.
+3. **Networking → Generate Domain** so the service has a public `https://….up.railway.app` URL.
+4. **Supabase → Edge Function `montage-cron` secrets:** set `VERCEL_MONTAGE_WORKER_URL` to that **public URL** (no path; trailing slash optional). Keep `MONTAGE_WORKER_SECRET` **identical** to Railway’s value.
+5. Redeploy Railway after env changes; test with `curl` (see below).
+
 ## Supabase Edge Function secrets
 
 Deploy: `supabase functions deploy montage-cron`
