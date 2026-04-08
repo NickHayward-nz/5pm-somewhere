@@ -1,5 +1,7 @@
 # Vercel deployments
 
+The **Vite frontend** deploys here. The **montage worker** (`workers/montage-worker.mjs`, FFmpeg) is **not** deployed to Vercel — it runs elsewhere so **Hobby** limits (serverless memory/duration) do not block production builds.
+
 ## Push did not trigger a new deploy
 
 Check in order:

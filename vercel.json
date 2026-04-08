@@ -1,8 +1,0 @@
-{
-  "functions": {
-    "api/montage-worker.mjs": {
-      "maxDuration": 300,
-      "memory": 3008
-    }
-  }
-}

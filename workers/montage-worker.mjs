@@ -1,5 +1,7 @@
 /**
- * Vercel Node.js worker: premium montages (weekly / monthly).
+ * Premium montage worker (FFmpeg + Mux). Runs outside Vercel — too heavy for Hobby serverless.
+ * Local: `npm run montage-worker` (listens on PORT, default 8787).
+ *
  * Env: SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, MONTAGE_WORKER_SECRET,
  *      MUX_TOKEN_ID, MUX_TOKEN_SECRET, MONTAGE_MAX_USERS (optional)
  */
@@ -10,6 +12,8 @@ import fs from 'fs/promises'
 import path from 'path'
 import os from 'os'
 import crypto from 'crypto'
+import http from 'http'
+import { fileURLToPath } from 'url'
 
 import ffmpegPath from 'ffmpeg-static'
 import ffprobeStatic from 'ffprobe-static'
@@ -94,7 +98,6 @@ function dominantReactionType(moments) {
 }
 
 async function pickMusicPath(sb, folder) {
-  const prefix = `${folder}/`
   const { data: files, error } = await sb.storage.from('music').list(folder, {
     limit: 200,
     sortBy: { column: 'name', order: 'asc' },
@@ -233,7 +236,8 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' })
   }
   const secret = process.env.MONTAGE_WORKER_SECRET
-  if (!secret || req.headers.authorization !== `Bearer ${secret}`) {
+  const authHeader = req.headers.authorization ?? req.headers.Authorization
+  if (!secret || authHeader !== `Bearer ${secret}`) {
     return res.status(401).json({ error: 'Unauthorized' })
   }
 
@@ -450,4 +454,73 @@ async function processOneUser(sb, opts) {
       /* ignore */
     }
   }
+}
+
+function isMainModule() {
+  try {
+    const a = process.argv[1]
+    if (!a) return false
+    return path.normalize(path.resolve(a)) === path.normalize(fileURLToPath(import.meta.url))
+  } catch {
+    return false
+  }
+}
+
+if (isMainModule()) {
+  const port = Number(process.env.PORT || 8787)
+  http
+    .createServer((req, res) => {
+      const authHeader = req.headers.authorization
+      if (req.method !== 'POST') {
+        res.writeHead(405, { 'Content-Type': 'application/json' })
+        res.end(JSON.stringify({ error: 'Method not allowed' }))
+        return
+      }
+      const chunks = []
+      req.on('data', (c) => chunks.push(c))
+      req.on('end', () => {
+        void (async () => {
+          try {
+            let body = {}
+            const raw = Buffer.concat(chunks).toString('utf8')
+            if (raw) {
+              try {
+                body = JSON.parse(raw)
+              } catch {
+                body = {}
+              }
+            }
+            const vercelRes = {
+              _code: 200,
+              status(c) {
+                this._code = c
+                return this
+              },
+              json(o) {
+                if (!res.headersSent) {
+                  res.writeHead(this._code, { 'Content-Type': 'application/json' })
+                  res.end(JSON.stringify(o))
+                }
+              },
+            }
+            await handler(
+              { method: 'POST', headers: { authorization: authHeader, Authorization: authHeader }, body },
+              vercelRes,
+            )
+            if (!res.headersSent) {
+              res.writeHead(500, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: 'No response from handler' }))
+            }
+          } catch (e) {
+            if (!res.headersSent) {
+              res.writeHead(500, { 'Content-Type': 'application/json' })
+              res.end(JSON.stringify({ error: String(e?.message || e) }))
+            }
+          }
+        })()
+      })
+    })
+    .listen(port, () => {
+      console.error(`[montage-worker] http://127.0.0.1:${port} POST {"type":"weekly"}`)
+    })
 }

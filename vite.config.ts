@@ -1,6 +1,4 @@
 // © 2026 Chromatic Productions Ltd. All rights reserved.
-// Vercel deploy connectivity test (2026-04-02) — remove after confirming Git → Vercel works.
-// Git reconnect deploy test (2026-04-09).
 import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'

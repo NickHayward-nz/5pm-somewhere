@@ -2,8 +2,10 @@
 
 ## Architecture
 
-1. **Supabase Edge Function** `montage-cron` — validates `CRON_SECRET`, forwards `POST` to your Vercel URL with `MONTAGE_WORKER_SECRET`.
-2. **Vercel** `api/montage-worker.mjs` — service role reads `profiles` / `moments`, trims clips (FFmpeg), mixes music from Storage, uploads MP4 to `montages` bucket, creates a **Mux** asset from a signed URL, writes **`user_montages`**.
+1. **Supabase Edge Function** `montage-cron` — validates `CRON_SECRET`, forwards `POST` to your **montage worker URL** with `MONTAGE_WORKER_SECRET`.
+2. **Montage worker** (`workers/montage-worker.mjs`) — runs **outside Vercel** (Railway, Fly.io, Render, a VPS, etc.). It uses the service role to read `profiles` / `moments`, trims clips (FFmpeg), mixes music from Storage, uploads MP4 to the `montages` bucket, creates a **Mux** asset from a signed URL, and writes **`user_montages`**.
+
+The Vite app deploys to Vercel on **Hobby** without bundling FFmpeg; the worker is a separate Node process with `npm run montage-worker` (or your host’s start command).
 
 ## Database
 
@@ -18,9 +20,9 @@ Apply migration `supabase/migrations/20260327100000_user_montages_and_music.sql`
    - `cheers/`
 3. Supported: common audio formats (e.g. `.mp3`, `.m4a`).
 
-## Vercel environment variables
+## Montage worker environment variables
 
-Set in the Vercel project (Settings → Environment Variables):
+Set on the **host where the worker runs** (not in the browser):
 
 | Variable | Description |
 |----------|-------------|
@@ -30,6 +32,9 @@ Set in the Vercel project (Settings → Environment Variables):
 | `MUX_TOKEN_ID` | Mux dashboard |
 | `MUX_TOKEN_SECRET` | Mux dashboard |
 | `MONTAGE_MAX_USERS` | Optional; default 25 users per run |
+| `PORT` | Optional; HTTP listen port (default `8787`) |
+
+Local: copy env into `.env` and run `npm run montage-worker`.
 
 ## Supabase Edge Function secrets
 
@@ -40,8 +45,8 @@ Secrets (Dashboard → Edge Functions → `montage-cron`):
 | Secret | Description |
 |--------|-------------|
 | `CRON_SECRET` | Bearer token callers must send to invoke the function |
-| `VERCEL_MONTAGE_WORKER_URL` | `https://<your-app>.vercel.app/api/montage-worker` |
-| `MONTAGE_WORKER_SECRET` | **Must match** Vercel `MONTAGE_WORKER_SECRET` |
+| `VERCEL_MONTAGE_WORKER_URL` | **Public URL of the montage worker** (name is historical; not Vercel-specific). Example: `https://your-worker.up.railway.app` — no path required; `POST` root with JSON body. |
+| `MONTAGE_WORKER_SECRET` | **Must match** the worker’s `MONTAGE_WORKER_SECRET` |
 
 ## Schedules (example)
 
@@ -62,7 +67,7 @@ curl -X POST "https://<PROJECT>.supabase.co/functions/v1/montage-cron" \
 Direct worker (bypasses Edge):
 
 ```bash
-curl -X POST "https://<app>.vercel.app/api/montage-worker" \
+curl -X POST "https://<your-worker-host>/" \
   -H "Authorization: Bearer <MONTAGE_WORKER_SECRET>" \
   -H "Content-Type: application/json" \
   -d '{"type":"weekly"}'
@@ -70,6 +75,6 @@ curl -X POST "https://<app>.vercel.app/api/montage-worker" \
 
 ## Notes
 
-- **Vercel Pro** (or similar) is recommended: function `maxDuration` is 300s and FFmpeg is CPU-heavy.
+- The worker can run for several minutes (FFmpeg + Mux polling); use a host that allows long requests or run batch sizes accordingly.
 - If a montage fails, the row is set to `status = failed` with `error_message`.
 - Dominant reaction type picks the `music/{pretty|funny|cheers}/` folder; rotation is fair via `montage_music_rotation`.

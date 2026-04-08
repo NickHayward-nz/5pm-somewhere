@@ -1,4 +1,4 @@
-// Thin trigger: validate CRON_SECRET, forward job to Vercel worker with MONTAGE_WORKER_SECRET.
+// Thin trigger: validate CRON_SECRET, forward job to montage worker (VERCEL_MONTAGE_WORKER_URL) with MONTAGE_WORKER_SECRET.
 // Schedule: Supabase pg_cron (or external cron) POSTs here with Authorization: Bearer CRON_SECRET
 // Body or ?type= weekly | monthly | both
 
