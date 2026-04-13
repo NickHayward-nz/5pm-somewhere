@@ -20,6 +20,7 @@ import MyMoments from './components/MyMoments'
 import { ProfileMenu } from './components/ProfileMenu'
 import { CopyrightFooter } from './components/CopyrightFooter'
 import { FirstUploadConsentModal } from './components/FirstUploadConsentModal'
+import { useAlmostFivePmReminder } from './hooks/useAlmostFivePmReminder'
 
 type FeaturedCity = {
   city: City
@@ -212,6 +213,8 @@ function App() {
     () => computeCaptureWindow(now, userTz, isPremium, currentStreak),
     [now, userTz, isPremium, currentStreak],
   )
+
+  useAlmostFivePmReminder(userId, userTz)
 
   const captureButtonGold =
     captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit
