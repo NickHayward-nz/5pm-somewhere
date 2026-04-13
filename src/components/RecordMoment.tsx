@@ -11,6 +11,7 @@ import {
   type ProfileStreak,
 } from '../lib/capture'
 import { CopyrightFooter } from './CopyrightFooter'
+import { pruneExcessMomentsForFreeUser } from '../lib/momentsRetention'
 
 type Props = {
   open: boolean
@@ -613,6 +614,10 @@ export function RecordMoment(props: Props) {
         // eslint-disable-next-line no-console
         console.error('Row insert failed:', e.message, err)
         throw e
+      }
+
+      if (!isPremium) {
+        await pruneExcessMomentsForFreeUser(sb, authUserId)
       }
 
       if (profile) {
