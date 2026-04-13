@@ -6,9 +6,11 @@ import { CopyrightFooter } from './CopyrightFooter'
 type Props = {
   open: boolean
   onClose: () => void
+  /** Shown above the title (e.g. why sign-in is needed) */
+  contextMessage?: string | null
 }
 
-export function SignInModal({ open, onClose }: Props) {
+export function SignInModal({ open, onClose, contextMessage }: Props) {
   const sb = getSupabase()
   const [email, setEmail] = useState('')
 
@@ -75,7 +77,18 @@ export function SignInModal({ open, onClose }: Props) {
         >
           Close
         </button>
+        {contextMessage ? (
+          <p className="text-sm sm:text-base text-white/90 text-center mb-4 pr-8 leading-relaxed">
+            {contextMessage}
+          </p>
+        ) : null}
         <h2 className="text-xl sm:text-2xl font-bold text-white mb-6 text-center pr-8">Sign In</h2>
+        {contextMessage ? (
+          <p className="text-xs text-white/60 text-center -mt-4 mb-6 pr-8">
+            Or use <span className="text-white/80 font-medium">Profile</span> (top right) →{' '}
+            <span className="text-white/80 font-medium">Sign in</span>.
+          </p>
+        ) : null}
         <button
           type="button"
           onClick={handleSignIn}

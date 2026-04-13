@@ -90,22 +90,6 @@ export function RecordMoment(props: Props) {
     return () => cleanup()
   }, [])
 
-  // Optional: observe auth events while the modal is open (for debugging only)
-  useEffect(() => {
-    if (!open) return
-    const sb = getSupabase()
-    if (!sb) return
-    const {
-      data: { subscription },
-    } = sb.auth.onAuthStateChange((event) => {
-      // eslint-disable-next-line no-console
-      console.log('RecordMoment auth event:', event)
-    })
-    return () => {
-      subscription?.unsubscribe()
-    }
-  }, [open])
-
   async function startCountdownAndRecord() {
     setError(null)
     // TEMP: auth + daily-limit bypassed for testing - re-enable last_post_date check later
@@ -512,6 +496,8 @@ export function RecordMoment(props: Props) {
       if (!session || !session.user?.id) {
         // eslint-disable-next-line no-console
         console.error('No active session in upload()')
+        setError('You must be signed in to upload a moment.')
+        setStep('preview')
         window.alert('You must be signed in to upload a moment.')
         return
       }
@@ -521,6 +507,8 @@ export function RecordMoment(props: Props) {
       // eslint-disable-next-line no-console
       console.log('Final user_id for insert:', authUserId || 'MISSING')
       if (!authUserId) {
+        setError('You must be signed in to upload a moment.')
+        setStep('preview')
         window.alert('You must be signed in to upload a moment.')
         return
       }

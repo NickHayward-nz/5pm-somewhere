@@ -18,6 +18,7 @@ import { RecordMoment } from './components/RecordMoment'
 import { LiveStream } from './components/LiveStream'
 import MyMoments from './components/MyMoments'
 import { ProfileMenu } from './components/ProfileMenu'
+import { SignInModal } from './components/SignInModal'
 import { CopyrightFooter } from './components/CopyrightFooter'
 import { FirstUploadConsentModal } from './components/FirstUploadConsentModal'
 import { useAlmostFivePmReminder } from './hooks/useAlmostFivePmReminder'
@@ -66,6 +67,7 @@ function App() {
   const [streakOpen, setStreakOpen] = useState(false)
   const [dailyLimitModalOpen, setDailyLimitModalOpen] = useState(false)
   const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
+  const [signInForCaptureOpen, setSignInForCaptureOpen] = useState(false)
   const recordOpenRef = useRef(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
@@ -359,7 +361,7 @@ function App() {
                       return
                     }
                     if (!userId) {
-                      window.alert('Sign in to capture your 5PM moment.')
+                      setSignInForCaptureOpen(true)
                       return
                     }
                     if (!profile?.upload_terms_accepted_at) {
@@ -400,6 +402,11 @@ function App() {
         </main>
         <CopyrightFooter variant="main" className="shrink-0" />
       </div>
+      <SignInModal
+        open={signInForCaptureOpen}
+        onClose={() => setSignInForCaptureOpen(false)}
+        contextMessage="To create and save your 5PM moment, sign in first. After you sign in, tap Capture again during your window."
+      />
       <FirstUploadConsentModal
         open={uploadConsentOpen}
         onClose={() => setUploadConsentOpen(false)}

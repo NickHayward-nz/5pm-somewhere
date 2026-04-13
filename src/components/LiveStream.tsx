@@ -84,6 +84,8 @@ export function LiveStream({ open, onClose, userId }: Props) {
   })
   const [fetchFrozenUntil, setFetchFrozenUntil] = useState(0)
   const [lastReactionTime, setLastReactionTime] = useState(0)
+  const [streamSoundOn, setStreamSoundOn] = useState(false)
+  const [playBlocked, setPlayBlocked] = useState(false)
   const currentVideoIdRef = useRef<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -121,6 +123,8 @@ export function LiveStream({ open, onClose, userId }: Props) {
 
   useEffect(() => {
     if (!open) return
+    setStreamSoundOn(false)
+    setPlayBlocked(false)
     setQueue([])
     setCurrentIndex(0)
     setError(null)
@@ -179,47 +183,13 @@ export function LiveStream({ open, onClose, userId }: Props) {
           .from('moments')
           .select('pretty_count, funny_count, cheers_count')
           .eq('id', momentId)
-          .single()
-        // #region agent log
-        fetch('http://127.0.0.1:7306/ingest/4ef3a4f4-1ac2-4982-a81c-532fdf430f25', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '75762d' },
-          body: JSON.stringify({
-            sessionId: '75762d',
-            location: 'LiveStream.tsx:fetchReactionCounts',
-            message: 'moments select reaction columns',
-            data: {
-              momentId,
-              errCode: error?.code ?? null,
-              errMsg: error?.message ?? null,
-              rowKeys: data ? Object.keys(data as Record<string, unknown>) : [],
-              pretty_count: (data as { pretty_count?: number } | null)?.pretty_count,
-              funny_count: (data as { funny_count?: number } | null)?.funny_count,
-              cheers_count: (data as { cheers_count?: number } | null)?.cheers_count,
-            },
-            timestamp: Date.now(),
-            hypothesisId: 'H1',
-          }),
-        }).catch(() => {})
-        // #endregion
+          .maybeSingle()
         if (error) {
           // eslint-disable-next-line no-console
           console.error('Failed to fetch reaction counts:', error)
           return
         }
         if (!data) {
-          // eslint-disable-next-line no-console
-          console.log('No moment row found for id:', momentId)
-          try {
-            await sb
-              .from('moments')
-              .insert({ id: momentId, pretty_count: 0, funny_count: 0, cheers_count: 0 })
-            // eslint-disable-next-line no-console
-            console.log('Inserted new moment row with initial counts')
-          } catch (insertErr) {
-            // eslint-disable-next-line no-console
-            console.error('Failed to insert initial moment row:', insertErr)
-          }
           return
         }
         setQueue((prevQueue) =>
@@ -276,20 +246,6 @@ export function LiveStream({ open, onClose, userId }: Props) {
 
       const currentVideoId = current?.id
       if (momentId !== currentVideoId) return
-      // #region agent log
-      fetch('http://127.0.0.1:7306/ingest/4ef3a4f4-1ac2-4982-a81c-532fdf430f25', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '75762d' },
-        body: JSON.stringify({
-          sessionId: '75762d',
-          location: 'LiveStream.tsx:toggleReaction:start',
-          message: 'toggle reaction',
-          data: { momentId, field, hasUserId: !!userId },
-          timestamp: Date.now(),
-          hypothesisId: 'H2',
-        }),
-      }).catch(() => {})
-      // #endregion
 
       let alreadyReacted: boolean
       if (userId) {
@@ -478,25 +434,6 @@ export function LiveStream({ open, onClose, userId }: Props) {
           moment_id: momentId,
           reaction_type: REACTION_FIELD_TO_TYPE[field],
         })
-        // #region agent log
-        fetch('http://127.0.0.1:7306/ingest/4ef3a4f4-1ac2-4982-a81c-532fdf430f25', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '75762d' },
-          body: JSON.stringify({
-            sessionId: '75762d',
-            location: 'LiveStream.tsx:user_reactions insert',
-            message: insertErr ? 'insert failed' : 'insert ok',
-            data: {
-              field,
-              errCode: insertErr?.code ?? null,
-              errMsg: insertErr?.message ?? null,
-              reactionType: REACTION_FIELD_TO_TYPE[field],
-            },
-            timestamp: Date.now(),
-            hypothesisId: 'H3',
-          }),
-        }).catch(() => {})
-        // #endregion
         if (insertErr) {
           // eslint-disable-next-line no-console
           console.error('user_reactions insert failed:', insertErr)
@@ -521,27 +458,6 @@ export function LiveStream({ open, onClose, userId }: Props) {
       }
       try {
         const { error } = await sb.from('moments').update({ [field]: optimisticCount }).eq('id', momentId)
-        // #region agent log
-        fetch('http://127.0.0.1:7306/ingest/4ef3a4f4-1ac2-4982-a81c-532fdf430f25', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', 'X-Debug-Session-Id': '75762d' },
-          body: JSON.stringify({
-            sessionId: '75762d',
-            location: 'LiveStream.tsx:moments.update add',
-            message: error ? 'moments update failed' : 'moments update ok',
-            data: {
-              field,
-              optimisticCount,
-              errCode: error?.code ?? null,
-              errMsg: error?.message ?? null,
-              errDetails: error?.details ?? null,
-              errHint: error?.hint ?? null,
-            },
-            timestamp: Date.now(),
-            hypothesisId: 'H4',
-          }),
-        }).catch(() => {})
-        // #endregion
         if (error) {
           // eslint-disable-next-line no-console
           console.error('Supabase reaction update failed:', error)
@@ -794,6 +710,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
   useEffect(() => {
     const video = videoRef.current
     if (!video || !currentBlobUrl) return
+    setPlayBlocked(false)
     video.pause()
     video.src = ''
     video.load()
@@ -803,9 +720,10 @@ export function LiveStream({ open, onClose, userId }: Props) {
     video.src = currentBlobUrl
     video.load()
     setTimeout(() => {
-      video.play().catch((e) => {
+      void video.play().catch((e) => {
         // eslint-disable-next-line no-console
         console.error('Play failed:', e)
+        setPlayBlocked(true)
       })
     }, 50)
   }, [currentBlobUrl])
@@ -986,7 +904,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
                   poster={POSTER_PLACEHOLDER}
                   autoPlay
                   playsInline
-                  muted={false}
+                  muted={!streamSoundOn}
                   controls={false}
                   preload="auto"
                   loop={false}
@@ -1011,6 +929,38 @@ export function LiveStream({ open, onClose, userId }: Props) {
                   onError={handleError}
                   onWaiting={handleWaiting}
                 />
+                {playBlocked && (
+                  <button
+                    type="button"
+                    className="absolute inset-0 z-[5] flex flex-col items-center justify-center gap-3 bg-midnight-900/55 px-6 text-center"
+                    onClick={() => {
+                      const v = videoRef.current
+                      if (!v) return
+                      void v.play().then(() => setPlayBlocked(false)).catch(() => {
+                        // keep overlay; browser still blocking
+                      })
+                    }}
+                  >
+                    <span className="rounded-full border-2 border-sunset-400 bg-sunset-500 px-6 py-3 text-sm font-semibold text-midnight-900 shadow-lg">
+                      Tap to play
+                    </span>
+                    <span className="max-w-xs text-xs text-sunset-100/90">
+                      Playback was blocked. Tap once to start the stream (then use Unmute if you want sound).
+                    </span>
+                  </button>
+                )}
+                {!playBlocked && !streamSoundOn && current && (
+                  <button
+                    type="button"
+                    className="absolute bottom-16 left-1/2 z-[5] -translate-x-1/2 rounded-full border border-sunset-400/80 bg-midnight-900/90 px-4 py-2 text-xs font-medium text-sunset-100 shadow-lg hover:bg-midnight-800/95 sm:bottom-20"
+                    onClick={() => {
+                      setStreamSoundOn(true)
+                      void videoRef.current?.play().catch(() => setPlayBlocked(true))
+                    }}
+                  >
+                    Tap for sound
+                  </button>
+                )}
                 {queue
                   .slice(currentIndex + 1, currentIndex + 1 + PRELOAD_NEXT)
                   .map((m) => (
