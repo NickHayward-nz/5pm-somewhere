@@ -92,6 +92,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
   const loadingMoreRef = useRef(false)
   const previousBlobUrlRef = useRef<string | null>(null)
   const urlToRevokeAfterLoadRef = useRef<string | null>(null)
+  const realtimeReactionFetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   const fetchMore = useCallback(async () => {
     const sb = getSupabase()
@@ -322,86 +323,49 @@ export function LiveStream({ open, onClose, userId }: Props) {
             return
           }
         }
-      try {
-        const { error } = await sb.from('moments').update({ [field]: newCount }).eq('id', momentId)
-        if (error) {
-          // eslint-disable-next-line no-console
-          console.error('Supabase reaction update (undo) failed:', error)
-          if (userId) {
-            await sb
-              .from('user_reactions')
-              .insert({
-                user_id: userId,
-                moment_id: momentId,
-                reaction_type: REACTION_FIELD_TO_TYPE[field],
-              })
-          }
-          const prevCount =
-            field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
-          setQueue((prevQueue) =>
-            prevQueue.map((mom) =>
-              mom.id === momentId ? { ...mom, [field]: prevCount } : mom,
-            ),
-          )
-          setPrettyCount(field === 'pretty_count' ? prevCount : prettyCount)
-          setFunnyCount(field === 'funny_count' ? prevCount : funnyCount)
-          setCheersCount(field === 'cheers_count' ? prevCount : cheersCount)
-          setUserReactions((u) => ({
-            ...u,
-            pretty: field === 'pretty_count' ? true : u.pretty,
-            funny: field === 'funny_count' ? true : u.funny,
-            cheers: field === 'cheers_count' ? true : u.cheers,
-          }))
-          if (!userId) {
-            try {
-              localStorage.setItem(key, '1')
-            } catch {
-              // ignore
-            }
-          }
-          return
-        }
-        const freezeEnd = Date.now() + 5000
-        setFetchFrozenUntil(freezeEnd)
+
+      const nowUndo = Date.now()
+      setFetchFrozenUntil(nowUndo + 5000)
+      setLastReactionTime(nowUndo)
+
+      if (userId) {
+        await fetchReactionCounts(momentId, { force: true })
+        return
+      }
+
+      const { error: rpcUndoErr } = await sb.rpc('bump_moment_reaction_for_anon', {
+        p_moment_id: momentId,
+        p_reaction_type: REACTION_FIELD_TO_TYPE[field],
+        p_delta: -1,
+      })
+      if (rpcUndoErr) {
         // eslint-disable-next-line no-console
-        console.log('Reaction updated - fetch frozen until:', new Date(freezeEnd).toLocaleTimeString())
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('Reaction remove failed:', e)
-          if (userId) {
-            await sb
-              .from('user_reactions')
-              .insert({
-                user_id: userId,
-                moment_id: momentId,
-                reaction_type: REACTION_FIELD_TO_TYPE[field],
-              })
-          }
-          const prevCount =
-            field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
-          setQueue((prevQueue) =>
-            prevQueue.map((mom) =>
-              mom.id === momentId ? { ...mom, [field]: prevCount } : mom,
-            ),
-          )
-          setPrettyCount(field === 'pretty_count' ? prevCount : prettyCount)
-          setFunnyCount(field === 'funny_count' ? prevCount : funnyCount)
-          setCheersCount(field === 'cheers_count' ? prevCount : cheersCount)
-          setUserReactions((u) => ({
-            ...u,
-            pretty: field === 'pretty_count' ? true : u.pretty,
-            funny: field === 'funny_count' ? true : u.funny,
-            cheers: field === 'cheers_count' ? true : u.cheers,
-          }))
-          if (!userId) {
-            try {
-              localStorage.setItem(key, '1')
-            } catch {
-              // ignore
-            }
-          }
+        console.error('bump_moment_reaction_for_anon (undo) failed:', rpcUndoErr)
+        const prevCount =
+          field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
+        setQueue((prevQueue) =>
+          prevQueue.map((mom) =>
+            mom.id === momentId ? { ...mom, [field]: prevCount } : mom,
+          ),
+        )
+        setPrettyCount(field === 'pretty_count' ? prevCount : prettyCount)
+        setFunnyCount(field === 'funny_count' ? prevCount : funnyCount)
+        setCheersCount(field === 'cheers_count' ? prevCount : cheersCount)
+        setUserReactions((u) => ({
+          ...u,
+          pretty: field === 'pretty_count' ? true : u.pretty,
+          funny: field === 'funny_count' ? true : u.funny,
+          cheers: field === 'cheers_count' ? true : u.cheers,
+        }))
+        try {
+          localStorage.setItem(key, '1')
+        } catch {
+          // ignore
         }
         return
+      }
+      await fetchReactionCounts(momentId, { force: true })
+      return
       }
 
       // Add reaction: optimistic +1
@@ -421,13 +385,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
         funny: field === 'funny_count' ? true : u.funny,
         cheers: field === 'cheers_count' ? true : u.cheers,
       }))
-      if (!userId) {
-        try {
-          localStorage.setItem(key, '1')
-        } catch {
-          // ignore
-        }
-      }
+
       if (userId) {
         const { error: insertErr } = await sb.from('user_reactions').insert({
           user_id: userId,
@@ -455,20 +413,15 @@ export function LiveStream({ open, onClose, userId }: Props) {
           }))
           return
         }
-      }
-      try {
-        const { error } = await sb.from('moments').update({ [field]: optimisticCount }).eq('id', momentId)
-        if (error) {
+      } else {
+        const { error: rpcAddErr } = await sb.rpc('bump_moment_reaction_for_anon', {
+          p_moment_id: momentId,
+          p_reaction_type: REACTION_FIELD_TO_TYPE[field],
+          p_delta: 1,
+        })
+        if (rpcAddErr) {
           // eslint-disable-next-line no-console
-          console.error('Supabase reaction update failed:', error)
-          if (userId) {
-            await sb
-              .from('user_reactions')
-              .delete()
-              .eq('user_id', userId)
-              .eq('moment_id', momentId)
-              .eq('reaction_type', REACTION_FIELD_TO_TYPE[field])
-          }
+          console.error('bump_moment_reaction_for_anon failed:', rpcAddErr)
           const prevCount =
             field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
           setQueue((prevQueue) =>
@@ -485,95 +438,24 @@ export function LiveStream({ open, onClose, userId }: Props) {
             funny: field === 'funny_count' ? false : u.funny,
             cheers: field === 'cheers_count' ? false : u.cheers,
           }))
-          if (!userId) {
-            try {
-              localStorage.removeItem(key)
-            } catch {
-              // ignore
-            }
-          }
           return
         }
-        // eslint-disable-next-line no-console
-        console.log('Supabase reaction update succeeded for field:', field, 'value:', optimisticCount)
-        const now = Date.now()
-        const freezeEnd = now + 5000
-        setFetchFrozenUntil(freezeEnd)
-        setLastReactionTime(now)
-        // eslint-disable-next-line no-console
-        console.log(
-          'Reaction updated - reaction freeze active until',
-          new Date(freezeEnd).toLocaleTimeString(),
-        )
-        // Force a one-time sync after 12s and never let the count drop below the optimistic value
-        setTimeout(async () => {
-          const sbInner = getSupabase()
-          if (!sbInner) return
-          try {
-            const { data } = await sbInner
-              .from('moments')
-              .select('pretty_count, funny_count, cheers_count')
-              .eq('id', momentId)
-              .single()
-            if (!data) return
-            if (momentId !== current?.id) return
-            if (field === 'pretty_count') {
-              const synced = data.pretty_count ?? 0
-              setPrettyCount(Math.max(synced, optimisticCount))
-              // eslint-disable-next-line no-console
-              console.log(
-                'Final 12s sync count (pretty):',
-                synced,
-                'using max:',
-                Math.max(synced, optimisticCount),
-              )
-            } else if (field === 'funny_count') {
-              const synced = data.funny_count ?? 0
-              setFunnyCount(Math.max(synced, optimisticCount))
-            } else if (field === 'cheers_count') {
-              const synced = data.cheers_count ?? 0
-              setCheersCount(Math.max(synced, optimisticCount))
-            }
-          } catch (e) {
-            // eslint-disable-next-line no-console
-            console.error('Final 12s sync failed:', e)
-          }
-        }, 12000)
-      } catch (e) {
-        // eslint-disable-next-line no-console
-        console.error('Reaction update failed:', e)
-        if (userId) {
-          await sb
-            .from('user_reactions')
-            .delete()
-            .eq('user_id', userId)
-            .eq('moment_id', momentId)
-            .eq('reaction_type', REACTION_FIELD_TO_TYPE[field])
-        }
-        setQueue((prevQueue) =>
-          prevQueue.map((mom) =>
-            mom.id === momentId
-              ? { ...mom, [field]: field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount }
-              : mom,
-          ),
-        )
-        setPrettyCount(field === 'pretty_count' ? prettyCount : prettyCount)
-        setFunnyCount(field === 'funny_count' ? funnyCount : funnyCount)
-        setCheersCount(field === 'cheers_count' ? cheersCount : cheersCount)
-        setUserReactions((u) => ({
-          ...u,
-          pretty: field === 'pretty_count' ? false : u.pretty,
-          funny: field === 'funny_count' ? false : u.funny,
-          cheers: field === 'cheers_count' ? false : u.cheers,
-        }))
-        if (!userId) {
-          try {
-            localStorage.removeItem(key)
-          } catch {
-            // ignore
-          }
+        try {
+          localStorage.setItem(key, '1')
+        } catch {
+          // ignore
         }
       }
+
+      const nowAdd = Date.now()
+      setFetchFrozenUntil(nowAdd + 5000)
+      setLastReactionTime(nowAdd)
+      // eslint-disable-next-line no-console
+      console.log(
+        'Reaction saved — counts synced from server (trigger or RPC). Freeze until',
+        new Date(nowAdd + 5000).toLocaleTimeString(),
+      )
+      await fetchReactionCounts(momentId, { force: true })
     },
     [prettyCount, funnyCount, cheersCount, current?.id, fetchReactionCounts, userId],
   )
@@ -634,12 +516,22 @@ export function LiveStream({ open, onClose, userId }: Props) {
               cheers: type === 'cheers' ? false : u.cheers,
             }))
           }
-          // Refetch global counts so this client sees latest
-          fetchReactionCounts(momentId, { force: true })
+          // Debounce: trigger updates moments in the same txn as this row change; burst events coalesce.
+          if (realtimeReactionFetchTimerRef.current) {
+            clearTimeout(realtimeReactionFetchTimerRef.current)
+          }
+          realtimeReactionFetchTimerRef.current = setTimeout(() => {
+            realtimeReactionFetchTimerRef.current = null
+            void fetchReactionCounts(momentId, { force: true })
+          }, 300)
         },
       )
       .subscribe()
     return () => {
+      if (realtimeReactionFetchTimerRef.current) {
+        clearTimeout(realtimeReactionFetchTimerRef.current)
+        realtimeReactionFetchTimerRef.current = null
+      }
       sb.removeChannel(channel)
     }
   }, [userId, current?.id, fetchReactionCounts])

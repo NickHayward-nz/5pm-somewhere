@@ -23,13 +23,22 @@ export function useProfile(userId: string | null) {
       return
     }
     try {
-      const { data, error: e } = await sb
-        .from('profiles')
-        .select(
-          'id, is_premium, timezone, current_streak, longest_streak, last_post_date, upload_terms_accepted_at',
-        )
-        .eq('id', userId)
-        .single()
+      const fullSelect =
+        'id, is_premium, timezone, current_streak, longest_streak, last_post_date, upload_terms_accepted_at'
+      let { data, error: e } = await sb.from('profiles').select(fullSelect).eq('id', userId).single()
+      if (e && e.code !== 'PGRST116') {
+        const { data: basic, error: e2 } = await sb
+          .from('profiles')
+          .select('id, is_premium, timezone, current_streak, longest_streak, last_post_date')
+          .eq('id', userId)
+          .single()
+        if (!e2 && basic) {
+          data = { ...basic, upload_terms_accepted_at: null }
+          e = null
+        } else {
+          e = e2 ?? e
+        }
+      }
       if (e) {
         if (e.code === 'PGRST116') {
           const defaultProfile: Profile = {
@@ -46,6 +55,9 @@ export function useProfile(userId: string | null) {
           return
         }
         throw e
+      }
+      if (!data) {
+        throw new Error('No profile data')
       }
       setProfile({
         id: data.id,
