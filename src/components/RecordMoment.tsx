@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getSupabase } from '../lib/supabase'
 import {
-  getStreakPriorityForUpload,
+  computeLiveStreamPriority,
   incrementUploadsToday,
   trackCaptureStarted,
   trackVideoUploaded,
@@ -12,6 +12,7 @@ import {
 } from '../lib/capture'
 import { CopyrightFooter } from './CopyrightFooter'
 import { pruneExcessMomentsForFreeUser } from '../lib/momentsRetention'
+import { prepareShareableVideo, shareVideoNatively, SHARE_CAPTION, drawSunsetBorder } from '../lib/share'
 
 type Props = {
   open: boolean
@@ -35,10 +36,13 @@ export function RecordMoment(props: Props) {
   const [caption, setCaption] = useState('')
   const [durationSec, setDurationSec] = useState(0)
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+  const [sharing, setSharing] = useState(false)
+  const [shareStatus, setShareStatus] = useState<string | null>(null)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const previewUrlRef = useRef<string | null>(null)
+  const recordedBlobRef = useRef<Blob | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
   const recordingStartRef = useRef<number | null>(null)
@@ -68,6 +72,9 @@ export function RecordMoment(props: Props) {
     setCaption('')
     setDurationSec(0)
     setPreviewUrl(null)
+    setSharing(false)
+    setShareStatus(null)
+    recordedBlobRef.current = null
   }, [open])
 
   function cleanup() {
@@ -165,6 +172,13 @@ export function RecordMoment(props: Props) {
         }
         if (canvas.width === 0 || canvas.height === 0) return
         ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+
+        // Premium visual indicator: thin sunset-gradient border matching the app's
+        // bg-sunset-gradient. Baked into every recorded frame so premium users see
+        // the distinctive border in the preview, live-stream, and shared video.
+        if (isPremium) {
+          drawSunsetBorder(ctx, canvas.width, canvas.height)
+        }
 
         // Timestamp overlay: centered bottom bar, glassmorphism (polaroid-frame style), Poppins text.
         // Responsive; wraps long locations into two lines; includes the app logo in the bar.
@@ -412,6 +426,7 @@ export function RecordMoment(props: Props) {
         const url = URL.createObjectURL(blob)
         if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
         previewUrlRef.current = url
+        recordedBlobRef.current = blob
         setPreviewUrl(url)
         setDurationSec(duration)
         setStep('preview')
@@ -468,6 +483,48 @@ export function RecordMoment(props: Props) {
       console.error('RecordMoment: No stream after try/catch - fallback')
       window.alert('Camera stream was not available after request. Check permissions and try again.')
       setStep('idle')
+    }
+  }
+
+  async function handleShare() {
+    const rawBlob = recordedBlobRef.current
+    if (!rawBlob) {
+      setShareStatus('No recording found to share.')
+      return
+    }
+    setSharing(true)
+    setShareStatus(null)
+    try {
+      // Premium users already have the sunset border baked into the recording (see drawFrame).
+      // Free users need the border added on-the-fly before sharing. Either way we append
+      // the share caption via the native share sheet so captions/link ride along.
+      const prepared = await prepareShareableVideo(rawBlob, {
+        addBorder: !isPremium,
+        preferMp4: true,
+      })
+      const result = await shareVideoNatively(prepared, {
+        title: "I'm 5PM Somewhere",
+        caption: SHARE_CAPTION,
+      })
+      if (result === 'shared') {
+        setShareStatus('Shared! 🎉')
+      } else if (result === 'downloaded') {
+        setShareStatus(
+          'Your browser does not support sharing files, so we downloaded the video — post it from your gallery.',
+        )
+      } else if (result === 'cancelled') {
+        setShareStatus('Share cancelled.')
+      } else if (result === 'text_only') {
+        setShareStatus(
+          'Your browser could not share the video file directly. We shared a link/caption instead.',
+        )
+      }
+    } catch (err) {
+      // eslint-disable-next-line no-console
+      console.error('Share failed:', err)
+      setShareStatus('Could not prepare the share. Try again, or tap Done and share from My Moments.')
+    } finally {
+      setSharing(false)
     }
   }
 
@@ -562,10 +619,14 @@ export function RecordMoment(props: Props) {
       console.log('Public video URL:', videoUrl)
 
       const streakDays = profile?.current_streak ?? 0
-      const streakPriority = getStreakPriorityForUpload(streakDays)
+      // Live-stream queue priority (spec formula):
+      //   base 100 + streak*25 + premium*80
+      // Applied to every upload so both premium flat-boost and streak boost
+      // are reflected in the feed ordering.
+      const livePriority = computeLiveStreamPriority(streakDays, isPremium)
       const boostExpiresAt =
-        streakPriority?.boostHours && streakPriority.boostHours > 0
-          ? now.plus({ hours: streakPriority.boostHours }).toISO()
+        livePriority.boostHours && livePriority.boostHours > 0
+          ? now.plus({ hours: livePriority.boostHours }).toISO()
           : null
 
       const insertRow: Record<string, unknown> = {
@@ -579,11 +640,10 @@ export function RecordMoment(props: Props) {
         pretty_count: 0,
         funny_count: 0,
         cheers_count: 0,
-      }
-      if (streakPriority) {
-        insertRow.uploader_streak_days = streakPriority.days
-        insertRow.uploader_streak_priority = streakPriority.priority
-        insertRow.visibility_boost_expires_at = boostExpiresAt
+        uploader_streak_days: livePriority.days,
+        uploader_streak_priority: livePriority.priority,
+        visibility_boost_expires_at: boostExpiresAt,
+        uploader_is_premium: isPremium,
       }
       // eslint-disable-next-line no-console
       console.log('Using real user_id from auth for insert:', authUserId)
@@ -713,7 +773,7 @@ export function RecordMoment(props: Props) {
 
             {step === 'success' && (
               <div
-                className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-6 bg-midnight-950/92 px-5 py-8 text-center backdrop-blur-[2px]"
+                className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-midnight-950/92 px-5 py-8 text-center backdrop-blur-[2px]"
                 role="status"
                 aria-live="polite"
               >
@@ -727,13 +787,30 @@ export function RecordMoment(props: Props) {
                 <p className="max-w-md text-balance text-lg font-semibold leading-snug text-sunset-50 sm:text-xl">
                   Your 5PM moment is live—thanks for sharing!
                 </p>
-                <button
-                  type="button"
-                  onClick={onClose}
-                  className="btn-glow-gold min-h-[48px] w-full max-w-xs touch-manipulation px-8 text-base"
-                >
-                  Done
-                </button>
+
+                {shareStatus && (
+                  <p className="text-xs text-sunset-100/70 max-w-xs" aria-live="polite">
+                    {shareStatus}
+                  </p>
+                )}
+
+                <div className="flex w-full max-w-xs flex-col gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleShare()}
+                    disabled={sharing || !recordedBlobRef.current}
+                    className="btn-glow-gold min-h-[48px] w-full touch-manipulation px-8 text-base disabled:opacity-60"
+                  >
+                    {sharing ? 'Preparing share…' : 'Share this moment 📤'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={onClose}
+                    className="btn-glow-muted min-h-[44px] w-full touch-manipulation px-8 text-sm"
+                  >
+                    Done
+                  </button>
+                </div>
               </div>
             )}
           </div>

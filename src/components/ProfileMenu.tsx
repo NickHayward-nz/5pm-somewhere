@@ -4,17 +4,17 @@ import { getSupabase } from '../lib/supabase'
 import { CopyrightFooter } from './CopyrightFooter'
 import { SignInModal } from './SignInModal'
 import { PrivacyPolicyText, TermsOfServiceText } from './PolicyLegalContent'
+import { startPremiumCheckout } from '../lib/premium'
 
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
 
-function goPremiumDev() {
-  try {
-    const u = new URL(window.location.href)
-    u.searchParams.set('premium', '1')
-    window.location.href = u.toString()
-  } catch {
-    window.location.search = '?premium=1'
+async function goPremium(): Promise<void> {
+  const result = await startPremiumCheckout()
+  if (!result.ok) {
+    window.alert(result.error)
+    return
   }
+  window.location.href = result.url
 }
 
 type Props = {
@@ -265,8 +265,12 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
               >
                 Not now
               </button>
-              <button type="button" onClick={goPremiumDev} className="btn-glow-gold min-h-[44px] px-4 text-sm">
-                Premium
+              <button
+                type="button"
+                onClick={() => void goPremium()}
+                className="btn-glow-gold min-h-[44px] px-4 text-sm"
+              >
+                Go Premium
               </button>
             </div>
           </div>

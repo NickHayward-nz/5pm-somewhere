@@ -22,6 +22,7 @@ import { SignInModal } from './components/SignInModal'
 import { CopyrightFooter } from './components/CopyrightFooter'
 import { FirstUploadConsentModal } from './components/FirstUploadConsentModal'
 import { useAlmostFivePmReminder } from './hooks/useAlmostFivePmReminder'
+import { consumeCheckoutReturnStatus, startPremiumCheckout } from './lib/premium'
 
 type FeaturedCity = {
   city: City
@@ -71,6 +72,10 @@ function App() {
   const recordOpenRef = useRef(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
+  // Dev-only local override: `?premium=1` / `?premium=0` still flips the
+  // stored flag so we can exercise premium flows without a real Stripe
+  // purchase. In production the authoritative source is
+  // `profiles.is_premium`, which the Stripe webhook maintains.
   const premiumQuery = useMemo(() => {
     try {
       const qs = new URLSearchParams(window.location.search)
@@ -115,6 +120,18 @@ function App() {
   useEffect(() => {
     // eslint-disable-next-line no-console
     console.log('Text top edge aligned with logo')
+  }, [])
+
+  // When the user comes back from Stripe Checkout we surface a status toast
+  // and immediately refetch the profile — the webhook may have already
+  // flipped `is_premium` by the time they land here.
+  useEffect(() => {
+    const status = consumeCheckoutReturnStatus()
+    if (status === 'success') {
+      showToast('🎉 Welcome to Premium! Refreshing your perks…')
+    } else if (status === 'cancelled') {
+      showToast('Checkout cancelled — you can upgrade any time.')
+    }
   }, [])
 
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
@@ -484,14 +501,13 @@ function App() {
               </button>
               <button
                 type="button"
-                onClick={() => {
-                  try {
-                    const u = new URL(window.location.href)
-                    u.searchParams.set('premium', '1')
-                    window.location.href = u.toString()
-                  } catch {
-                    window.location.search = '?premium=1'
+                onClick={async () => {
+                  const result = await startPremiumCheckout()
+                  if (!result.ok) {
+                    window.alert(result.error)
+                    return
                   }
+                  window.location.href = result.url
                 }}
                 className="btn-glow-gold w-full sm:w-auto min-h-[44px] px-4 text-sm touch-manipulation"
               >

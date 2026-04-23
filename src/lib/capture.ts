@@ -107,36 +107,46 @@ export function getStreakTier(currentStreak: number | null | undefined): StreakT
   return eligible.sort((a, b) => b.minDays - a.minDays)[0]
 }
 
+/**
+ * Compute the live-stream queue priority for an upload.
+ *
+ * Formula (per spec):
+ *   basePriority = 100
+ *   streakBonus  = currentStreak * 25     // +25 per consecutive day
+ *   premiumBonus = isPremium ? 80 : 0     // flat premium boost
+ *   total        = base + streak + premium
+ *
+ * The returned value is stored on `moments.uploader_streak_priority` at insert time
+ * and used as the primary sort key in LiveStream's queue query.
+ *
+ * Also returns `boostHours` from the legacy tier system so existing freshness logic
+ * (visibility_boost_expires_at) keeps working. For users with no tier, boost is
+ * undefined (queue priority still applies for the standard LIVE_WINDOW_MINUTES).
+ */
+export function computeLiveStreamPriority(
+  currentStreak: number | null | undefined,
+  isPremium: boolean,
+): { days: number; priority: number; boostHours?: number } {
+  const streak = Math.max(0, currentStreak ?? 0)
+  const basePriority = 100
+  const streakBonus = streak * 25
+  const premiumBonus = isPremium ? 80 : 0
+  const priority = basePriority + streakBonus + premiumBonus
+
+  const tier = getStreakTier(streak)
+  return {
+    days: tier?.minDays ?? streak,
+    priority,
+    boostHours: tier?.boostHours,
+  }
+}
+
+/** @deprecated Use {@link computeLiveStreamPriority}. Kept as a shim so older call sites keep compiling. */
 export function getStreakPriorityForUpload(
   currentStreak: number | null | undefined,
 ): { days: number; priority: number; boostHours?: number } | null {
-  const tier = getStreakTier(currentStreak)
-  if (!tier) return null
-  let priority = 0
-  switch (tier.visibilityBoost) {
-    case 'small':
-      priority = 1
-      break
-    case 'medium':
-      priority = 2
-      break
-    case 'large':
-      priority = 3
-      break
-    case 'very_large':
-      priority = 4
-      break
-    case 'permanent_medium':
-      priority = 2
-      break
-    default:
-      priority = 0
-  }
-  return {
-    days: tier.minDays,
-    priority,
-    boostHours: tier.boostHours,
-  }
+  if (!currentStreak || currentStreak <= 0) return null
+  return computeLiveStreamPriority(currentStreak, false)
 }
 
 export function getUserTimezone(fallback = 'Pacific/Auckland'): string {
@@ -158,9 +168,11 @@ export function computeCaptureWindow(
   const local = now.setZone(userTz)
   const diffMinutes = (local.hour - 17) * 60 + local.minute
 
-  // Base windows start exactly at 5:00 PM local time (diffMinutes >= 0),
-  // and last for 5 minutes for free users and 8 minutes for premium users.
-  const baseMaxMinutes = isPremium ? 8 : 5
+  // Base capture windows (minutes after 5:00 PM local time):
+  //   Free users    → 5 min  (5:00–5:05)
+  //   Premium users → 7 min  (5:00–5:07), a flat +2 minutes over free per spec
+  // Streak tiers may add additional minutes on top of the base window.
+  const baseMaxMinutes = isPremium ? 7 : 5
   const tier = getStreakTier(currentStreak)
   const extra = tier?.extraWindowMinutes ?? 0
   const maxMinutes = baseMaxMinutes + extra
