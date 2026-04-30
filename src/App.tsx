@@ -136,7 +136,7 @@ function App() {
 
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
   const userTz = profile?.timezone ?? getUserTimezone()
-  const isPremium = typeof profile?.is_premium === 'boolean' ? profile.is_premium : premiumQuery
+  const isPremium = userId ? profile?.is_premium === true : premiumQuery
   const checkingDailyLimit = profileLoading
   const currentStreak = profile?.current_streak ?? 0
   const streakTier = getStreakTier(currentStreak)
