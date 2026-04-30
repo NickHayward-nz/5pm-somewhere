@@ -3,6 +3,16 @@ import { useEffect, useState, useCallback } from 'react'
 import { getSupabase } from '../lib/supabase'
 import type { Profile } from '../types/profile'
 
+type ProfileRow = {
+  id: string
+  is_premium?: boolean | null
+  timezone?: string | null
+  current_streak?: number | null
+  longest_streak?: number | null
+  last_post_date?: string | null
+  upload_terms_accepted_at?: string | null
+}
+
 export function useProfile(userId: string | null) {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(!!userId)
@@ -23,22 +33,28 @@ export function useProfile(userId: string | null) {
       return
     }
     try {
-      const fullSelect =
-        'id, is_premium, timezone, current_streak, longest_streak, last_post_date, upload_terms_accepted_at'
-      let { data, error: e } = await sb.from('profiles').select(fullSelect).eq('id', userId).single()
-      if (e && e.code !== 'PGRST116') {
-        const { data: basic, error: e2 } = await sb
-          .from('profiles')
-          .select('id, is_premium, timezone, current_streak, longest_streak, last_post_date')
-          .eq('id', userId)
-          .single()
-        if (!e2 && basic) {
-          data = { ...basic, upload_terms_accepted_at: null }
+      let data: ProfileRow | null = null
+      let e: any = null
+      const selectAttempts = [
+        'id, is_premium, timezone, current_streak, longest_streak, last_post_date, upload_terms_accepted_at',
+        'id, is_premium, timezone, current_streak, longest_streak, last_post_date',
+        'id, is_premium',
+        'id',
+      ]
+
+      for (const select of selectAttempts) {
+        const result = await sb.from('profiles').select(select).eq('id', userId).single()
+        if (!result.error) {
+          data = result.data as unknown as ProfileRow
           e = null
-        } else {
-          e = e2 ?? e
+          break
         }
+        e = result.error
+        // eslint-disable-next-line no-console
+        console.warn('Profile query failed:', { select, error: result.error })
+        if (result.error.code === 'PGRST116') break
       }
+
       if (e) {
         if (e.code === 'PGRST116') {
           const defaultProfile: Profile = {

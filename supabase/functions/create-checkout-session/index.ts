@@ -78,7 +78,7 @@ serve(async (req) => {
   // the profile so repeat purchases don't create duplicate customers.
   const { data: profile } = await admin
     .from('profiles')
-    .select('stripe_customer_id, is_premium')
+    .select('stripe_customer_id')
     .eq('id', user.id)
     .maybeSingle()
 

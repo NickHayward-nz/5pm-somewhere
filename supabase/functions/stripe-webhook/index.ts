@@ -48,6 +48,7 @@ function iso(ts?: number | null): string | null {
 
 async function setPremiumByCustomer(
   customerId: string,
+  userId: string | null,
   args: {
     isPremium: boolean
     subscriptionId?: string | null
@@ -64,13 +65,25 @@ async function setPremiumByCustomer(
   if (args.startedAt !== undefined) patch.premium_started_at = args.startedAt
   if (args.expiresAt !== undefined) patch.premium_expires_at = args.expiresAt
 
-  const { error } = await admin
+  const { data, error } = await admin
     .from('profiles')
     .update(patch)
     .eq('stripe_customer_id', customerId)
-  if (error) {
+    .select('id')
+    .maybeSingle()
+  if (error && error.code !== 'PGRST116') {
     // eslint-disable-next-line no-console
     console.error('stripe-webhook: profile update failed', error, { customerId })
+  }
+  if (data || !userId) return
+
+  const { error: fallbackError } = await admin
+    .from('profiles')
+    .update({ ...patch, stripe_customer_id: customerId })
+    .eq('id', userId)
+  if (fallbackError) {
+    // eslint-disable-next-line no-console
+    console.error('stripe-webhook: fallback profile update failed', fallbackError, { customerId, userId })
   }
 }
 
@@ -108,6 +121,7 @@ serve(async (req) => {
           typeof session.subscription === 'string'
             ? session.subscription
             : session.subscription?.id ?? null
+        const userId = session.client_reference_id ?? null
         if (!customerId) break
 
         // Pull the subscription so we know the current period end.
@@ -119,7 +133,7 @@ serve(async (req) => {
           plan = sub.items.data[0]?.price.id ?? null
         }
 
-        await setPremiumByCustomer(customerId, {
+        await setPremiumByCustomer(customerId, userId, {
           isPremium: true,
           subscriptionId,
           plan,
@@ -132,7 +146,7 @@ serve(async (req) => {
         const sub = event.data.object as Stripe.Subscription
         const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id
         const isActive = sub.status === 'active' || sub.status === 'trialing'
-        await setPremiumByCustomer(customerId, {
+        await setPremiumByCustomer(customerId, sub.metadata.supabase_user_id ?? null, {
           isPremium: isActive,
           subscriptionId: sub.id,
           plan: sub.items.data[0]?.price.id ?? null,
@@ -143,7 +157,7 @@ serve(async (req) => {
       case 'customer.subscription.deleted': {
         const sub = event.data.object as Stripe.Subscription
         const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer.id
-        await setPremiumByCustomer(customerId, {
+        await setPremiumByCustomer(customerId, sub.metadata.supabase_user_id ?? null, {
           isPremium: false,
           subscriptionId: null,
           expiresAt: iso(sub.current_period_end),
