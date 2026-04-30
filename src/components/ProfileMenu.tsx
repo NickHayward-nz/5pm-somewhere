@@ -8,15 +8,6 @@ import { startPremiumCheckout } from '../lib/premium'
 
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
 
-async function goPremium(): Promise<void> {
-  const result = await startPremiumCheckout()
-  if (!result.ok) {
-    window.alert(result.error)
-    return
-  }
-  window.location.href = result.url
-}
-
 type Props = {
   userEmail: string | null
   userId: string | null
@@ -31,8 +22,23 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
   const [policyOpen, setPolicyOpen] = useState<null | 'terms' | 'privacy'>(null)
   const [montageOpen, setMontageOpen] = useState<null | 'weekly' | 'monthly'>(null)
   const [premiumPitch, setPremiumPitch] = useState<null | 'weekly' | 'monthly'>(null)
+  const [checkoutStarting, setCheckoutStarting] = useState(false)
 
   const displayName = userEmail?.trim() || ''
+
+  const goPremium = async () => {
+    if (checkoutStarting) return
+
+    setCheckoutStarting(true)
+    const result = await startPremiumCheckout()
+    setCheckoutStarting(false)
+
+    if (!result.ok) {
+      window.alert(result.error)
+      return
+    }
+    window.location.href = result.url
+  }
 
   const handleSignOut = async () => {
     if (!sb) return
@@ -163,6 +169,21 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
                 My Moments
               </button>
 
+              {!isPremium ? (
+                <button
+                  type="button"
+                  onClick={() => void goPremium()}
+                  disabled={checkoutStarting}
+                  className="btn-glow-gold min-h-[44px] w-full text-sm touch-manipulation disabled:cursor-wait disabled:opacity-70"
+                >
+                  {checkoutStarting ? 'Opening checkout…' : 'Upgrade to Premium'}
+                </button>
+              ) : (
+                <div className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em] text-amber-200">
+                  Premium active
+                </div>
+              )}
+
               {/* 4 — Weekly montage */}
               <button
                 type="button"
@@ -255,7 +276,7 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
             <p className="mb-4 text-sm text-sunset-100/90">
               Upgrade to Premium for{' '}
               {premiumPitch === 'weekly' ? 'your weekly montage' : 'your monthly highlights'}. Subscription
-              checkout will be available here soon.
+              checkout opens securely with Stripe.
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
@@ -268,9 +289,10 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
               <button
                 type="button"
                 onClick={() => void goPremium()}
-                className="btn-glow-gold min-h-[44px] px-4 text-sm"
+                disabled={checkoutStarting}
+                className="btn-glow-gold min-h-[44px] px-4 text-sm disabled:cursor-wait disabled:opacity-70"
               >
-                Go Premium
+                {checkoutStarting ? 'Opening…' : 'Go Premium'}
               </button>
             </div>
           </div>
