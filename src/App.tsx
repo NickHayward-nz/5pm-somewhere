@@ -22,7 +22,11 @@ import { SignInModal } from './components/SignInModal'
 import { CopyrightFooter } from './components/CopyrightFooter'
 import { FirstUploadConsentModal } from './components/FirstUploadConsentModal'
 import { useAlmostFivePmReminder } from './hooks/useAlmostFivePmReminder'
-import { consumeCheckoutReturnStatus, startPremiumCheckout } from './lib/premium'
+import {
+  consumeCheckoutReturnStatus,
+  startPremiumCheckout,
+  type CheckoutReturnStatus,
+} from './lib/premium'
 
 type FeaturedCity = {
   city: City
@@ -69,7 +73,9 @@ function App() {
   const [dailyLimitModalOpen, setDailyLimitModalOpen] = useState(false)
   const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
   const [signInForCaptureOpen, setSignInForCaptureOpen] = useState(false)
+  const [checkoutReturnStatus, setCheckoutReturnStatus] = useState<CheckoutReturnStatus>(null)
   const recordOpenRef = useRef(false)
+  const checkoutRefetchDoneRef = useRef(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
   // Dev-only local override: `?premium=1` / `?premium=0` still flips the
@@ -127,6 +133,7 @@ function App() {
   // flipped `is_premium` by the time they land here.
   useEffect(() => {
     const status = consumeCheckoutReturnStatus()
+    setCheckoutReturnStatus(status)
     if (status === 'success') {
       showToast('🎉 Welcome to Premium! Refreshing your perks…')
     } else if (status === 'cancelled') {
@@ -137,6 +144,13 @@ function App() {
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
   const userTz = profile?.timezone ?? getUserTimezone()
   const isPremium = userId ? profile?.is_premium === true : premiumQuery
+
+  useEffect(() => {
+    if (checkoutReturnStatus !== 'success' || !userId || checkoutRefetchDoneRef.current) return
+    checkoutRefetchDoneRef.current = true
+    void refetchProfile()
+  }, [checkoutReturnStatus, refetchProfile, userId])
+
   const checkingDailyLimit = profileLoading
   const currentStreak = profile?.current_streak ?? 0
   const streakTier = getStreakTier(currentStreak)

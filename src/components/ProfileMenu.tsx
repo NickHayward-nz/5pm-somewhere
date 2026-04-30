@@ -60,7 +60,11 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
       <div className="flex w-full min-w-0 flex-row items-center justify-end gap-2">
         {userEmail ? (
           <span
-            className="max-w-[min(10rem,32vw)] shrink truncate text-right font-mono text-[10px] text-sunset-200/90 sm:max-w-[13rem] sm:text-xs"
+            className={`max-w-[min(10rem,32vw)] shrink truncate text-right font-mono text-[10px] sm:max-w-[13rem] sm:text-xs ${
+              isPremium
+                ? 'font-semibold text-amber-200 drop-shadow-[0_0_8px_rgba(251,191,36,0.95)] [text-shadow:0_0_14px_rgba(251,191,36,0.75)]'
+                : 'text-sunset-200/90'
+            }`}
             title={userEmail}
           >
             {displayName}
