@@ -53,11 +53,6 @@ export function RecordMoment(props: Props) {
   const MAX_SEC = isPremium ? 30 : 20
 
   useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('Modal open state:', open, 'Step:', step)
-  }, [open, step])
-
-  useEffect(() => {
     if (!open) {
       cleanup()
       if (previewUrlRef.current) {
@@ -103,12 +98,8 @@ export function RecordMoment(props: Props) {
     setStep('countdown')
     setCountdown(3)
 
-    // eslint-disable-next-line no-console
-    console.log('RecordMoment: Attempting getUserMedia...')
-
     const sb = getSupabase()
     if (!sb) {
-      // eslint-disable-next-line no-console
       console.error('RecordMoment: Supabase not configured - cannot upload later')
       setError('Supabase is not configured.')
       setStep('error')
@@ -117,18 +108,11 @@ export function RecordMoment(props: Props) {
 
     let stream: MediaStream | null = null
     try {
-      // eslint-disable-next-line no-console
-      console.log('getUserMedia called')
-      // eslint-disable-next-line no-console
-      console.log('Requesting camera permission...')
       stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
         audio: true,
       })
-      // eslint-disable-next-line no-console
-      console.log('Camera permission granted - stream obtained:', stream)
       if (!stream || stream.getTracks().length === 0) {
-        // eslint-disable-next-line no-console
         console.error('RecordMoment: stream null or no tracks')
         window.alert('Camera stream was empty. Check site permissions.')
         setStep('idle')
@@ -261,12 +245,12 @@ export function RecordMoment(props: Props) {
 
         // Glassmorphism box (canvas can’t use backdrop-filter; layered frosted gradients + borders)
         const radius = Math.min(18, Math.round(barHeight * 0.22))
-        const roundRectAvailable = typeof (ctx as any).roundRect === 'function'
+        const roundRectAvailable = typeof ctx.roundRect === 'function'
 
         const drawGlassPanel = () => {
           if (roundRectAvailable) {
             ctx.beginPath()
-            ;(ctx as any).roundRect(barX, barY, barWidth, barHeight, radius)
+            ctx.roundRect(barX, barY, barWidth, barHeight, radius)
           } else {
             ctx.beginPath()
             ctx.rect(barX, barY, barWidth, barHeight)
@@ -324,7 +308,7 @@ export function RecordMoment(props: Props) {
         // Inner edge (depth)
         if (roundRectAvailable) {
           ctx.beginPath()
-          ;(ctx as any).roundRect(barX + 1.5, barY + 1.5, barWidth - 3, barHeight - 3, Math.max(0, radius - 2))
+          ctx.roundRect(barX + 1.5, barY + 1.5, barWidth - 3, barHeight - 3, Math.max(0, radius - 2))
           ctx.strokeStyle = 'rgba(255, 255, 255, 0.1)'
           ctx.lineWidth = 1
           ctx.stroke()
@@ -341,7 +325,7 @@ export function RecordMoment(props: Props) {
           ctx.shadowBlur = 12
           ctx.beginPath()
           if (roundRectAvailable) {
-            ;(ctx as any).roundRect(logoX, logoY, logoBoxSize, logoBoxSize, logoRadius)
+            ctx.roundRect(logoX, logoY, logoBoxSize, logoBoxSize, logoRadius)
             ctx.clip()
           }
           ctx.drawImage(logoImg, logoX, logoY, logoBoxSize, logoBoxSize)
@@ -421,8 +405,6 @@ export function RecordMoment(props: Props) {
         const duration = recordingStartRef.current
           ? Math.floor((Date.now() - recordingStartRef.current) / 1000)
           : 0
-        // eslint-disable-next-line no-console
-        console.log('Recorded blob size:', blob.size, 'duration:', duration)
         const url = URL.createObjectURL(blob)
         if (previewUrlRef.current) URL.revokeObjectURL(previewUrlRef.current)
         previewUrlRef.current = url
@@ -465,7 +447,7 @@ export function RecordMoment(props: Props) {
       }, 1000)
     } catch (e) {
       const err = e as Error & { name?: string; stack?: string }
-      // eslint-disable-next-line no-console
+       
       console.error('getUserMedia failed:', err.name, err.message, err.stack)
       setError('Unable to access camera or microphone.')
       setStep('error')
@@ -479,7 +461,7 @@ export function RecordMoment(props: Props) {
       )
     }
     if (!streamRef.current) {
-      // eslint-disable-next-line no-console
+       
       console.error('RecordMoment: No stream after try/catch - fallback')
       window.alert('Camera stream was not available after request. Check permissions and try again.')
       setStep('idle')
@@ -520,7 +502,7 @@ export function RecordMoment(props: Props) {
         )
       }
     } catch (err) {
-      // eslint-disable-next-line no-console
+       
       console.error('Share failed:', err)
       setShareStatus('Could not prepare the share. Try again, or tap Done and share from My Moments.')
     } finally {
@@ -551,7 +533,6 @@ export function RecordMoment(props: Props) {
       const { data: sessionResult } = await sb.auth.getSession()
       const session = sessionResult?.session ?? null
       if (!session || !session.user?.id) {
-        // eslint-disable-next-line no-console
         console.error('No active session in upload()')
         setError('You must be signed in to upload a moment.')
         setStep('preview')
@@ -559,47 +540,18 @@ export function RecordMoment(props: Props) {
         return
       }
       const authUserId = session.user.id
-      // eslint-disable-next-line no-console
-      console.log('Session check in upload: Signed in as', authUserId)
-      // eslint-disable-next-line no-console
-      console.log('Final user_id for insert:', authUserId || 'MISSING')
       if (!authUserId) {
         setError('You must be signed in to upload a moment.')
         setStep('preview')
         window.alert('You must be signed in to upload a moment.')
         return
       }
-      // eslint-disable-next-line no-console
-      console.log('Authenticated session found - token present, proceeding with insert')
       const res = await fetch(previewUrl)
       const blob = await res.blob()
-      const duration = durationSec
-
-      // Detailed debug logging for uploads
-      // eslint-disable-next-line no-console
-      console.log('=== UPLOAD START ===')
-      // eslint-disable-next-line no-console
-      console.log('Blob size:', blob.size, 'Type:', blob.type, 'Duration:', duration)
-      // eslint-disable-next-line no-console
-      console.log(
-        'Supabase URL:',
-        import.meta.env.VITE_SUPABASE_URL ? 'present' : 'MISSING',
-      )
-      // eslint-disable-next-line no-console
-      console.log(
-        'Anon key length:',
-        import.meta.env.VITE_SUPABASE_ANON_KEY
-          ? import.meta.env.VITE_SUPABASE_ANON_KEY.length
-          : 'MISSING',
-      )
 
       const now = DateTime.now().setZone(userTz)
 
-      // eslint-disable-next-line no-console
-      console.log('Using user_id for upload:', authUserId)
       const path = `${authUserId}/${now.toFormat('yyyy/LL/dd')}/${now.toMillis()}.webm`
-      // eslint-disable-next-line no-console
-      console.log('Uploading to path:', path)
 
       const { data: storageData, error: storageError } = await sb.storage
         .from('moments')
@@ -610,13 +562,9 @@ export function RecordMoment(props: Props) {
       if (storageError || !storageData?.path) {
         throw storageError || new Error('Upload failed at storage step')
       }
-      // eslint-disable-next-line no-console
-      console.log('Upload SUCCESS (storage):', storageData)
 
       const { data: publicUrlData } = sb.storage.from('moments').getPublicUrl(storageData.path)
       const videoUrl = publicUrlData.publicUrl
-      // eslint-disable-next-line no-console
-      console.log('Public video URL:', videoUrl)
 
       const streakDays = profile?.current_streak ?? 0
       // Live-stream queue priority (spec formula):
@@ -645,21 +593,12 @@ export function RecordMoment(props: Props) {
         visibility_boost_expires_at: boostExpiresAt,
         uploader_is_premium: isPremium,
       }
-      // eslint-disable-next-line no-console
-      console.log('Using real user_id from auth for insert:', authUserId)
-      // eslint-disable-next-line no-console
-      console.log('Inserting moments row:', insertRow)
 
       try {
-        // eslint-disable-next-line no-console
-        console.log('Insert request headers should include auth token')
-        const { data, error } = await sb.from('moments').insert([insertRow])
+        const { error } = await sb.from('moments').insert([insertRow])
         if (error) throw error
-        // eslint-disable-next-line no-console
-        console.log('Row insert success:', data)
       } catch (err) {
         const e = err as Error & { message?: string }
-        // eslint-disable-next-line no-console
         console.error('Row insert failed:', e.message, err)
         throw e
       }
@@ -679,18 +618,12 @@ export function RecordMoment(props: Props) {
       }
       trackVideoUploaded({ userId: authUserId, durationSec, isPremium, tz: userTz })
       incrementUploadsToday(userId, userTz)
-      // eslint-disable-next-line no-console
-      console.log('=== UPLOAD COMPLETE ===')
       setStep('success')
     } catch (e) {
       const err = e as Error & { name?: string; message?: string; stack?: string }
-      // eslint-disable-next-line no-console
       console.error('=== UPLOAD FAILED ===')
-      // eslint-disable-next-line no-console
       console.error('Error name:', err.name)
-      // eslint-disable-next-line no-console
       console.error('Error message:', err.message)
-      // eslint-disable-next-line no-console
       console.error('Full error:', err)
       setError('Upload failed. Please try again.')
       setStep('error')

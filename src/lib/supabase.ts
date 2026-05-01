@@ -10,7 +10,7 @@ export function getSupabase() {
   const anonKey = import.meta.env.VITE_SUPABASE_ANON_KEY as string | undefined
 
   if (!url || !anonKey) {
-    // eslint-disable-next-line no-console
+     
     console.error('Missing Supabase env vars')
     return null
   }

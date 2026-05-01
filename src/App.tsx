@@ -1,6 +1,7 @@
 // © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { DateTime, Interval } from 'luxon'
+import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { CITIES, type City } from './data/cities'
 import { useNow } from './hooks/useNow'
 import { formatClock } from './lib/time'
@@ -101,15 +102,13 @@ function App() {
   useEffect(() => {
     const sb = getSupabase()
     if (!sb) return
-    void sb.auth.getUser().then(({ data }: { data: any }) => {
+    void sb.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
       setUserId(data.user?.id ?? null)
       setUserEmail(data.user?.email ?? null)
     })
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange((event: any, session: any) => {
-      // eslint-disable-next-line no-console
-      console.log('Auth state change:', event, 'Session:', session != null ? 'present' : 'null')
+    } = sb.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
       if (session != null) {
         setUserId(session.user?.id ?? null)
         setUserEmail(session.user?.email ?? null)
@@ -121,11 +120,6 @@ function App() {
       }
     })
     return () => subscription.unsubscribe()
-  }, [])
-
-  useEffect(() => {
-    // eslint-disable-next-line no-console
-    console.log('Text top edge aligned with logo')
   }, [])
 
   // When the user comes back from Stripe Checkout we surface a status toast
@@ -213,25 +207,25 @@ function App() {
     cityId: null,
     lockUntil: 0,
   })
+  const bestCandidateCityId = bestCandidate?.city.id ?? null
+  const nowMillis = now.toMillis()
 
   useEffect(() => {
-    if (!bestCandidate) return
+    if (!bestCandidateCityId) return
     const nowMs = Date.now()
     const { cityId, lockUntil } = lockRef.current
 
     // If we are within the hold window for a locked city, keep it even if bestCandidate changes.
-    if (cityId && nowMs < lockUntil && cityId !== bestCandidate.city.id) {
+    if (cityId && nowMs < lockUntil && cityId !== bestCandidateCityId) {
       return
     }
 
     // Either hold expired or no lock yet: lock (or relock) to the current best candidate.
-    if (cityId !== bestCandidate.city.id) {
-      // eslint-disable-next-line no-console
-      console.log('Switching featured city to', bestCandidate.city.name, 'after hold expired')
-      setLockedCityId(bestCandidate.city.id)
+    if (cityId !== bestCandidateCityId) {
+      setLockedCityId(bestCandidateCityId)
     }
-    lockRef.current = { cityId: bestCandidate.city.id, lockUntil: nowMs + HOLD_MS }
-  }, [bestCandidate?.city.id, now.toMillis()])
+    lockRef.current = { cityId: bestCandidateCityId, lockUntil: nowMs + HOLD_MS }
+  }, [bestCandidateCityId, nowMillis])
 
   const featured: FeaturedCity | undefined = useMemo(() => {
     if (!bestCandidate) return undefined
@@ -263,25 +257,6 @@ function App() {
       })()
     : ''
   const featuredCityTime = featured?.local ?? now
-  const featuredRawDiff = featured?.rawDiffMinutes ?? 0
-  const featuredWrappedDiff = featured?.wrappedDiffMinutes ?? 0
-
-  useEffect(() => {
-    if (!featured) return
-    // Debugging: verify Luxon local time for the featured city
-    // eslint-disable-next-line no-console
-    console.log(
-      'Selected city:',
-      featured.city.name,
-      'Local:',
-      featuredCityTime.toFormat('HH:mm:ss'),
-      'Diff:',
-      featuredRawDiff,
-      "min (type: " +
-        (featuredRawDiff > 0 ? 'past' : featuredRawDiff < 0 ? 'before' : 'exact') +
-        `), wrapped=${featuredWrappedDiff}`,
-    )
-  }, [featured, featuredCityTime])
 
   const dayRange = useMemo(() => {
     const start = now.startOf('day')
@@ -299,10 +274,6 @@ function App() {
                 src="/Logo.png"
                 alt="5PM Somewhere Logo"
                 className="block h-14 w-auto max-w-full max-h-[56px] object-contain sm:h-24 sm:max-h-none md:h-28 lg:h-32"
-                onLoad={() => {
-                  // eslint-disable-next-line no-console
-                  console.log('Custom logo loaded')
-                }}
               />
             </div>
             <div className="leading-tight min-w-0 overflow-visible mt-2 sm:mt-5 md:mt-6 lg:mt-7">

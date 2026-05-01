@@ -42,21 +42,21 @@ export async function pruneExcessMomentsForFreeUser(
 
   const { error: rxErr } = await sb.from('user_reactions').delete().in('moment_id', ids)
   if (rxErr) {
-    // eslint-disable-next-line no-console
+     
     console.warn('momentsRetention: user_reactions delete', rxErr.message)
   }
 
   if (paths.length > 0) {
     const { error: stErr } = await sb.storage.from('moments').remove(paths)
     if (stErr) {
-      // eslint-disable-next-line no-console
+       
       console.warn('momentsRetention: storage remove', stErr.message)
     }
   }
 
   const { error: delErr } = await sb.from('moments').delete().in('id', ids)
   if (delErr) {
-    // eslint-disable-next-line no-console
+     
     console.warn('momentsRetention: moments delete', delErr.message)
   }
 }

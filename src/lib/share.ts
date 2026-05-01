@@ -60,9 +60,9 @@ export function drawSunsetBorder(
   ctx.shadowBlur = Math.round(thickness * 0.8)
 
   const radius = Math.min(width, height) * 0.025
-  if (typeof (ctx as any).roundRect === 'function') {
+  if (typeof ctx.roundRect === 'function') {
     ctx.beginPath()
-    ;(ctx as any).roundRect(
+    ctx.roundRect(
       inset,
       inset,
       width - thickness,
@@ -160,13 +160,16 @@ async function reencodeWithBorder(source: Blob, preferMp4: boolean): Promise<Blo
     try {
       // Some browsers disallow createMediaElementSource on blob: URLs for
       // CORS reasons; fall back to silent re-encode if that happens.
-      audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)()
+      const AudioContextCtor =
+        window.AudioContext ||
+        (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext
+      if (!AudioContextCtor) throw new Error('AudioContext unavailable')
+      audioCtx = new AudioContextCtor()
       const srcNode = audioCtx.createMediaElementSource(video)
       const dest = audioCtx.createMediaStreamDestination()
       srcNode.connect(dest)
       dest.stream.getAudioTracks().forEach((t) => canvasStream.addTrack(t))
     } catch (err) {
-      // eslint-disable-next-line no-console
       console.warn('Audio re-encode unavailable, continuing silent:', err)
     }
 
@@ -232,6 +235,14 @@ type NativeShareInput = {
   caption: string
 }
 
+type ShareNavigator = Navigator & {
+  canShare?: (data: ShareData) => boolean
+}
+
+function isAbortError(err: unknown): boolean {
+  return err instanceof DOMException && err.name === 'AbortError'
+}
+
 /**
  * Share a prepared video file via the best available share surface.
  *
@@ -247,20 +258,20 @@ export async function shareVideoNatively(
   { title, caption }: NativeShareInput,
 ): Promise<ShareResult> {
   const url = buildAppLink()
-  const navAny = navigator as any
+  const shareNavigator = navigator as ShareNavigator
 
   try {
     if (
       typeof navigator !== 'undefined' &&
       typeof navigator.share === 'function' &&
-      typeof navAny.canShare === 'function' &&
-      navAny.canShare({ files: [file] })
+      typeof shareNavigator.canShare === 'function' &&
+      shareNavigator.canShare({ files: [file] })
     ) {
       try {
         await navigator.share({ files: [file], title, text: caption, url })
         return 'shared'
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return 'cancelled'
+      } catch (err: unknown) {
+        if (isAbortError(err)) return 'cancelled'
         // Fall through to text-only share / download fallback
       }
     }
@@ -270,8 +281,8 @@ export async function shareVideoNatively(
         await navigator.share({ title, text: caption, url })
         await downloadFile(file)
         return 'text_only'
-      } catch (err: any) {
-        if (err?.name === 'AbortError') return 'cancelled'
+      } catch (err: unknown) {
+        if (isAbortError(err)) return 'cancelled'
       }
     }
 
@@ -283,7 +294,6 @@ export async function shareVideoNatively(
     }
     return 'downloaded'
   } catch (err) {
-    // eslint-disable-next-line no-console
     console.error('shareVideoNatively fatal:', err)
     await downloadFile(file)
     return 'downloaded'

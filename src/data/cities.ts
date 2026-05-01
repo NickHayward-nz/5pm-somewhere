@@ -140,7 +140,7 @@ export const CITIES: City[] = [
 ]
 
 if (CITIES.length < 75) {
-  // eslint-disable-next-line no-console
+   
   console.warn(`Expected at least 75 cities, got ${CITIES.length}`)
 }
 

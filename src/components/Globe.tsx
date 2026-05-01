@@ -54,6 +54,10 @@ export function Globe({ now, cities }: Props) {
   const countryLabels = useMemo(() => countryLabelsFromCities(cities), [cities])
 
   useEffect(() => {
+    dotTimeRef.current = now.toMillis()
+  }, [now])
+
+  useEffect(() => {
     const hostEl = hostRef.current
     if (!hostEl) return
     const el = hostEl
@@ -81,8 +85,6 @@ export function Globe({ now, cities }: Props) {
     controls.enableRotate = true
     controls.autoRotate = true
     controls.autoRotateSpeed = 0.5
-    // eslint-disable-next-line no-console
-    console.log('Zoom enabled - min/max distance:', controls.minDistance, controls.maxDistance)
 
     const group = new THREE.Group()
     scene.add(group)
@@ -104,14 +106,11 @@ export function Globe({ now, cities }: Props) {
     loader.load(
       DAY_MAP_URL,
       (tex) => {
-        // eslint-disable-next-line no-console
-        console.log('Pastel texture loaded successfully')
         earthMat.map = tex
         earthMat.needsUpdate = true
       },
       undefined,
       (err) => {
-        // eslint-disable-next-line no-console
         console.error('Pastel texture load failed:', err)
         earthMat.color = new THREE.Color(0xaaddff)
         earthMat.needsUpdate = true
@@ -246,7 +245,7 @@ export function Globe({ now, cities }: Props) {
 
     function resize() {
       const rect = el.getBoundingClientRect()
-      let w = Math.max(1, Math.floor(rect.width))
+      const w = Math.max(1, Math.floor(rect.width))
       let h = Math.max(1, Math.floor(rect.height))
       // Flex can report 0 height before layout; fall back until ResizeObserver refires
       if (h <= 1 && w > 1) {
@@ -265,7 +264,6 @@ export function Globe({ now, cities }: Props) {
     const ro = new ResizeObserver(resize)
     ro.observe(el)
 
-    dotTimeRef.current = now.toMillis()
     const dotInterval = setInterval(() => {
       dotTimeRef.current = DateTime.now().toMillis()
     }, DOT_UPDATE_INTERVAL_MS)
@@ -340,7 +338,7 @@ export function Globe({ now, cities }: Props) {
       controls.update()
 
       const dotNow = DateTime.fromMillis(dotTimeRef.current)
-      const timeForDots = dotNow.isValid ? dotNow : now
+      const timeForDots = dotNow.isValid ? dotNow : DateTime.now()
 
       for (let i = 0; i < cityPositions.length; i++) {
         const { city, pos } = cityPositions[i]

@@ -28,7 +28,7 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL')
 const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
 if (!stripeKey || !webhookSecret || !supabaseUrl || !serviceRoleKey) {
-  // eslint-disable-next-line no-console
+   
   console.error('stripe-webhook: missing required env vars')
 }
 
@@ -72,7 +72,7 @@ async function setPremiumByCustomer(
     .select('id')
     .maybeSingle()
   if (error && error.code !== 'PGRST116') {
-    // eslint-disable-next-line no-console
+     
     console.error('stripe-webhook: profile update failed', error, { customerId })
   }
   if (data || !userId) return
@@ -82,7 +82,7 @@ async function setPremiumByCustomer(
     .update({ ...patch, stripe_customer_id: customerId })
     .eq('id', userId)
   if (fallbackError) {
-    // eslint-disable-next-line no-console
+     
     console.error('stripe-webhook: fallback profile update failed', fallbackError, { customerId, userId })
   }
 }
@@ -107,7 +107,7 @@ serve(async (req) => {
       webhookSecret ?? '',
     )
   } catch (err) {
-    // eslint-disable-next-line no-console
+     
     console.error('Webhook signature verification failed:', err)
     return new Response('invalid_signature', { status: 400 })
   }
@@ -168,7 +168,7 @@ serve(async (req) => {
         // Leave premium state as-is; Stripe will retry and fire
         // customer.subscription.updated if things change. Log for ops.
         const invoice = event.data.object as Stripe.Invoice
-        // eslint-disable-next-line no-console
+         
         console.warn('invoice.payment_failed', { customer: invoice.customer })
         break
       }
@@ -177,7 +177,7 @@ serve(async (req) => {
         break
     }
   } catch (err) {
-    // eslint-disable-next-line no-console
+     
     console.error('stripe-webhook handler error:', err)
     return new Response('handler_error', { status: 500 })
   }

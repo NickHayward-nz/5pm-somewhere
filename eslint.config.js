@@ -20,5 +20,10 @@ export default defineConfig([
       ecmaVersion: 2020,
       globals: globals.browser,
     },
+    rules: {
+      // Existing media/modal effects intentionally reset React state when UI
+      // opens/closes. Keep this rule off until those flows are refactored.
+      'react-hooks/set-state-in-effect': 'off',
+    },
   },
 ])

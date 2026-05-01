@@ -18,7 +18,7 @@ export function SignInModal({ open, onClose, contextMessage }: Props) {
 
   const handleSignIn = async () => {
     if (!sb) {
-      // eslint-disable-next-line no-console
+       
       console.error('Missing VITE_SUPABASE_URL or VITE_SUPABASE_ANON_KEY in env')
       window.alert('Supabase is not configured - check env vars.')
       return
@@ -32,7 +32,7 @@ export function SignInModal({ open, onClose, contextMessage }: Props) {
         },
       })
     } catch (e) {
-      // eslint-disable-next-line no-console
+       
       console.error(e)
       window.alert('Unable to start Google sign-in. Please try again.')
     }
@@ -52,7 +52,7 @@ export function SignInModal({ open, onClose, contextMessage }: Props) {
       })
       window.alert('Magic link sent! Check your email.')
     } catch (e) {
-      // eslint-disable-next-line no-console
+       
       console.error(e)
       window.alert('Unable to send magic link.')
     }

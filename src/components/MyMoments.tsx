@@ -20,6 +20,10 @@ type Props = {
   userId: string
 }
 
+type ShareNavigator = Navigator & {
+  canShare?: (data: ShareData) => boolean
+}
+
 const APP_URL = 'https://5pm-somewhere-alpha.vercel.app'
 
 function buildShareText(city: string): string {
@@ -33,7 +37,7 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
   // Attempt to share the actual video file (so the share sheet treats it as a video).
   const videoFile = await getVideoFile(moment.video_url)
 
-  const nav: any = navigator
+  const nav = navigator as ShareNavigator
   if (!nav?.share) {
     // Minimal fallback: copy link + text.
     const payload = `${text}\n${APP_URL}`

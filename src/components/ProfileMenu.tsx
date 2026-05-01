@@ -62,7 +62,7 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
       await sb.auth.signOut()
       setProfileOpen(false)
     } catch (e) {
-      // eslint-disable-next-line no-console
+       
       console.error(e)
     }
   }

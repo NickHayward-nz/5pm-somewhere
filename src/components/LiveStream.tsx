@@ -108,16 +108,9 @@ export function LiveStream({ open, onClose, userId }: Props) {
       .limit(FETCH_LIMIT)
     loadingMoreRef.current = false
     const list = (videos ?? []) as MomentRow[]
-    // eslint-disable-next-line no-console
-    console.log('Stream query returned:', list.length, 'videos')
     if (error) {
-      // eslint-disable-next-line no-console
       console.error('Stream query error:', error)
       return []
-    }
-    if (list.length === 0) {
-      // eslint-disable-next-line no-console
-      console.log('No moments in the last', LIVE_WINDOW_MINUTES, 'minutes')
     }
     return list
   }, [])
@@ -168,13 +161,6 @@ export function LiveStream({ open, onClose, userId }: Props) {
         !options?.force &&
         (Date.now() < fetchFrozenUntil || Date.now() - lastReactionTime < 15000)
       ) {
-        // eslint-disable-next-line no-console
-        console.log(
-          'Fetch skipped - reaction freeze active until',
-          new Date(
-            Math.max(fetchFrozenUntil, lastReactionTime + 15000),
-          ).toLocaleTimeString(),
-        )
         return
       }
       const sb = getSupabase()
@@ -186,7 +172,6 @@ export function LiveStream({ open, onClose, userId }: Props) {
           .eq('id', momentId)
           .maybeSingle()
         if (error) {
-          // eslint-disable-next-line no-console
           console.error('Failed to fetch reaction counts:', error)
           return
         }
@@ -229,10 +214,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
             })
           }
         }
-        // eslint-disable-next-line no-console
-        console.log('Normal fetch counts:', data)
       } catch (e) {
-        // eslint-disable-next-line no-console
         console.error('Failed to fetch reaction counts:', e)
       }
     },
@@ -302,7 +284,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
             .eq('moment_id', momentId)
             .eq('reaction_type', REACTION_FIELD_TO_TYPE[field])
           if (delErr) {
-            // eslint-disable-next-line no-console
+             
             console.error('user_reactions delete (undo) failed:', delErr)
             const prevCount =
               field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
@@ -339,7 +321,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
         p_delta: -1,
       })
       if (rpcUndoErr) {
-        // eslint-disable-next-line no-console
+         
         console.error('bump_moment_reaction_for_anon (undo) failed:', rpcUndoErr)
         const prevCount =
           field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
@@ -393,7 +375,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
           reaction_type: REACTION_FIELD_TO_TYPE[field],
         })
         if (insertErr) {
-          // eslint-disable-next-line no-console
+           
           console.error('user_reactions insert failed:', insertErr)
           const prevCount =
             field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
@@ -420,7 +402,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
           p_delta: 1,
         })
         if (rpcAddErr) {
-          // eslint-disable-next-line no-console
+           
           console.error('bump_moment_reaction_for_anon failed:', rpcAddErr)
           const prevCount =
             field === 'pretty_count' ? prettyCount : field === 'funny_count' ? funnyCount : cheersCount
@@ -450,11 +432,6 @@ export function LiveStream({ open, onClose, userId }: Props) {
       const nowAdd = Date.now()
       setFetchFrozenUntil(nowAdd + 5000)
       setLastReactionTime(nowAdd)
-      // eslint-disable-next-line no-console
-      console.log(
-        'Reaction saved — counts synced from server (trigger or RPC). Freeze until',
-        new Date(nowAdd + 5000).toLocaleTimeString(),
-      )
       await fetchReactionCounts(momentId, { force: true })
     },
     [prettyCount, funnyCount, cheersCount, current?.id, fetchReactionCounts, userId],
@@ -477,7 +454,14 @@ export function LiveStream({ open, onClose, userId }: Props) {
           },
     )
     fetchReactionCounts(current.id, { force: true })
-  }, [current?.id, fetchReactionCounts, userId])
+  }, [
+    current?.id,
+    current?.pretty_count,
+    current?.funny_count,
+    current?.cheers_count,
+    fetchReactionCounts,
+    userId,
+  ])
 
   // Realtime: when logged in, sync user_reactions for current moment across devices/tabs
   useEffect(() => {
@@ -558,7 +542,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
       })
       .catch((err) => {
         if (!cancelled) {
-          // eslint-disable-next-line no-console
+           
           console.error('Stream blob fetch failed:', err)
           setCurrentBlobUrl(current.video_url)
         }
@@ -613,7 +597,7 @@ export function LiveStream({ open, onClose, userId }: Props) {
     video.load()
     setTimeout(() => {
       void video.play().catch((e) => {
-        // eslint-disable-next-line no-console
+         
         console.error('Play failed:', e)
         setPlayBlocked(true)
       })
@@ -658,45 +642,22 @@ export function LiveStream({ open, onClose, userId }: Props) {
 
   const handlePlay = useCallback(() => {
     setTransitioning(false)
-    const video = videoRef.current
-    if (video) {
-      // eslint-disable-next-line no-console
-      console.log('Video onplay - currentSrc:', video.currentSrc)
-    }
-    if (current) {
-      // eslint-disable-next-line no-console
-      console.log('Playing video:', current.id)
-    }
-  }, [current])
-
-  const handleLoadedMetadata = useCallback(() => {
-    const video = videoRef.current
-    if (video) {
-      // eslint-disable-next-line no-console
-      console.log('Video element dimensions:', video.clientWidth, video.clientHeight)
-    }
   }, [])
 
+  const handleLoadedMetadata = useCallback(() => {}, [])
+
   const handleCanPlay = useCallback(() => {
-    const video = videoRef.current
-    if (video) {
-      // eslint-disable-next-line no-console
-      console.log('Video canplay - should render frames')
-    }
     if (urlToRevokeAfterLoadRef.current) {
       URL.revokeObjectURL(urlToRevokeAfterLoadRef.current)
       urlToRevokeAfterLoadRef.current = null
     }
   }, [])
 
-  const handlePlaying = useCallback(() => {
-    // eslint-disable-next-line no-console
-    console.log('Video playing event - frames should show')
-  }, [])
+  const handlePlaying = useCallback(() => {}, [])
 
   const handleError = useCallback(
     (e: React.SyntheticEvent<HTMLVideoElement, Event>) => {
-      // eslint-disable-next-line no-console
+       
       console.error('Video element error:', e)
       goNext()
     },
@@ -706,24 +667,9 @@ export function LiveStream({ open, onClose, userId }: Props) {
   const currentVideoKey = `${current?.id ?? 'video'}-${currentIndex}`
 
   const handleLoadedData = useCallback(() => {
-    const video = videoRef.current
-    if (video) {
-      // eslint-disable-next-line no-console
-      console.log('Video loaded - readyState:', video.readyState)
-    }
   }, [])
 
-  const handleWaiting = useCallback(() => {
-    // eslint-disable-next-line no-console
-    console.log('Video waiting/buffering')
-  }, [])
-
-  useEffect(() => {
-    if (open) {
-      // eslint-disable-next-line no-console
-      console.log('Live stream cleaned: no bottom text, shrunk & centered video, no top bar')
-    }
-  }, [open])
+  const handleWaiting = useCallback(() => {}, [])
 
   if (!open) return null
 
