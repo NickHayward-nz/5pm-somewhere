@@ -4,6 +4,7 @@ import { DateTime, Interval } from 'luxon'
 import type { AuthChangeEvent, Session, User } from '@supabase/supabase-js'
 import { CITIES, type City } from './data/cities'
 import { useNow } from './hooks/useNow'
+import { useReachStats } from './hooks/useReachStats'
 import { formatClock } from './lib/time'
 import { Globe } from './components/Globe'
 import { getSupabase } from './lib/supabase'
@@ -61,6 +62,13 @@ function showToast(message: string) {
   setTimeout(() => { toast.style.opacity = '1' }, 100)
   setTimeout(() => { toast.style.opacity = '0' }, 3500)
   setTimeout(() => toast.remove(), 4000)
+}
+
+function formatReachViews(totalViews: number): string {
+  const formatted = new Intl.NumberFormat().format(totalViews)
+  return totalViews === 1
+    ? `${formatted} person has seen your moments`
+    : `${formatted} people have seen your moments`
 }
 
 function App() {
@@ -136,6 +144,7 @@ function App() {
   }, [])
 
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
+  const { stats: reachStats, refetch: refetchReachStats } = useReachStats(userId)
   const userTz = profile?.timezone ?? getUserTimezone()
   const isPremium = userId ? profile?.is_premium === true : premiumQuery
 
@@ -288,6 +297,14 @@ function App() {
               Your local time
             </div>
             <div className="font-mono text-xs sm:text-base text-sunset-50/90">{formatClock(DateTime.local())}</div>
+            {userId && (
+              <div className="mt-1 leading-tight text-sunset-100/75">
+                <div className="text-[10px] sm:text-xs">{formatReachViews(reachStats.totalViews)}</div>
+                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200 sm:text-xs">
+                  {reachStats.globalRank ? `5PM Reach #${reachStats.globalRank}` : '5PM Reach unranked'}
+                </div>
+              </div>
+            )}
             <div className="mt-1 sm:mt-2 flex justify-end items-center gap-2">
               {userId && currentStreak > 0 && (
                 <button
@@ -441,9 +458,19 @@ function App() {
           onProfileUpdated={refetchProfile}
         />
       )}
-      <LiveStream open={liveStreamOpen} onClose={() => setLiveStreamOpen(false)} userId={userId} />
+      <LiveStream
+        open={liveStreamOpen}
+        onClose={() => setLiveStreamOpen(false)}
+        userId={userId}
+        onReachStatsChange={refetchReachStats}
+      />
       {userId && (
-        <MyMoments open={myMomentsOpen} onClose={() => setMyMomentsOpen(false)} userId={userId} />
+        <MyMoments
+          open={myMomentsOpen}
+          onClose={() => setMyMomentsOpen(false)}
+          userId={userId}
+          onReachStatsChange={refetchReachStats}
+        />
       )}
       {dailyLimitModalOpen && (
         <div

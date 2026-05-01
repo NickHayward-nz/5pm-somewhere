@@ -1,10 +1,12 @@
 // © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
+import { incrementMomentView } from '../lib/reach'
 import { CopyrightFooter } from './CopyrightFooter'
 
 export type MomentRow = {
   id: string
+  user_id?: string | null
   created_at: string
   timezone: string
   city: string
@@ -35,6 +37,7 @@ type Props = {
   open: boolean
   onClose: () => void
   userId?: string | null
+  onReachStatsChange?: () => void
 }
 
 const POSTER_PLACEHOLDER =
@@ -67,7 +70,7 @@ function hasReacted(momentId: string, field: string): boolean {
   }
 }
 
-export function LiveStream({ open, onClose, userId }: Props) {
+export function LiveStream({ open, onClose, userId, onReachStatsChange }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -150,6 +153,8 @@ export function LiveStream({ open, onClose, userId }: Props) {
   }, [open, queue.length, currentIndex, fetchMore])
 
   const current = queue[currentIndex]
+  const currentMomentId = current?.id ?? null
+  const currentOwnerId = current?.user_id ?? null
   const hasNext = currentIndex < queue.length - 1
   const hasPrev = currentIndex > 0
 
@@ -642,7 +647,14 @@ export function LiveStream({ open, onClose, userId }: Props) {
 
   const handlePlay = useCallback(() => {
     setTransitioning(false)
-  }, [])
+    if (!currentMomentId) return
+
+    void incrementMomentView(currentMomentId).then(() => {
+      if (userId && currentOwnerId === userId) {
+        void onReachStatsChange?.()
+      }
+    })
+  }, [currentMomentId, currentOwnerId, onReachStatsChange, userId])
 
   const handleLoadedMetadata = useCallback(() => {}, [])
 
