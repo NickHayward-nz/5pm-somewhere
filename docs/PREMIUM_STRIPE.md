@@ -44,7 +44,7 @@ supabase secrets set SITE_URL=https://your-production-domain.example
 
 # Deploy (npm scripts wrap these):
 npm run deploy:checkout-fn          # create-checkout-session
-npm run deploy:billing-portal-fn    # create-billing-portal-session
+npm run deploy:billing-portal-fn    # create-billing-portal-session (deployed with --no-verify-jwt)
 npm run deploy:stripe-webhook       # stripe-webhook (deployed with --no-verify-jwt)
 ```
 
