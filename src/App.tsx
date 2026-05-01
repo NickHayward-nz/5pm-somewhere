@@ -64,13 +64,6 @@ function showToast(message: string) {
   setTimeout(() => toast.remove(), 4000)
 }
 
-function formatReachViews(totalViews: number): string {
-  const formatted = new Intl.NumberFormat().format(totalViews)
-  return totalViews === 1
-    ? `${formatted} person has seen your moments`
-    : `${formatted} people have seen your moments`
-}
-
 function App() {
   const now = useNow(250)
   const [userId, setUserId] = useState<string | null>(null)
@@ -297,14 +290,6 @@ function App() {
               Your local time
             </div>
             <div className="font-mono text-xs sm:text-base text-sunset-50/90">{formatClock(DateTime.local())}</div>
-            {userId && (
-              <div className="mt-1 leading-tight text-sunset-100/75">
-                <div className="text-[10px] sm:text-xs">{formatReachViews(reachStats.totalViews)}</div>
-                <div className="text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200 sm:text-xs">
-                  {reachStats.globalRank ? `5PM Reach #${reachStats.globalRank}` : '5PM Reach unranked'}
-                </div>
-              </div>
-            )}
             <div className="mt-1 sm:mt-2 flex justify-end items-center gap-2">
               {userId && currentStreak > 0 && (
                 <button
@@ -462,6 +447,7 @@ function App() {
         open={liveStreamOpen}
         onClose={() => setLiveStreamOpen(false)}
         userId={userId}
+        reachStats={reachStats}
         onReachStatsChange={refetchReachStats}
       />
       {userId && (

@@ -22,6 +22,13 @@ function toNumber(value: number | string | null | undefined): number {
   return 0
 }
 
+export function formatReachViews(totalViews: number): string {
+  const formatted = new Intl.NumberFormat().format(totalViews)
+  return totalViews === 1
+    ? `${formatted} person has seen your moments`
+    : `${formatted} people have seen your moments`
+}
+
 export async function incrementMomentView(momentId: string): Promise<void> {
   const sb = getSupabase()
   if (!sb) return

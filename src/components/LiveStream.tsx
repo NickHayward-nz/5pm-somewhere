@@ -1,7 +1,7 @@
 // © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
-import { incrementMomentView } from '../lib/reach'
+import { formatReachViews, incrementMomentView, type ReachStats } from '../lib/reach'
 import { CopyrightFooter } from './CopyrightFooter'
 
 export type MomentRow = {
@@ -37,6 +37,7 @@ type Props = {
   open: boolean
   onClose: () => void
   userId?: string | null
+  reachStats?: ReachStats
   onReachStatsChange?: () => void
 }
 
@@ -70,7 +71,7 @@ function hasReacted(momentId: string, field: string): boolean {
   }
 }
 
-export function LiveStream({ open, onClose, userId, onReachStatsChange }: Props) {
+export function LiveStream({ open, onClose, userId, reachStats, onReachStatsChange }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -828,40 +829,52 @@ export function LiveStream({ open, onClose, userId, onReachStatsChange }: Props)
                   </div>
                 )}
               </div>
-              <div className="flex-shrink-0 flex items-center justify-center gap-2 sm:gap-3 py-2 px-2 flex-wrap">
-                <button
-                  type="button"
-                  onClick={() => current && toggleReaction(current.id, 'pretty_count')}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
-                    userReactions.pretty
-                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
-                      : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
-                  }`}
-                >
-                  🌅 {prettyCount || 0}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => current && toggleReaction(current.id, 'funny_count')}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
-                    userReactions.funny
-                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
-                      : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
-                  }`}
-                >
-                  😂 {funnyCount || 0}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => current && toggleReaction(current.id, 'cheers_count')}
-                  className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
-                    userReactions.cheers
-                      ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
-                      : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
-                  }`}
-                >
-                  🍻 {cheersCount || 0}
-                </button>
+              <div className="flex-shrink-0 px-2 py-2">
+                <div className="flex flex-wrap items-center justify-center gap-2 sm:gap-3">
+                  <button
+                    type="button"
+                    onClick={() => current && toggleReaction(current.id, 'pretty_count')}
+                    className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
+                      userReactions.pretty
+                        ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
+                        : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
+                    }`}
+                  >
+                    🌅 {prettyCount || 0}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => current && toggleReaction(current.id, 'funny_count')}
+                    className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
+                      userReactions.funny
+                        ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
+                        : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
+                    }`}
+                  >
+                    😂 {funnyCount || 0}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => current && toggleReaction(current.id, 'cheers_count')}
+                    className={`rounded-full border px-3 py-1.5 text-sm transition-all duration-200 ${
+                      userReactions.cheers
+                        ? 'scale-125 border-sunset-400 bg-amber-500/90 text-midnight-900 shadow-[0_0_12px_rgba(251,191,36,0.6)]'
+                        : 'scale-100 border-sunset-500/40 bg-midnight-700/80 text-sunset-100 hover:bg-midnight-600/90'
+                    }`}
+                  >
+                    🍻 {cheersCount || 0}
+                  </button>
+                </div>
+                {userId && reachStats && (
+                  <div className="mx-auto mt-2 max-w-xs rounded-xl border border-sky-300/25 bg-midnight-900/70 px-3 py-2 text-center shadow-lg backdrop-blur-sm">
+                    <div className="text-[11px] leading-snug text-sunset-100/85 sm:text-xs">
+                      {formatReachViews(reachStats.totalViews)}
+                    </div>
+                    <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200 sm:text-xs">
+                      {reachStats.globalRank ? `5PM Reach #${reachStats.globalRank}` : '5PM Reach unranked'}
+                    </div>
+                  </div>
+                )}
               </div>
             </>
           )}
