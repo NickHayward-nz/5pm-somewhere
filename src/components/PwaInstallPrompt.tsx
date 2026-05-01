@@ -56,11 +56,11 @@ export function PwaInstallPrompt() {
   }
 
   return (
-    <div className="rounded-xl border border-sunset-400/35 bg-sunset-500/10 px-3 py-3 text-sunset-50 shadow-[0_0_22px_rgba(249,115,22,0.16)]">
-      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-amber-200">
+    <div className="rounded-xl border border-sky-300/35 bg-sky-400/10 px-3 py-3 text-sky-50 shadow-[0_0_22px_rgba(125,211,252,0.16)]">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sky-200">
         Install the app
       </div>
-      <p className="mb-3 text-sm leading-relaxed text-sunset-100/90">
+      <p className="mb-3 text-sm leading-relaxed text-sky-50/90">
         Add 5PM Somewhere to your home screen for the full app experience.
       </p>
       {installPrompt ? (
@@ -72,14 +72,14 @@ export function PwaInstallPrompt() {
           Install 5PM Somewhere
         </button>
       ) : isApple ? (
-        <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs leading-relaxed text-sunset-100/85">
-          On iPhone or iPad: tap <span className="font-semibold text-sunset-50">Share</span>, then{' '}
-          <span className="font-semibold text-sunset-50">Add to Home Screen</span>.
+        <p className="rounded-lg border border-sky-200/15 bg-sky-100/5 px-3 py-2 text-xs leading-relaxed text-sky-50/85">
+          On iPhone or iPad: tap <span className="font-semibold text-sky-50">Share</span>, then{' '}
+          <span className="font-semibold text-sky-50">Add to Home Screen</span>.
         </p>
       ) : (
-        <p className="rounded-lg border border-white/10 bg-white/5 px-3 py-2 text-xs leading-relaxed text-sunset-100/85">
-          Use your browser menu and choose <span className="font-semibold text-sunset-50">Install app</span>{' '}
-          or <span className="font-semibold text-sunset-50">Add to home screen</span>.
+        <p className="rounded-lg border border-sky-200/15 bg-sky-100/5 px-3 py-2 text-xs leading-relaxed text-sky-50/85">
+          Use your browser menu and choose <span className="font-semibold text-sky-50">Install app</span>{' '}
+          or <span className="font-semibold text-sky-50">Add to home screen</span>.
         </p>
       )}
     </div>
