@@ -99,14 +99,14 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
 
       {profileOpen && (
         <div
-          className="fixed inset-0 z-[10002] flex items-center justify-center bg-black/70 px-4 py-6 backdrop-blur-sm"
+          className="fixed inset-0 z-[10002] flex items-start justify-center overflow-y-auto bg-black/70 px-4 pb-[calc(env(safe-area-inset-bottom)+1rem)] pt-[calc(env(safe-area-inset-top)+1rem)] backdrop-blur-sm sm:items-center sm:py-6"
           role="dialog"
           aria-modal="true"
           aria-labelledby="profile-menu-title"
           onClick={() => setProfileOpen(false)}
         >
           <div
-            className="relative w-full max-w-md rounded-2xl border border-white/20 bg-midnight-900/95 p-4 shadow-2xl sm:p-5"
+            className="relative max-h-[calc(100dvh-2rem)] w-full max-w-md overflow-y-auto rounded-2xl border border-white/20 bg-midnight-900/95 p-4 shadow-2xl sm:p-5"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-4 flex items-start justify-between gap-3">
