@@ -43,6 +43,34 @@ export async function startPremiumCheckout(): Promise<StartCheckoutResult> {
   return { ok: true, url: data.url }
 }
 
+/**
+ * Create a Stripe Billing Portal session via the edge function and return the
+ * hosted portal URL. Premium users can manage payment details and cancellation
+ * from Stripe's hosted UI.
+ */
+export async function startBillingPortal(): Promise<StartCheckoutResult> {
+  const sb = getSupabase()
+  if (!sb) return { ok: false, error: 'Supabase client is not configured.' }
+
+  const { data: sessionData } = await sb.auth.getSession()
+  if (!sessionData.session) {
+    return { ok: false, error: 'You need to sign in before managing your subscription.' }
+  }
+
+  const { data, error } = await sb.functions.invoke<{ url?: string; error?: string }>(
+    'create-billing-portal-session',
+    { body: {} },
+  )
+
+  if (error) {
+    return { ok: false, error: error.message ?? 'Billing portal failed to open.' }
+  }
+  if (!data?.url) {
+    return { ok: false, error: data?.error ?? 'Billing portal did not return a URL.' }
+  }
+  return { ok: true, url: data.url }
+}
+
 export type CheckoutReturnStatus = 'success' | 'cancelled' | null
 
 /**

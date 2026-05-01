@@ -11,6 +11,7 @@
     "montage-worker": "node workers/montage-worker.mjs",
     "deploy:montage-cron": "supabase functions deploy montage-cron",
     "deploy:checkout-fn": "supabase functions deploy create-checkout-session",
+    "deploy:billing-portal-fn": "supabase functions deploy create-billing-portal-session",
     "deploy:stripe-webhook": "supabase functions deploy stripe-webhook --no-verify-jwt",
     "cap:sync": "npm run build && cap sync",
     "cap:add:ios": "cap add ios",

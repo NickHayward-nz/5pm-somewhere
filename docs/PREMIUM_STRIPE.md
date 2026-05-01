@@ -5,6 +5,8 @@ Functions, which own the Stripe secret key:
 
 - `supabase/functions/create-checkout-session` → creates a Checkout session and
   returns the hosted URL the client redirects to.
+- `supabase/functions/create-billing-portal-session` → creates a Stripe Billing
+  Portal session so premium users can manage/cancel their subscription.
 - `supabase/functions/stripe-webhook` → receives Stripe webhook events and
   mirrors subscription state onto `profiles.is_premium` /
   `profiles.premium_expires_at`.
@@ -42,6 +44,7 @@ supabase secrets set SITE_URL=https://your-production-domain.example
 
 # Deploy (npm scripts wrap these):
 npm run deploy:checkout-fn          # create-checkout-session
+npm run deploy:billing-portal-fn    # create-billing-portal-session
 npm run deploy:stripe-webhook       # stripe-webhook (deployed with --no-verify-jwt)
 ```
 
@@ -74,6 +77,12 @@ npm run deploy:stripe-webhook       # stripe-webhook (deployed with --no-verify-
    function, which sets `is_premium = true` + `premium_expires_at`.
 5. `useProfile` refetches on next mount; `App.tsx` surfaces a "Welcome to
    Premium" toast via `consumeCheckoutReturnStatus()`.
+6. Once premium, the Profile menu shows **Manage subscription**, which calls
+   `startBillingPortal()` and redirects to Stripe's hosted Billing Portal.
+
+Before using the Billing Portal, configure it in Stripe Dashboard →
+**Settings → Billing → Customer portal** so cancellation/payment method options
+match your policy.
 
 ## 6. Local testing (recommended)
 
@@ -92,7 +101,7 @@ the function locally (`supabase functions serve stripe-webhook --env-file .env`)
 - Switch the dashboard from **Test mode** to **Live mode** and copy
   `sk_live_...` + the live-mode price id + the live-mode webhook secret.
 - Update the three `supabase secrets set ...` calls accordingly.
-- Re-deploy both functions.
+- Re-deploy all Stripe functions.
 - Deploy a new client build so `SITE_URL` redirects to the correct domain.
 
 ## 8. Apple / Google in-app purchase policy

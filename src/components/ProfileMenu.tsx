@@ -4,7 +4,7 @@ import { getSupabase } from '../lib/supabase'
 import { CopyrightFooter } from './CopyrightFooter'
 import { SignInModal } from './SignInModal'
 import { PrivacyPolicyText, TermsOfServiceText } from './PolicyLegalContent'
-import { startPremiumCheckout } from '../lib/premium'
+import { startBillingPortal, startPremiumCheckout } from '../lib/premium'
 
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
 
@@ -23,6 +23,7 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
   const [montageOpen, setMontageOpen] = useState<null | 'weekly' | 'monthly'>(null)
   const [premiumPitch, setPremiumPitch] = useState<null | 'weekly' | 'monthly'>(null)
   const [checkoutStarting, setCheckoutStarting] = useState(false)
+  const [billingPortalStarting, setBillingPortalStarting] = useState(false)
 
   const displayName = userEmail?.trim() || ''
 
@@ -32,6 +33,20 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
     setCheckoutStarting(true)
     const result = await startPremiumCheckout()
     setCheckoutStarting(false)
+
+    if (!result.ok) {
+      window.alert(result.error)
+      return
+    }
+    window.location.href = result.url
+  }
+
+  const manageSubscription = async () => {
+    if (billingPortalStarting) return
+
+    setBillingPortalStarting(true)
+    const result = await startBillingPortal()
+    setBillingPortalStarting(false)
 
     if (!result.ok) {
       window.alert(result.error)
@@ -183,8 +198,18 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
                   {checkoutStarting ? 'Opening checkout…' : 'Upgrade to Premium'}
                 </button>
               ) : (
-                <div className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-2 text-center text-xs font-semibold uppercase tracking-[0.14em] text-amber-200">
-                  Premium active
+                <div className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-3 text-center">
+                  <div className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-amber-200">
+                    Premium active
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => void manageSubscription()}
+                    disabled={billingPortalStarting}
+                    className="btn-glow-muted min-h-[44px] w-full text-sm touch-manipulation disabled:cursor-wait disabled:opacity-70"
+                  >
+                    {billingPortalStarting ? 'Opening billing…' : 'Manage subscription'}
+                  </button>
                 </div>
               )}
 
