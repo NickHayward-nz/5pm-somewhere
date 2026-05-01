@@ -104,18 +104,12 @@ the function locally (`supabase functions serve stripe-webhook --env-file .env`)
 - Re-deploy all Stripe functions.
 - Deploy a new client build so `SITE_URL` redirects to the correct domain.
 
-## 8. Apple / Google in-app purchase policy
+## 8. PWA-only distribution
 
-If you distribute the native iOS / Android app through the stores **and**
-premium unlocks digital content within the app, you are required to use
-StoreKit (iOS) / Google Play Billing (Android) — Stripe is not allowed for
-in-app subscriptions on mobile. Plan options:
+The app is distributed as an installable Progressive Web App, not through the
+Apple App Store or Google Play Store. Users subscribe on the web with Stripe,
+then can install the PWA to their home screen from the browser.
 
-- **Easiest**: keep premium purchases **web-only** (outside the native app)
-  and render a "Manage subscription on the web" CTA in the native builds.
-- **Full native**: swap the Capacitor `goPremium` flow for a native
-  StoreKit/Billing plugin (e.g. `cordova-plugin-purchase`). The webhook will
-  move from Stripe to App Store Server Notifications / Google Play RTDN —
-  same concept, different inbound events.
-
-Both options need separate work before submitting to the stores.
+Because there is no native app-store distribution, Stripe remains the billing
+system for Premium. Keep the PWA install prompt visible in the Profile menu so
+users understand they can add 5PM Somewhere to their home screen.

@@ -12,6 +12,8 @@ export default defineConfig({
         name: '5PM Somewhere',
         short_name: '5PM',
         description: "It's 5PM Somewhere",
+        start_url: '/',
+        scope: '/',
         theme_color: '#f97316',
         background_color: '#1a0f00',
         display: 'standalone',

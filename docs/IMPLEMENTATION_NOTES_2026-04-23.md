@@ -34,10 +34,9 @@ moment 📤**. On tap:
 - Premium users skip the re-encode because the border is already baked
   into the recording (see §3).
 - `shareVideoNatively` picks the best share surface:
-  1. Capacitor native build → `@capacitor/share` (real iOS/Android share sheet).
-  2. Web Share API with files → `navigator.share({ files })`.
-  3. Web Share API without files → share caption + link, download file.
-  4. No share API → download file, copy caption to clipboard.
+  1. Web Share API with files → `navigator.share({ files })`.
+  2. Web Share API without files → share caption + link, download file.
+  3. No share API → download file, copy caption to clipboard.
 - The caption always contains `Captured at 5PM Somewhere → <origin URL>`.
 
 ## 3. Premium benefits (audit)
@@ -52,24 +51,15 @@ moment 📤**. On tap:
 | Weekly + Monthly montages | Already implemented | `ProfileMenu.tsx` + `workers/montage-worker.mjs` |
 | Thin sunset-gradient border on video | Implemented | `RecordMoment.tsx` `drawFrame()` calls `drawSunsetBorder` when `isPremium` |
 
-## 4. Native iOS / Android app (Capacitor)
+## 4. PWA distribution
 
-Scaffold in place. Already done:
+The app now ships as an installable Progressive Web App rather than native
+store binaries. `vite-plugin-pwa` generates the manifest/service worker, and
+the Profile menu includes a clear install prompt:
 
-- `capacitor.config.ts` (root).
-- Capacitor dependencies installed.
-- `cap:*` npm scripts wired up.
-- `shareVideoNatively` now uses the Capacitor Share plugin when running
-  inside a native build.
-
-**Still to do (requires macOS/Android Studio/paid accounts):**
-
-- Run `npm run cap:add:android` → commits the generated `android/` folder.
-- Run `npm run cap:add:ios` **on a Mac** → commits `ios/`.
-- Code-signing certificates (Apple Developer, Google Play).
-- Store listings + screenshots + privacy forms.
-
-See `docs/CAPACITOR_NATIVE_APPS.md` for the full runbook.
+- Chrome / Edge / Android: uses the browser install prompt when available.
+- iPhone / iPad: shows "Share → Add to Home Screen" instructions.
+- Installed standalone sessions hide the install prompt.
 
 ## 5. Premium payment (Stripe)
 
@@ -110,8 +100,7 @@ End-to-end flow built:
 
 4. Register the webhook endpoint in the Stripe dashboard.
 
-See `docs/PREMIUM_STRIPE.md` for the full runbook and caveats (notably the
-App Store/Play Store policy on in-app subscriptions).
+See `docs/PREMIUM_STRIPE.md` for the full runbook.
 
 ## Files changed
 
@@ -121,10 +110,9 @@ App Store/Play Store policy on in-app subscriptions).
 - `src/components/RecordMoment.tsx` — share button, premium border, new priority.
 - `src/components/ProfileMenu.tsx` — real Go Premium action.
 - `src/App.tsx` — Upgrade button, checkout return toast.
-- `capacitor.config.ts` — **new**.
-- `package.json` — Capacitor deps + cap:/deploy: scripts.
+- `package.json` — deploy scripts.
 - `.env.example` — Stripe env vars.
 - `supabase/migrations/20260423120000_moment_priority_and_premium_fields.sql` — **new**.
 - `supabase/functions/create-checkout-session/index.ts` — **new**.
 - `supabase/functions/stripe-webhook/index.ts` — **new**.
-- `docs/PREMIUM_STRIPE.md`, `docs/CAPACITOR_NATIVE_APPS.md` — **new**.
+- `docs/PREMIUM_STRIPE.md` — **new**.

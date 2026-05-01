@@ -8,15 +8,14 @@
 // have the border baked into the recording, so we skip the re-encode and
 // share the raw blob directly.
 //
-// Falls back to downloading the video + opening the native share sheet
-// with a text-only payload on browsers that can't share files (e.g. most
-// desktop browsers, iOS Safari pre-15, some Android WebViews).
+// Falls back to downloading the video + opening a text-only Web Share payload
+// on browsers that can't share files (e.g. most desktop browsers, older iOS
+// Safari versions, some Android WebViews).
 
 /**
  * Host-relative share caption appended to every native share.
  * Uses the current origin so the link follows whichever domain the app is
- * running on (localhost in dev, production domain in production, and the
- * in-app browser on iOS/Android native once wrapped with Capacitor).
+ * running on (localhost in dev, preview domains, or production).
  */
 function buildAppLink(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {
@@ -26,9 +25,8 @@ function buildAppLink(): string {
 }
 
 /**
- * Text appended to every share. The native share sheet (WhatsApp,
- * Messages, Instagram Stories, TikTok, etc.) will typically present this
- * as the caption / message body for the user to edit before posting.
+ * Text appended to every share. Supported browsers will typically present
+ * this as the caption / message body for the user to edit before posting.
  */
 export const SHARE_CAPTION = `Captured at 5PM Somewhere → ${buildAppLink()}`
 
@@ -235,34 +233,13 @@ type NativeShareInput = {
 }
 
 /**
- * Lazy-import the Capacitor Share plugin. Returns null outside of native
- * builds so the bundler can tree-shake on web. On iOS / Android this
- * surfaces the platform share sheet (UIActivityViewController /
- * Android Intent chooser) which includes Instagram, TikTok, WhatsApp,
- * Messages, etc.
- */
-async function getCapacitorShare(): Promise<null | typeof import('@capacitor/share').Share> {
-  try {
-    const { Capacitor } = await import('@capacitor/core')
-    if (!Capacitor?.isNativePlatform?.()) return null
-    const mod = await import('@capacitor/share')
-    return mod.Share
-  } catch {
-    return null
-  }
-}
-
-/**
  * Share a prepared video file via the best available share surface.
  *
- * 1. Inside a Capacitor iOS/Android build → use the native Share plugin
- *    with a data URL for the file, which hands the video off to the OS
- *    share sheet (Instagram / TikTok / WhatsApp / Messages / …).
- * 2. On the web, if `navigator.canShare({ files })` is supported → share
+ * 1. If `navigator.canShare({ files })` is supported → share
  *    the file + caption + URL.
- * 3. Otherwise, if basic text share is supported, share the caption + URL
+ * 2. Otherwise, if basic text share is supported, share the caption + URL
  *    only.
- * 4. Otherwise, download the file so the user can post it manually and
+ * 3. Otherwise, download the file so the user can post it manually and
  *    copy the caption to the clipboard.
  */
 export async function shareVideoNatively(
@@ -270,26 +247,6 @@ export async function shareVideoNatively(
   { title, caption }: NativeShareInput,
 ): Promise<ShareResult> {
   const url = buildAppLink()
-
-  const capShare = await getCapacitorShare()
-  if (capShare) {
-    try {
-      const dataUrl = await readAsDataUrl(file)
-      await capShare.share({
-        title,
-        text: caption,
-        url: dataUrl,
-        dialogTitle: 'Share your 5PM moment',
-      })
-      return 'shared'
-    } catch (err: any) {
-      if (err?.message?.toLowerCase().includes('cancel')) return 'cancelled'
-      // eslint-disable-next-line no-console
-      console.error('Capacitor share failed:', err)
-      // Fall through to web-based fallbacks.
-    }
-  }
-
   const navAny = navigator as any
 
   try {
@@ -331,15 +288,6 @@ export async function shareVideoNatively(
     await downloadFile(file)
     return 'downloaded'
   }
-}
-
-function readAsDataUrl(file: File): Promise<string> {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onerror = () => reject(reader.error)
-    reader.onload = () => resolve(typeof reader.result === 'string' ? reader.result : '')
-    reader.readAsDataURL(file)
-  })
 }
 
 async function downloadFile(file: File): Promise<void> {

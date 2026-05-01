@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/supabase'
 import { CopyrightFooter } from './CopyrightFooter'
 import { SignInModal } from './SignInModal'
 import { PrivacyPolicyText, TermsOfServiceText } from './PolicyLegalContent'
+import { PwaInstallPrompt } from './PwaInstallPrompt'
 import { startBillingPortal, startPremiumCheckout } from '../lib/premium'
 
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
@@ -126,6 +127,8 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
             </div>
 
             <div className="flex flex-col gap-2">
+              <PwaInstallPrompt />
+
               {/* 1 — Sign in / Sign out */}
               {userId && userEmail ? (
                 <div className="rounded-xl border border-white/10 bg-white/5 px-3 py-3">
