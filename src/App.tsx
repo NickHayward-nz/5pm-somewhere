@@ -137,7 +137,7 @@ function App() {
   }, [])
 
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
-  const { stats: reachStats, refetch: refetchReachStats } = useReachStats(userId)
+  const { stats: reachStats } = useReachStats(userId)
   const userTz = profile?.timezone ?? getUserTimezone()
   const isPremium = userId ? profile?.is_premium === true : premiumQuery
 
@@ -448,14 +448,12 @@ function App() {
         onClose={() => setLiveStreamOpen(false)}
         userId={userId}
         reachStats={reachStats}
-        onReachStatsChange={refetchReachStats}
       />
       {userId && (
         <MyMoments
           open={myMomentsOpen}
           onClose={() => setMyMomentsOpen(false)}
           userId={userId}
-          onReachStatsChange={refetchReachStats}
         />
       )}
       {dailyLimitModalOpen && (

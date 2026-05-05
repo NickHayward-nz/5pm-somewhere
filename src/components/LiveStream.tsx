@@ -38,7 +38,6 @@ type Props = {
   onClose: () => void
   userId?: string | null
   reachStats?: ReachStats
-  onReachStatsChange?: () => void
 }
 
 const POSTER_PLACEHOLDER =
@@ -71,7 +70,7 @@ function hasReacted(momentId: string, field: string): boolean {
   }
 }
 
-export function LiveStream({ open, onClose, userId, reachStats, onReachStatsChange }: Props) {
+export function LiveStream({ open, onClose, userId, reachStats }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -648,14 +647,10 @@ export function LiveStream({ open, onClose, userId, reachStats, onReachStatsChan
 
   const handlePlay = useCallback(() => {
     setTransitioning(false)
-    if (!currentMomentId) return
+    if (!currentMomentId || (userId && currentOwnerId === userId)) return
 
-    void incrementMomentView(currentMomentId).then(() => {
-      if (userId && currentOwnerId === userId) {
-        void onReachStatsChange?.()
-      }
-    })
-  }, [currentMomentId, currentOwnerId, onReachStatsChange, userId])
+    void incrementMomentView(currentMomentId)
+  }, [currentMomentId, currentOwnerId, userId])
 
   const handleLoadedMetadata = useCallback(() => {}, [])
 
@@ -685,6 +680,18 @@ export function LiveStream({ open, onClose, userId, reachStats, onReachStatsChan
   const handleWaiting = useCallback(() => {}, [])
 
   if (!open) return null
+
+  const reachStatsCard =
+    userId && reachStats ? (
+      <div className="mx-auto mt-2 max-w-xs rounded-xl border border-sky-300/25 bg-midnight-900/70 px-3 py-2 text-center shadow-lg backdrop-blur-sm">
+        <div className="text-[11px] leading-snug text-sunset-100/85 sm:text-xs">
+          {formatReachViews(reachStats.totalViews)}
+        </div>
+        <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200 sm:text-xs">
+          {reachStats.globalRank ? `5PM Reach #${reachStats.globalRank}` : '5PM Reach unranked'}
+        </div>
+      </div>
+    ) : null
 
   return (
     <div
@@ -731,11 +738,13 @@ export function LiveStream({ open, onClose, userId, reachStats, onReachStatsChan
             <div className="flex h-full flex-col items-center justify-center gap-4">
               <div className="h-12 w-12 animate-spin rounded-full border-2 border-sunset-400 border-t-transparent" />
               <span className="text-sm text-sunset-200/80">Loading recent 5PM moments…</span>
+              {reachStatsCard}
             </div>
           )}
           {error && queue.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
               <p className="text-sunset-200/90">{error}</p>
+              {reachStatsCard}
               <button
                 type="button"
                 onClick={onClose}
@@ -865,16 +874,7 @@ export function LiveStream({ open, onClose, userId, reachStats, onReachStatsChan
                     🍻 {cheersCount || 0}
                   </button>
                 </div>
-                {userId && reachStats && (
-                  <div className="mx-auto mt-2 max-w-xs rounded-xl border border-sky-300/25 bg-midnight-900/70 px-3 py-2 text-center shadow-lg backdrop-blur-sm">
-                    <div className="text-[11px] leading-snug text-sunset-100/85 sm:text-xs">
-                      {formatReachViews(reachStats.totalViews)}
-                    </div>
-                    <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200 sm:text-xs">
-                      {reachStats.globalRank ? `5PM Reach #${reachStats.globalRank}` : '5PM Reach unranked'}
-                    </div>
-                  </div>
-                )}
+                {reachStatsCard}
               </div>
             </>
           )}

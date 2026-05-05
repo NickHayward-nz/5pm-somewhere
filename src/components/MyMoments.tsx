@@ -2,7 +2,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getSupabase } from '../lib/supabase'
-import { incrementMomentView } from '../lib/reach'
 import { CopyrightFooter } from './CopyrightFooter'
 
 type MomentRow = {
@@ -19,7 +18,6 @@ type Props = {
   open: boolean
   onClose: () => void
   userId: string
-  onReachStatsChange?: () => void
 }
 
 type ShareNavigator = Navigator & {
@@ -196,12 +194,10 @@ async function generateFirstFrameThumbnail(args: {
 function VideoPlayModal(props: {
   open: boolean
   onClose: () => void
-  momentId: string | null
   url: string
   caption: string | null
-  onReachStatsChange?: () => void
 }) {
-  const { open, onClose, momentId, url, caption, onReachStatsChange } = props
+  const { open, onClose, url, caption } = props
   if (!open) return null
   return (
     <div
@@ -229,12 +225,6 @@ function VideoPlayModal(props: {
           playsInline
           autoPlay
           className="w-full aspect-video bg-black"
-          onPlay={() => {
-            if (!momentId) return
-            void incrementMomentView(momentId).then(() => {
-              void onReachStatsChange?.()
-            })
-          }}
         />
         {caption && <div className="px-4 py-3 text-sm text-white/80">{caption}</div>}
         <CopyrightFooter variant="card" />
@@ -243,7 +233,7 @@ function VideoPlayModal(props: {
   )
 }
 
-export default function MyMoments({ open, onClose, userId, onReachStatsChange }: Props) {
+export default function MyMoments({ open, onClose, userId }: Props) {
   const sb = useMemo(() => getSupabase(), [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -252,12 +242,10 @@ export default function MyMoments({ open, onClose, userId, onReachStatsChange }:
 
   const [playModal, setPlayModal] = useState<{
     open: boolean
-    momentId: string | null
     url: string
     caption: string | null
   }>({
     open: false,
-    momentId: null,
     url: '',
     caption: null,
   })
@@ -411,7 +399,7 @@ export default function MyMoments({ open, onClose, userId, onReachStatsChange }:
                       <button
                         type="button"
                         onClick={() =>
-                          setPlayModal({ open: true, momentId: m.id, url: m.video_url, caption: m.caption })
+                          setPlayModal({ open: true, url: m.video_url, caption: m.caption })
                         }
                         className="absolute inset-0 flex items-center justify-center"
                         aria-label="Play video"
@@ -453,11 +441,9 @@ export default function MyMoments({ open, onClose, userId, onReachStatsChange }:
 
       <VideoPlayModal
         open={playModal.open}
-        momentId={playModal.momentId}
         url={playModal.url}
         caption={playModal.caption}
-        onClose={() => setPlayModal({ open: false, momentId: null, url: '', caption: null })}
-        onReachStatsChange={onReachStatsChange}
+        onClose={() => setPlayModal({ open: false, url: '', caption: null })}
       />
     </div>
   )
