@@ -1,5 +1,6 @@
 // © 2026 Chromatic Productions Ltd. All rights reserved.
-import { useState } from 'react'
+import type Hls from 'hls.js'
+import { useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 import { CopyrightFooter } from './CopyrightFooter'
 import { SignInModal } from './SignInModal'
@@ -9,11 +10,79 @@ import { startBillingPortal, startPremiumCheckout } from '../lib/premium'
 
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
 
+type MontageKind = 'weekly' | 'monthly'
+
+type MontageRow = {
+  id: string
+  kind: MontageKind
+  title: string | null
+  playback_url: string | null
+  period_start: string
+  period_end: string
+  status: 'pending' | 'processing' | 'ready' | 'failed'
+  error_message: string | null
+  created_at: string
+}
+
+type MontageState =
+  | { status: 'idle' | 'loading' }
+  | { status: 'empty' }
+  | { status: 'error'; message: string }
+  | { status: 'loaded'; montage: MontageRow }
+
 type Props = {
   userEmail: string | null
   userId: string | null
   isPremium: boolean
   onOpenMyMoments: () => void
+}
+
+function formatPeriod(start: string, end: string): string {
+  const fmt = new Intl.DateTimeFormat(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+  const inclusiveEnd = new Date(new Date(end).getTime() - 1)
+  return `${fmt.format(new Date(start))} – ${fmt.format(inclusiveEnd)}`
+}
+
+function MontageVideo({ src }: { src: string }) {
+  const videoRef = useRef<HTMLVideoElement | null>(null)
+
+  useEffect(() => {
+    const video = videoRef.current
+    if (!video) return
+
+    if (video.canPlayType('application/vnd.apple.mpegurl')) {
+      video.src = src
+      return
+    }
+
+    let cancelled = false
+    let hls: Hls | null = null
+
+    void import('hls.js').then(({ default: Hls }) => {
+      if (cancelled) return
+      if (!Hls.isSupported()) {
+        video.src = src
+        return
+      }
+      hls = new Hls()
+      hls.loadSource(src)
+      hls.attachMedia(video)
+    })
+
+    return () => {
+      cancelled = true
+      hls?.destroy()
+    }
+  }, [src])
+
+  return (
+    <video
+      ref={videoRef}
+      controls
+      playsInline
+      className="mt-3 aspect-video w-full rounded-xl bg-black"
+    />
+  )
 }
 
 export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: Props) {
@@ -25,8 +94,53 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
   const [premiumPitch, setPremiumPitch] = useState<null | 'weekly' | 'monthly'>(null)
   const [checkoutStarting, setCheckoutStarting] = useState(false)
   const [billingPortalStarting, setBillingPortalStarting] = useState(false)
+  const [montageState, setMontageState] = useState<MontageState>({ status: 'idle' })
 
   const displayName = userEmail?.trim() || ''
+
+  useEffect(() => {
+    if (!montageOpen) {
+      setMontageState({ status: 'idle' })
+      return
+    }
+    if (!userId) {
+      setMontageState({ status: 'error', message: 'Sign in to view your montage.' })
+      return
+    }
+    if (!sb) {
+      setMontageState({ status: 'error', message: 'Supabase is not configured.' })
+      return
+    }
+
+    let cancelled = false
+    setMontageState({ status: 'loading' })
+
+    ;(async () => {
+      const { data, error } = await sb
+        .from('user_montages')
+        .select('id, kind, title, playback_url, period_start, period_end, status, error_message, created_at')
+        .eq('user_id', userId)
+        .eq('kind', montageOpen)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle()
+
+      if (cancelled) return
+      if (error) {
+        setMontageState({ status: 'error', message: error.message || 'Could not load your montage.' })
+        return
+      }
+      if (!data) {
+        setMontageState({ status: 'empty' })
+        return
+      }
+      setMontageState({ status: 'loaded', montage: data as MontageRow })
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [montageOpen, sb, userId])
 
   const goPremium = async () => {
     if (checkoutStarting) return
@@ -337,7 +451,7 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
           onClick={() => setMontageOpen(null)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-sunset-500/40 bg-midnight-900/95 p-4 shadow-xl sm:p-6"
+            className="w-full max-w-2xl rounded-2xl border border-sunset-500/40 bg-midnight-900/95 p-4 shadow-xl sm:p-6"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="mb-3 flex items-center justify-between">
@@ -352,11 +466,50 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
                 Close
               </button>
             </div>
-            <p className="text-sm text-sunset-100/85">
-              {montageOpen === 'weekly'
-                ? 'Your montage of all 5PM moments from Monday–Sunday will appear here once video processing is set up.'
-                : 'Your top 5 moments of the month (by views and interactions) will appear here once the feature is ready.'}
-            </p>
+
+            {montageState.status === 'loading' && (
+              <div className="flex items-center justify-center gap-3 rounded-xl border border-white/10 bg-white/5 px-4 py-10 text-sm text-sunset-100/80">
+                <div className="h-5 w-5 animate-spin rounded-full border-2 border-sunset-400 border-t-transparent" />
+                Loading your montage…
+              </div>
+            )}
+
+            {montageState.status === 'error' && (
+              <div className="rounded-xl border border-red-300/30 bg-red-900/20 px-4 py-3 text-sm text-red-100">
+                {montageState.message}
+              </div>
+            )}
+
+            {montageState.status === 'empty' && (
+              <div className="rounded-xl border border-white/10 bg-white/5 px-4 py-4 text-sm text-sunset-100/85">
+                No {montageOpen === 'weekly' ? 'weekly montage' : 'monthly highlights'} found yet. We need at
+                least 3 eligible moments, then the next montage job will generate this for Premium users.
+              </div>
+            )}
+
+            {montageState.status === 'loaded' && (
+              <div className="rounded-xl border border-white/10 bg-white/5 p-3">
+                <div className="text-sm font-semibold text-sunset-50">
+                  {montageState.montage.title ?? (montageOpen === 'weekly' ? 'Weekly montage' : 'Monthly highlights')}
+                </div>
+                <div className="mt-1 text-[11px] text-sunset-100/60">
+                  {formatPeriod(montageState.montage.period_start, montageState.montage.period_end)}
+                </div>
+
+                {montageState.montage.status === 'ready' && montageState.montage.playback_url ? (
+                  <MontageVideo src={montageState.montage.playback_url} />
+                ) : montageState.montage.status === 'failed' ? (
+                  <div className="mt-3 rounded-xl border border-red-300/30 bg-red-900/20 px-4 py-3 text-sm text-red-100">
+                    Montage generation failed: {montageState.montage.error_message ?? 'Unknown error'}
+                  </div>
+                ) : (
+                  <div className="mt-3 rounded-xl border border-sky-300/25 bg-sky-900/20 px-4 py-3 text-sm text-sky-100">
+                    Your montage is {montageState.montage.status}. Check back shortly after processing completes.
+                  </div>
+                )}
+              </div>
+            )}
+
             <button
               type="button"
               onClick={() => setMontageOpen(null)}

@@ -4,6 +4,7 @@
 
 1. **Supabase Edge Function** `montage-cron` — validates `CRON_SECRET`, forwards `POST` to your **montage worker URL** with `MONTAGE_WORKER_SECRET`.
 2. **Montage worker** (`workers/montage-worker.mjs`) — runs **outside Vercel** (Railway, Fly.io, Render, a VPS, etc.). It uses the service role to read `profiles` / `moments`, trims clips (FFmpeg), mixes music from Storage, uploads MP4 to the `montages` bucket, creates a **Mux** asset from a signed URL, and writes **`user_montages`**.
+3. **Premium Profile UI** reads the signed-in user's latest `user_montages` row and plays the ready Mux HLS URL in-app.
 
 The Vite app deploys to Vercel on **Hobby** without bundling FFmpeg; the worker is a separate Node process with `npm run montage-worker` (or your host’s start command).
 
@@ -58,8 +59,8 @@ Secrets (Dashboard → Edge Functions → `montage-cron`):
 
 ## Schedules (example)
 
-- **Weekly:** Sunday 09:00 UTC — `POST` body `{"type":"weekly"}` (previous 7 days ending “now” when the job runs).
-- **Monthly:** 1st 09:00 UTC — `{"type":"monthly"}` (previous 30 days, top 6 moments by total reactions).
+- **Weekly:** Monday 09:00 UTC — `POST` body `{"type":"weekly"}` (completed Monday-Sunday UTC period).
+- **Monthly:** 1st 09:00 UTC — `{"type":"monthly"}` (previous calendar month, top 5 moments by views + reactions).
 
 Use **pg_cron** + `pg_net` to `POST` the Edge Function URL, or an external cron (GitHub Actions, etc.) with `Authorization: Bearer <CRON_SECRET>`.
 
@@ -85,4 +86,5 @@ curl -X POST "https://<your-worker-host>/" \
 
 - The worker can run for several minutes (FFmpeg + Mux polling); use a host that allows long requests or run batch sizes accordingly.
 - If a montage fails, the row is set to `status = failed` with `error_message`.
+- Premium users can open **Profile -> Watch my Weekly Montage / Monthly Highlights** to see the latest ready, processing, failed, or empty state.
 - Dominant reaction type picks the `music/{pretty|funny|cheers}/` folder; rotation is fair via `montage_music_rotation`.

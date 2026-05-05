@@ -21,6 +21,7 @@ import ffprobeStatic from 'ffprobe-static'
 const ffprobePath = ffprobeStatic.path
 
 const execFileAsync = promisify(execFile)
+const DAY_MS = 24 * 60 * 60 * 1000
 
 function muxBasicAuthHeader() {
   const id = process.env.MUX_TOKEN_ID
@@ -95,6 +96,50 @@ function dominantReactionType(moments) {
   if (p >= f && p >= c) return 'pretty'
   if (f >= c) return 'funny'
   return 'cheers'
+}
+
+function startOfUtcDay(date) {
+  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
+}
+
+function addDays(date, days) {
+  return new Date(date.getTime() + days * DAY_MS)
+}
+
+function completedWeekPeriod(now) {
+  const today = startOfUtcDay(now)
+  const day = today.getUTCDay()
+  const daysSinceMonday = (day + 6) % 7
+  const currentWeekStart = addDays(today, -daysSinceMonday)
+  return {
+    start: addDays(currentWeekStart, -7),
+    end: currentWeekStart,
+  }
+}
+
+function completedMonthPeriod(now) {
+  const currentMonthStart = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), 1))
+  return {
+    start: new Date(Date.UTC(currentMonthStart.getUTCFullYear(), currentMonthStart.getUTCMonth() - 1, 1)),
+    end: currentMonthStart,
+  }
+}
+
+function formatInclusiveDate(date) {
+  return date.toISOString().slice(0, 10)
+}
+
+function formatPeriodTitleRange(start, end) {
+  return `${formatInclusiveDate(start)}-${formatInclusiveDate(new Date(end.getTime() - 1))}`
+}
+
+function montageScore(moment) {
+  return (
+    (Number(moment.view_count) || 0) +
+    (Number(moment.pretty_count) || 0) +
+    (Number(moment.funny_count) || 0) +
+    (Number(moment.cheers_count) || 0)
+  )
 }
 
 async function pickMusicPath(sb, folder) {
@@ -272,9 +317,8 @@ export default async function handler(req, res) {
   }
   const userIds = (premiumRows ?? []).map((r) => r.id).slice(0, maxUsers)
 
-  const periodEnd = now
-  const weeklyStart = new Date(periodEnd.getTime() - 7 * 24 * 60 * 60 * 1000)
-  const monthlyStart = new Date(periodEnd.getTime() - 30 * 24 * 60 * 60 * 1000)
+  const weeklyPeriod = completedWeekPeriod(now)
+  const monthlyPeriod = completedMonthPeriod(now)
 
   for (const userId of userIds) {
     if (runWeekly) {
@@ -282,17 +326,17 @@ export default async function handler(req, res) {
         const r = await processOneUser(sb, {
           kind: 'weekly',
           userId,
-          periodStart: weeklyStart,
-          periodEnd,
+          periodStart: weeklyPeriod.start,
+          periodEnd: weeklyPeriod.end,
           titleFormatter: (s, e) =>
-            `5PM Somewhere • Weekly Montage ${s.toISOString().slice(0, 10)}–${e.toISOString().slice(0, 10)}`,
+            `5PM Somewhere • Weekly Montage ${formatPeriodTitleRange(s, e)}`,
           pickMoments: async () => {
             const { data, error } = await sb
               .from('moments')
               .select('id, video_url, created_at, pretty_count, funny_count, cheers_count, duration')
               .eq('user_id', userId)
-              .gte('created_at', weeklyStart.toISOString())
-              .lt('created_at', periodEnd.toISOString())
+              .gte('created_at', weeklyPeriod.start.toISOString())
+              .lt('created_at', weeklyPeriod.end.toISOString())
               .order('created_at', { ascending: true })
             if (error) throw error
             return data ?? []
@@ -308,25 +352,21 @@ export default async function handler(req, res) {
         const r = await processOneUser(sb, {
           kind: 'monthly',
           userId,
-          periodStart: monthlyStart,
-          periodEnd,
+          periodStart: monthlyPeriod.start,
+          periodEnd: monthlyPeriod.end,
           titleFormatter: (s, _e) =>
             `5PM Somewhere • Monthly Highlights ${s.toISOString().slice(0, 7)}`,
           pickMoments: async () => {
             const { data, error } = await sb
               .from('moments')
-              .select('id, video_url, created_at, pretty_count, funny_count, cheers_count, duration')
+              .select('id, video_url, created_at, pretty_count, funny_count, cheers_count, view_count, duration')
               .eq('user_id', userId)
-              .gte('created_at', monthlyStart.toISOString())
-              .lt('created_at', periodEnd.toISOString())
+              .gte('created_at', monthlyPeriod.start.toISOString())
+              .lt('created_at', monthlyPeriod.end.toISOString())
             if (error) throw error
             const rows = data ?? []
-            rows.sort(
-              (a, b) =>
-                (Number(b.pretty_count) + Number(b.funny_count) + Number(b.cheers_count)) -
-                (Number(a.pretty_count) + Number(a.funny_count) + Number(a.cheers_count)),
-            )
-            return rows.slice(0, 6)
+            rows.sort((a, b) => montageScore(b) - montageScore(a))
+            return rows.slice(0, 5)
           },
         })
         results.monthly.push(r)
