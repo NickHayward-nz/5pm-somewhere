@@ -70,7 +70,6 @@ function App() {
   const [recordOpen, setRecordOpen] = useState(false)
   const [liveStreamOpen, setLiveStreamOpen] = useState(false)
   const [myMomentsOpen, setMyMomentsOpen] = useState(false)
-  const [streakOpen, setStreakOpen] = useState(false)
   const [dailyLimitModalOpen, setDailyLimitModalOpen] = useState(false)
   const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
   const [signInForCaptureOpen, setSignInForCaptureOpen] = useState(false)
@@ -288,16 +287,6 @@ function App() {
             </div>
             <div className="font-mono text-xs sm:text-base text-sunset-50/90">{formatClock(DateTime.local())}</div>
             <div className="mt-1 sm:mt-2 flex justify-end items-center gap-2">
-              {userId && currentStreak > 0 && (
-                <button
-                  type="button"
-                  onClick={() => setStreakOpen(true)}
-                  className="inline-flex items-center gap-1 rounded-full bg-amber-500/90 px-2.5 py-1 text-[10px] font-semibold text-midnight-900 shadow hover:bg-amber-400"
-                  title="View your streak perks"
-                >
-                  🔥 {currentStreak}
-                </button>
-              )}
               <ProfileMenu
                 userEmail={userEmail}
                 userId={userId}
@@ -381,7 +370,7 @@ function App() {
                   className="app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation"
                   onClick={() => setLiveStreamOpen(true)}
                 >
-                  Watch Live 5PM Stream 🌍
+                  Watch Live 5PM Moments 🌍
                 </button>
               </div>
 
@@ -455,6 +444,7 @@ function App() {
         onClose={() => setLiveStreamOpen(false)}
         userId={userId}
         reachStats={reachStats}
+        currentStreak={currentStreak}
       />
       {userId && (
         <MyMoments
@@ -517,47 +507,6 @@ function App() {
                 Upgrade
               </button>
             </div>
-          </div>
-        </div>
-      )}
-      {streakOpen && streakTier && (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4">
-          <div className="w-full max-w-sm rounded-2xl bg-midnight-900/95 p-4 shadow-xl border border-sunset-500/40">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-xs font-semibold tracking-[0.14em] uppercase text-sunset-100/80">
-                Streak rewards
-              </div>
-              <button
-                type="button"
-                onClick={() => setStreakOpen(false)}
-                className="text-[11px] text-sunset-100/70 hover:text-sunset-50"
-              >
-                Close
-              </button>
-            </div>
-            <div className="text-sm text-sunset-100/90 mb-1">
-              🔥 Current streak:{' '}
-              <span className="font-semibold">
-                {currentStreak} day{currentStreak === 1 ? '' : 's'}
-              </span>
-            </div>
-            <div className="text-[11px] text-sunset-100/70 mb-2">
-              Tier:{' '}
-              <span className="font-semibold">
-                {streakTier.name}
-                {streakTier.badge ? ` • ${streakTier.badge}` : ''}
-              </span>
-            </div>
-            <ul className="list-disc pl-4 text-[11px] text-sunset-100/80 space-y-1 mb-3">
-              {streakTier.perks.map((perk) => (
-                <li key={perk}>{perk}</li>
-              ))}
-            </ul>
-            <div className="text-[10px] text-sunset-100/60">
-              Keep posting every day at 5PM local time to climb to the next tier and unlock more
-              boosts.
-            </div>
-            <CopyrightFooter variant="card" />
           </div>
         </div>
       )}

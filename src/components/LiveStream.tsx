@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 import { formatReachViews, incrementMomentView, type ReachStats } from '../lib/reach'
+import { getStreakTier } from '../lib/capture'
 import { CopyrightFooter } from './CopyrightFooter'
 
 export type MomentRow = {
@@ -38,6 +39,7 @@ type Props = {
   onClose: () => void
   userId?: string | null
   reachStats?: ReachStats
+  currentStreak?: number
 }
 
 const POSTER_PLACEHOLDER =
@@ -70,7 +72,7 @@ function hasReacted(momentId: string, field: string): boolean {
   }
 }
 
-export function LiveStream({ open, onClose, userId, reachStats }: Props) {
+export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 0 }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
@@ -89,6 +91,7 @@ export function LiveStream({ open, onClose, userId, reachStats }: Props) {
   const [lastReactionTime, setLastReactionTime] = useState(0)
   const [streamSoundOn, setStreamSoundOn] = useState(false)
   const [playBlocked, setPlayBlocked] = useState(false)
+  const [streakOpen, setStreakOpen] = useState(false)
   const currentVideoIdRef = useRef<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -673,6 +676,7 @@ export function LiveStream({ open, onClose, userId, reachStats }: Props) {
   )
 
   const currentVideoKey = `${current?.id ?? 'video'}-${currentIndex}`
+  const streakTier = getStreakTier(currentStreak)
 
   const handleLoadedData = useCallback(() => {
   }, [])
@@ -690,6 +694,28 @@ export function LiveStream({ open, onClose, userId, reachStats }: Props) {
         <div className="mt-0.5 text-[10px] font-semibold uppercase tracking-[0.16em] text-sky-200 sm:text-xs">
           {reachStats.globalRank ? `5PM Reach #${reachStats.globalRank}` : '5PM Reach unranked'}
         </div>
+      </div>
+    ) : null
+
+  const streakStatsCard =
+    userId && currentStreak > 0 ? (
+      <div className="mx-auto mt-2 max-w-xs text-center">
+        <button
+          type="button"
+          onClick={() => setStreakOpen(true)}
+          className="inline-flex items-center gap-1 rounded-full bg-amber-500/90 px-3 py-1.5 text-xs font-semibold text-midnight-900 shadow hover:bg-amber-400"
+          title="View your streak perks"
+        >
+          🔥 {currentStreak} day{currentStreak === 1 ? '' : 's'}
+        </button>
+      </div>
+    ) : null
+
+  const streamStatsCards =
+    reachStatsCard || streakStatsCard ? (
+      <div className="flex flex-col items-center">
+        {streakStatsCard}
+        {reachStatsCard}
       </div>
     ) : null
 
@@ -738,13 +764,13 @@ export function LiveStream({ open, onClose, userId, reachStats }: Props) {
             <div className="flex h-full flex-col items-center justify-center gap-4">
               <div className="h-12 w-12 animate-spin rounded-full border-2 border-sunset-400 border-t-transparent" />
               <span className="text-sm text-sunset-200/80">Loading recent 5PM moments…</span>
-              {reachStatsCard}
+              {streamStatsCards}
             </div>
           )}
           {error && queue.length === 0 && (
             <div className="flex h-full flex-col items-center justify-center gap-4 px-4 text-center">
               <p className="text-sunset-200/90">{error}</p>
-              {reachStatsCard}
+              {streamStatsCards}
               <button
                 type="button"
                 onClick={onClose}
@@ -874,7 +900,7 @@ export function LiveStream({ open, onClose, userId, reachStats }: Props) {
                     🍻 {cheersCount || 0}
                   </button>
                 </div>
-                {reachStatsCard}
+                {streamStatsCards}
               </div>
             </>
           )}
@@ -933,6 +959,49 @@ export function LiveStream({ open, onClose, userId, reachStats }: Props) {
           Close
         </button>
       </div>
+      {streakOpen && userId && currentStreak > 0 && (
+        <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/70 px-4">
+          <div className="w-full max-w-sm rounded-2xl bg-midnight-900/95 p-4 shadow-xl border border-sunset-500/40">
+            <div className="flex items-center justify-between mb-2">
+              <div className="text-xs font-semibold tracking-[0.14em] uppercase text-sunset-100/80">
+                Streak rewards
+              </div>
+              <button
+                type="button"
+                onClick={() => setStreakOpen(false)}
+                className="text-[11px] text-sunset-100/70 hover:text-sunset-50"
+              >
+                Close
+              </button>
+            </div>
+            <div className="text-sm text-sunset-100/90 mb-1">
+              🔥 Current streak:{' '}
+              <span className="font-semibold">
+                {currentStreak} day{currentStreak === 1 ? '' : 's'}
+              </span>
+            </div>
+            <div className="text-[11px] text-sunset-100/70 mb-2">
+              Tier:{' '}
+              <span className="font-semibold">
+                {streakTier ? streakTier.name : 'Building streak'}
+                {streakTier?.badge ? ` • ${streakTier.badge}` : ''}
+              </span>
+            </div>
+            {streakTier ? (
+              <ul className="list-disc pl-4 text-[11px] text-sunset-100/80 space-y-1 mb-3">
+                {streakTier.perks.map((perk) => (
+                  <li key={perk}>{perk}</li>
+                ))}
+              </ul>
+            ) : null}
+            <div className="text-[10px] text-sunset-100/60">
+              Keep posting every day at 5PM local time to climb to the next tier and unlock more
+              boosts.
+            </div>
+            <CopyrightFooter variant="card" />
+          </div>
+        </div>
+      )}
       <CopyrightFooter variant="overlay" />
     </div>
   )
