@@ -48,7 +48,7 @@ export const STREAK_TIERS: StreakTier[] = [
     perks: [
       'Larger visibility boost',
       'Significant queue priority',
-      'Unlock +2 minutes recording window (5:00–5:07 pm)',
+      'Unlock +2 minutes recording window (5:00 PM–5:07 PM)',
     ],
     visibilityBoost: 'large',
     extraWindowMinutes: 2,

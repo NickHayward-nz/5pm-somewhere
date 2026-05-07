@@ -23,7 +23,7 @@ cleanupOutdatedCaches()
 self.addEventListener('push', (event) => {
   const fallback: Required<Pick<PushPayload, 'title' | 'body' | 'url' | 'icon'>> = {
     title: "It's 5PM Somewhere",
-    body: 'A 5PM moment window is opening now.',
+    body: 'A 5:00 PM moment window is opening now.',
     url: '/',
     icon: '/Logo.png',
   }

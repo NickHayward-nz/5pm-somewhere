@@ -373,7 +373,7 @@ export default function MyMoments({ open, onClose, userId }: Props) {
                 const thumb = thumbs[m.id]
                 const caption = m.caption ?? ''
                 const createdLabel = m.created_at
-                  ? DateTime.fromISO(m.created_at).toFormat('LLL d, HH:mm')
+                  ? DateTime.fromISO(m.created_at).toFormat('LLL d, h:mm a')
                   : ''
                 return (
                   <div

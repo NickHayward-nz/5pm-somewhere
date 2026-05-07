@@ -995,7 +995,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
               </ul>
             ) : null}
             <div className="text-[10px] text-sunset-100/60">
-              Keep posting every day at 5PM local time to climb to the next tier and unlock more
+              Keep posting every day at 5:00 PM local time to climb to the next tier and unlock more
               boosts.
             </div>
             <CopyrightFooter variant="card" />

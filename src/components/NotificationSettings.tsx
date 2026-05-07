@@ -53,7 +53,7 @@ function countryName(countryCode: string): string {
 }
 
 function offsetLabel(offset: number): string {
-  if (offset === 0) return 'At 5PM'
+  if (offset === 0) return 'At 5:00 PM'
   return `${offset} min before`
 }
 
@@ -210,7 +210,7 @@ export function NotificationSettings({ userId, userTz }: Props) {
       {
         user_id: userId,
         city_id: LOCAL_CITY_ID,
-        city_name: 'My local 5PM',
+        city_name: 'My local 5:00 PM',
         country_code: 'LOCAL',
         timezone: userTz,
         reminder_offsets: [10, 0],
@@ -312,10 +312,10 @@ export function NotificationSettings({ userId, userTz }: Props) {
   return (
     <div className="rounded-xl border border-pink-300/30 bg-pink-400/10 px-3 py-3 shadow-[0_0_22px_rgba(244,114,182,0.12)]">
       <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-pink-200">
-        5PM notifications
+        5:00 PM notifications
       </div>
       <p className="mb-3 text-xs leading-relaxed text-pink-50/85">
-        Get reminded before your own 5PM window and before selected cities hit 5PM.
+        Get reminded before your own 5:00 PM window and before selected cities hit 5:00 PM.
       </p>
 
       <button
@@ -422,7 +422,7 @@ export function NotificationSettings({ userId, userTz }: Props) {
         ))}
         {!loading && preferences.length === 0 ? (
           <p className="text-xs text-sunset-100/65">
-            Enable notifications to add your local 5PM reminder, then search for cities to follow.
+            Enable notifications to add your local 5:00 PM reminder, then search for cities to follow.
           </p>
         ) : null}
       </div>

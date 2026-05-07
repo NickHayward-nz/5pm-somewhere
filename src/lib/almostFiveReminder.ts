@@ -10,7 +10,7 @@ export function msUntilNextFivePmLocal(localNow: DateTime): number {
   return fiveToday.plus({ days: 1 }).toMillis() - localNow.toMillis()
 }
 
-export const ALMOST_FIVE_TITLE = "It's almost 5 PM!"
+export const ALMOST_FIVE_TITLE = "It's almost 5:00 PM!"
 export const ALMOST_FIVE_BODY =
   "Your 5-minute window to capture today's moment opens in 10 minutes"
 

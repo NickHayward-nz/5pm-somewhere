@@ -307,7 +307,7 @@ function App() {
                     className="uppercase tracking-[0.34em] text-sunset-100/70"
                     style={{ fontSize: 'clamp(1rem, 4vw, 1.8rem)' }}
                   >
-                    ITS 5PM IN
+                    IT&apos;S 5:00 PM IN
                   </div>
                   <div
                     className="uppercase font-semibold tracking-[0.22em] text-sunset-100 text-balance leading-tight drop-shadow-[0_0_18px_rgba(255,160,80,0.55)] [text-shadow:0_0_28px_rgba(255,120,60,0.45),0_0_48px_rgba(255,90,40,0.2)]"
@@ -319,7 +319,7 @@ function App() {
                     className="flex flex-wrap justify-center items-baseline gap-x-3 sm:gap-x-4 gap-y-1 uppercase tracking-[0.12em] text-sunset-100/75"
                     style={{ fontSize: 'clamp(0.8rem, 2vw, 1.05rem)' }}
                   >
-                    <span className="whitespace-nowrap">{featuredCityTime.toFormat('HH:mm')}</span>
+                    <span className="whitespace-nowrap">{featuredCityTime.toFormat('h:mm a')}</span>
                     <span className="whitespace-nowrap">{featuredCityTime.toFormat('ccc')}</span>
                     <span className="whitespace-nowrap">{featuredCityTime.toFormat('LLL d')}</span>
                     {featuredCountryName ? (
@@ -342,7 +342,7 @@ function App() {
                   onClick={() => {
                     if (!captureWindow.active) {
                       showToast(
-                        "You're outside your personal 5 PM window — come back at 5 PM local time!",
+                        "You're outside your personal 5:00 PM window — come back at 5:00 PM local time!",
                       )
                       return
                     }
@@ -386,7 +386,7 @@ function App() {
                 />
               </div>
               <div className="text-[10px] sm:text-xs text-sunset-500/90 text-center py-1 sm:py-2 flex-shrink-0">
-                Cities at 5PM glow brightest (Range: {Math.round(dayRange.length('hours'))}h)
+                Cities at 5:00 PM glow brightest (Range: {Math.round(dayRange.length('hours'))}h)
               </div>
             </div>
           </section>

@@ -54,8 +54,7 @@ export function clamp01(n: number) {
 }
 
 export function formatClock(dt: DateTime) {
-  // 24h clock, e.g. 17:00:00
-  return dt.toFormat('HH:mm:ss')
+  return dt.toFormat('h:mm:ss a')
 }
 
 export function getLocalCaptureWindow(now = DateTime.local(), windowMinutes: 5 | 8) {

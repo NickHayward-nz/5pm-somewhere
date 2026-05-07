@@ -91,11 +91,11 @@ function notificationPayload(preference: DuePreference, siteUrl: string) {
   const atFive = preference.offsetMinutes === 0
   const city = isLocal ? 'your location' : preference.city_name
   const title = atFive
-    ? `It's 5PM in ${city}`
-    : `${city} hits 5PM in ${preference.offsetMinutes} minutes`
+    ? `It's 5:00 PM in ${city}`
+    : `${city} hits 5:00 PM in ${preference.offsetMinutes} minutes`
   const body = atFive
     ? 'Open 5PM Somewhere to catch the live moments now.'
-    : 'Get ready for the 5PM moments coming through soon.'
+    : 'Get ready for the 5:00 PM moments coming through soon.'
 
   return {
     title,
