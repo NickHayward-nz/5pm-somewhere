@@ -4,7 +4,6 @@ import { DateTime } from 'luxon'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
 import type { City } from '../data/cities'
-import { countryLabelsFromCities } from '../lib/countryLabels'
 import { latLonToVector3 } from '../lib/geo'
 import { getCityTimeInfo, NEAR_FIVE_PM_VISIBLE_MINUTES } from '../lib/time'
 
@@ -13,8 +12,8 @@ const DAY_MAP_URL =
 
 const DOT_UPDATE_INTERVAL_MS = 120000
 const SPHERE_SEGMENTS = 64
-/** Country name labels sit slightly outside city pins */
-const COUNTRY_LABEL_RADIUS = 1.068
+/** City name labels sit slightly outside city pins */
+const CITY_LABEL_RADIUS = 1.075
 /** Camera distance (orbit target = origin): hide labels when zoomed out */
 const LABEL_ZOOM_DIST_FULL = 3.45
 /** Show labels fully when zoomed in at least this much */
@@ -50,8 +49,6 @@ export function Globe({ now, cities }: Props) {
       pos: latLonToVector3(c.lat, c.lon, radius),
     }))
   }, [cities])
-
-  const countryLabels = useMemo(() => countryLabelsFromCities(cities), [cities])
 
   useEffect(() => {
     dotTimeRef.current = now.toMillis()
@@ -179,9 +176,9 @@ export function Globe({ now, cities }: Props) {
       ringSprites.push(s)
     }
 
-    function makeCountryLabelSprite(text: string): THREE.Sprite {
+    function makeCityLabelSprite(text: string): THREE.Sprite {
       const cw = 512
-      const ch = 120
+      const ch = 112
       const canvas = document.createElement('canvas')
       canvas.width = cw
       canvas.height = ch
@@ -191,7 +188,7 @@ export function Globe({ now, cities }: Props) {
         return new THREE.Sprite(new THREE.SpriteMaterial({ map: empty, transparent: true, opacity: 0 }))
       }
       ctx.clearRect(0, 0, cw, ch)
-      const fontPx = 30
+      const fontPx = 28
       ctx.font = `600 ${fontPx}px Poppins, Inter, system-ui, sans-serif`
       let display = text
       const maxTextW = cw - 56
@@ -200,7 +197,7 @@ export function Globe({ now, cities }: Props) {
       }
       const tw = ctx.measureText(display).width
       const bw = Math.min(cw - 28, tw + 44)
-      const bh = 58
+      const bh = 54
       const bx = (cw - bw) / 2
       const by = (ch - bh) / 2
       const r = 14
@@ -208,7 +205,7 @@ export function Globe({ now, cities }: Props) {
       ctx.beginPath()
       ctx.roundRect(bx, by, bw, bh, r)
       ctx.fill()
-      ctx.strokeStyle = 'rgba(255, 170, 110, 0.55)'
+      ctx.strokeStyle = 'rgba(255, 170, 110, 0.62)'
       ctx.lineWidth = 2
       ctx.stroke()
       ctx.fillStyle = 'rgba(255, 240, 220, 0.98)'
@@ -226,18 +223,18 @@ export function Globe({ now, cities }: Props) {
         depthWrite: false,
       })
       const sprite = new THREE.Sprite(mat)
-      sprite.scale.setScalar(0.2)
+      sprite.scale.setScalar(0.17)
       return sprite
     }
 
-    const countryLabelSprites: THREE.Sprite[] = []
-    for (const cl of countryLabels) {
-      const v = latLonToVector3(cl.lat, cl.lon, COUNTRY_LABEL_RADIUS)
-      const spr = makeCountryLabelSprite(cl.name)
+    const cityLabelSprites: THREE.Sprite[] = []
+    for (const { city } of cityPositions) {
+      const v = latLonToVector3(city.lat, city.lon, CITY_LABEL_RADIUS)
+      const spr = makeCityLabelSprite(city.name)
       spr.position.set(v.x, v.y, v.z)
       spr.visible = false
       group.add(spr)
-      countryLabelSprites.push(spr)
+      cityLabelSprites.push(spr)
     }
 
     const tmpObj = new THREE.Object3D()
@@ -387,8 +384,8 @@ export function Globe({ now, cities }: Props) {
         1,
       )
       const labelOpacity = labelT * 0.94
-      const labelScale = 0.16 + labelT * 0.1
-      for (const spr of countryLabelSprites) {
+      const labelScale = 0.12 + labelT * 0.08
+      for (const spr of cityLabelSprites) {
         spr.visible = labelOpacity > 0.02
         spr.scale.setScalar(labelScale)
         const m = spr.material as THREE.SpriteMaterial
@@ -407,7 +404,7 @@ export function Globe({ now, cities }: Props) {
       rafRef.current = null
       ro.disconnect()
       controls.dispose()
-      for (const spr of countryLabelSprites) {
+      for (const spr of cityLabelSprites) {
         const m = spr.material as THREE.SpriteMaterial
         m.map?.dispose()
         m.dispose()
@@ -418,7 +415,7 @@ export function Globe({ now, cities }: Props) {
       renderer.dispose()
       if (el.contains(canvas)) el.removeChild(canvas)
     }
-  }, [cityPositions, countryLabels])
+  }, [cityPositions])
 
   return (
     <div className="relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden">
