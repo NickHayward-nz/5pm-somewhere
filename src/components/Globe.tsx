@@ -14,6 +14,8 @@ const DOT_UPDATE_INTERVAL_MS = 120000
 const SPHERE_SEGMENTS = 64
 /** City name labels sit slightly outside city pins */
 const CITY_LABEL_RADIUS = 1.075
+/** Tangential offset keeps label cards from sitting directly on top of pins */
+const CITY_LABEL_TANGENT_OFFSET = 0.105
 /** Camera distance (orbit target = origin): hide labels when zoomed out */
 const LABEL_ZOOM_DIST_FULL = 3.45
 /** Show labels fully when zoomed in at least this much */
@@ -229,7 +231,15 @@ export function Globe({ now, cities }: Props) {
 
     const cityLabelSprites: THREE.Sprite[] = []
     for (const { city } of cityPositions) {
-      const v = latLonToVector3(city.lat, city.lon, CITY_LABEL_RADIUS)
+      const labelBase = latLonToVector3(city.lat, city.lon, 1)
+      const normal = new THREE.Vector3(labelBase.x, labelBase.y, labelBase.z).normalize()
+      const v = normal.clone().multiplyScalar(CITY_LABEL_RADIUS)
+      const tangent = new THREE.Vector3(0, 1, 0).addScaledVector(normal, -normal.y)
+      if (tangent.lengthSq() < 0.0001) {
+        tangent.set(1, 0, 0).addScaledVector(normal, -normal.x)
+      }
+      tangent.normalize()
+      v.addScaledVector(tangent, CITY_LABEL_TANGENT_OFFSET)
       const spr = makeCityLabelSprite(city.name)
       spr.position.set(v.x, v.y, v.z)
       spr.visible = false
