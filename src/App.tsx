@@ -23,7 +23,6 @@ import { ProfileMenu } from './components/ProfileMenu'
 import { SignInModal } from './components/SignInModal'
 import { CopyrightFooter } from './components/CopyrightFooter'
 import { FirstUploadConsentModal } from './components/FirstUploadConsentModal'
-import { useAlmostFivePmReminder } from './hooks/useAlmostFivePmReminder'
 import {
   consumeCheckoutReturnStatus,
   startPremiumCheckout,
@@ -243,8 +242,6 @@ function App() {
     [now, userTz, isPremium, currentStreak],
   )
 
-  useAlmostFivePmReminder(userId, userTz)
-
   const captureButtonGold =
     captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit
 
@@ -304,6 +301,7 @@ function App() {
               <ProfileMenu
                 userEmail={userEmail}
                 userId={userId}
+                userTz={userTz}
                 isPremium={isPremium}
                 onOpenMyMoments={() => setMyMomentsOpen(true)}
               />
@@ -439,7 +437,16 @@ function App() {
           city={userCity}
           country={userCountry}
           isPremium={isPremium}
-          profile={profile ? { last_post_date: profile.last_post_date, current_streak: profile.current_streak, longest_streak: profile.longest_streak } : null}
+          profile={
+            profile
+              ? {
+                  last_post_date: profile.last_post_date,
+                  current_streak: profile.current_streak,
+                  longest_streak: profile.longest_streak,
+                  total_uploads: profile.total_uploads,
+                }
+              : null
+          }
           onProfileUpdated={refetchProfile}
         />
       )}

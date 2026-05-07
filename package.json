@@ -10,6 +10,8 @@
     "preview": "vite preview",
     "montage-worker": "node workers/montage-worker.mjs",
     "deploy:montage-cron": "supabase functions deploy montage-cron",
+    "deploy:save-push-subscription": "supabase functions deploy save-push-subscription",
+    "deploy:send-5pm-notifications": "supabase functions deploy send-5pm-notifications --no-verify-jwt",
     "deploy:checkout-fn": "supabase functions deploy create-checkout-session",
     "deploy:billing-portal-fn": "supabase functions deploy create-billing-portal-session --no-verify-jwt",
     "deploy:stripe-webhook": "supabase functions deploy stripe-webhook --no-verify-jwt"

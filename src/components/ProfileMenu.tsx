@@ -6,6 +6,7 @@ import { CopyrightFooter } from './CopyrightFooter'
 import { SignInModal } from './SignInModal'
 import { PrivacyPolicyText, TermsOfServiceText } from './PolicyLegalContent'
 import { PwaInstallPrompt } from './PwaInstallPrompt'
+import { NotificationSettings } from './NotificationSettings'
 import { startBillingPortal, startPremiumCheckout } from '../lib/premium'
 
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
@@ -33,6 +34,7 @@ type MontageState =
 type Props = {
   userEmail: string | null
   userId: string | null
+  userTz: string
   isPremium: boolean
   onOpenMyMoments: () => void
 }
@@ -85,7 +87,7 @@ function MontageVideo({ src }: { src: string }) {
   )
 }
 
-export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: Props) {
+export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMoments }: Props) {
   const sb = getSupabase()
   const [profileOpen, setProfileOpen] = useState(false)
   const [signInOpen, setSignInOpen] = useState(false)
@@ -288,6 +290,8 @@ export function ProfileMenu({ userEmail, userId, isPremium, onOpenMyMoments }: P
                   Privacy Policy
                 </button>
               </div>
+
+              <NotificationSettings userId={userId} userTz={userTz} />
 
               {/* 3 — My Moments */}
               <button

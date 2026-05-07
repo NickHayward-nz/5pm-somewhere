@@ -567,11 +567,11 @@ export function RecordMoment(props: Props) {
       const videoUrl = publicUrlData.publicUrl
 
       const streakDays = profile?.current_streak ?? 0
-      // Live-stream queue priority (spec formula):
-      //   base 100 + streak*25 + premium*80
+      // Live-stream queue priority:
+      //   base 100 + streak*25 + premium*80 + launch boost for uploads 1/2/3
       // Applied to every upload so both premium flat-boost and streak boost
       // are reflected in the feed ordering.
-      const livePriority = computeLiveStreamPriority(streakDays, isPremium)
+      const livePriority = computeLiveStreamPriority(streakDays, isPremium, profile?.total_uploads ?? 0)
       const boostExpiresAt =
         livePriority.boostHours && livePriority.boostHours > 0
           ? now.plus({ hours: livePriority.boostHours }).toISO()
@@ -612,6 +612,7 @@ export function RecordMoment(props: Props) {
           last_post_date: null,
           current_streak: 0,
           longest_streak: 0,
+          total_uploads: 0,
         }
         await updateProfileAfterUpload(userId, userTz, previous)
         onProfileUpdated()

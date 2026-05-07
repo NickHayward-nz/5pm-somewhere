@@ -6,6 +6,12 @@ import type { Profile } from '../types/profile'
 type ProfileRow = {
   id: string
   is_premium?: boolean | null
+  timezone?: string | null
+  current_streak?: number | null
+  longest_streak?: number | null
+  last_post_date?: string | null
+  total_uploads?: number | null
+  upload_terms_accepted_at?: string | null
 }
 
 export function useProfile(userId: string | null) {
@@ -30,7 +36,9 @@ export function useProfile(userId: string | null) {
     try {
       const { data, error: e } = await sb
         .from('profiles')
-        .select('id, is_premium')
+        .select(
+          'id, is_premium, timezone, current_streak, longest_streak, last_post_date, total_uploads, upload_terms_accepted_at',
+        )
         .eq('id', userId)
         .single<ProfileRow>()
       if (e) {
@@ -42,6 +50,7 @@ export function useProfile(userId: string | null) {
             current_streak: 0,
             longest_streak: 0,
             last_post_date: null,
+            total_uploads: 0,
             upload_terms_accepted_at: null,
           }
           await sb.from('profiles').upsert(
@@ -59,11 +68,12 @@ export function useProfile(userId: string | null) {
       setProfile({
         id: data.id,
         is_premium: Boolean(data.is_premium),
-        timezone: 'Pacific/Auckland',
-        current_streak: 0,
-        longest_streak: 0,
-        last_post_date: null,
-        upload_terms_accepted_at: null,
+        timezone: data.timezone ?? 'Pacific/Auckland',
+        current_streak: data.current_streak ?? 0,
+        longest_streak: data.longest_streak ?? 0,
+        last_post_date: data.last_post_date ?? null,
+        total_uploads: data.total_uploads ?? 0,
+        upload_terms_accepted_at: data.upload_terms_accepted_at ?? null,
       })
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load profile'))

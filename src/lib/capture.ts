@@ -114,7 +114,8 @@ export function getStreakTier(currentStreak: number | null | undefined): StreakT
  *   basePriority = 100
  *   streakBonus  = currentStreak * 25     // +25 per consecutive day
  *   premiumBonus = isPremium ? 80 : 0     // flat premium boost
- *   total        = base + streak + premium
+ *   firstUploadBonus = 5000/3000/1500     // uploads 1/2/3 get a big launch boost
+ *   total        = base + streak + premium + firstUploadBonus
  *
  * The returned value is stored on `moments.uploader_streak_priority` at insert time
  * and used as the primary sort key in LiveStream's queue query.
@@ -126,12 +127,15 @@ export function getStreakTier(currentStreak: number | null | undefined): StreakT
 export function computeLiveStreamPriority(
   currentStreak: number | null | undefined,
   isPremium: boolean,
+  totalUploadsBeforeCurrent?: number | null,
 ): { days: number; priority: number; boostHours?: number } {
   const streak = Math.max(0, currentStreak ?? 0)
+  const totalUploads = Math.max(0, totalUploadsBeforeCurrent ?? 0)
   const basePriority = 100
   const streakBonus = streak * 25
   const premiumBonus = isPremium ? 80 : 0
-  const priority = basePriority + streakBonus + premiumBonus
+  const newUploaderBonus = totalUploads === 0 ? 5000 : totalUploads === 1 ? 3000 : totalUploads === 2 ? 1500 : 0
+  const priority = basePriority + streakBonus + premiumBonus + newUploaderBonus
 
   const tier = getStreakTier(streak)
   return {
@@ -196,6 +200,7 @@ export type ProfileStreak = {
   last_post_date: string | null
   current_streak: number
   longest_streak: number
+  total_uploads: number
 }
 
 function getDailyUploadKey(userId: string, userTz: string): string {
@@ -267,6 +272,7 @@ export async function updateProfileAfterUpload(
       last_post_date: next.last_post_date,
       current_streak: next.current_streak,
       longest_streak: next.longest_streak,
+      total_uploads: Math.max(0, previous.total_uploads ?? 0) + 1,
     })
     .eq('id', userId)
 }
