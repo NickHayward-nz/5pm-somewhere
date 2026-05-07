@@ -137,7 +137,8 @@ function App() {
   const { profile, loading: profileLoading, refetch: refetchProfile } = useProfile(userId)
   const { stats: reachStats } = useReachStats(userId)
   const userTz = profile?.timezone ?? getUserTimezone()
-  const isPremium = userId ? profile?.is_premium === true : premiumQuery
+  const isPremium = userId ? profile?.is_premium === true : false
+  const captureIsPremium = userId ? isPremium : premiumQuery
 
   useEffect(() => {
     if (checkoutReturnStatus !== 'success' || !userId || checkoutRefetchDoneRef.current) return
@@ -237,8 +238,8 @@ function App() {
   }, [bestCandidate, candidates, lockedCityId])
 
   const captureWindow = useMemo(
-    () => computeCaptureWindow(now, userTz, isPremium, currentStreak),
-    [now, userTz, isPremium, currentStreak],
+    () => computeCaptureWindow(now, userTz, captureIsPremium, currentStreak),
+    [now, userTz, captureIsPremium, currentStreak],
   )
 
   const captureButtonGold =
@@ -425,7 +426,7 @@ function App() {
           userTz={userTz}
           city={userCity}
           country={userCountry}
-          isPremium={isPremium}
+          isPremium={captureIsPremium}
           profile={
             profile
               ? {
