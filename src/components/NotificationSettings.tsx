@@ -1,6 +1,6 @@
 // © 2026 Chromatic Productions Ltd. All rights reserved.
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { CITIES, type City } from '../data/cities'
+import { CITIES } from '../data/cities'
 import { getSupabase } from '../lib/supabase'
 import {
   notificationPermission,
@@ -17,6 +17,27 @@ type PreferenceRow = {
   timezone: string
   reminder_offsets: number[]
   active: boolean
+}
+
+type NotificationCity = {
+  id: string
+  name: string
+  countryCode: string
+  tz: string
+  region?: string
+}
+
+type GeocodingCity = {
+  id?: number
+  name?: string
+  country_code?: string
+  country?: string
+  admin1?: string
+  timezone?: string
+}
+
+type GeocodingResponse = {
+  results?: GeocodingCity[]
 }
 
 const OFFSET_OPTIONS = [30, 10, 0]
@@ -36,13 +57,22 @@ function offsetLabel(offset: number): string {
   return `${offset} min before`
 }
 
-function uniqueCities(): City[] {
+function uniqueCities(): NotificationCity[] {
   const seen = new Set<string>()
   return CITIES.filter((city) => {
     if (seen.has(city.id)) return false
     seen.add(city.id)
     return true
-  })
+  }).map((city) => ({
+    id: city.id,
+    name: city.name,
+    countryCode: city.countryCode,
+    tz: city.tz,
+  }))
+}
+
+function cityResultKey(city: NotificationCity): string {
+  return `${city.name.toLowerCase()}|${city.countryCode.toLowerCase()}|${city.tz.toLowerCase()}`
 }
 
 type Props = {
@@ -54,6 +84,9 @@ export function NotificationSettings({ userId, userTz }: Props) {
   const sb = getSupabase()
   const [preferences, setPreferences] = useState<PreferenceRow[]>([])
   const [query, setQuery] = useState('')
+  const [globalCityResults, setGlobalCityResults] = useState<NotificationCity[]>([])
+  const [citySearchLoading, setCitySearchLoading] = useState(false)
+  const [citySearchError, setCitySearchError] = useState<string | null>(null)
   const [newCityOffsets, setNewCityOffsets] = useState<number[]>([10, 0])
   const [loading, setLoading] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -64,7 +97,7 @@ export function NotificationSettings({ userId, userTz }: Props) {
   const vapidReady = vapidPublicKeyConfigured()
   const cities = useMemo(() => uniqueCities(), [])
   const activeCityIds = useMemo(() => new Set(preferences.map((pref) => pref.city_id)), [preferences])
-  const searchResults = useMemo(() => {
+  const localSearchResults = useMemo(() => {
     const needle = query.trim().toLowerCase()
     if (!needle) return []
     return cities
@@ -78,6 +111,18 @@ export function NotificationSettings({ userId, userTz }: Props) {
       })
       .slice(0, 8)
   }, [activeCityIds, cities, query])
+  const searchResults = useMemo(() => {
+    const seen = new Set(localSearchResults.map(cityResultKey))
+    const merged = [...localSearchResults]
+    for (const city of globalCityResults) {
+      if (activeCityIds.has(city.id)) continue
+      const key = cityResultKey(city)
+      if (seen.has(key)) continue
+      seen.add(key)
+      merged.push(city)
+    }
+    return merged.slice(0, 10)
+  }, [activeCityIds, globalCityResults, localSearchResults])
 
   const loadPreferences = useCallback(async () => {
     if (!sb || !userId) {
@@ -102,6 +147,62 @@ export function NotificationSettings({ userId, userTz }: Props) {
   useEffect(() => {
     void loadPreferences()
   }, [loadPreferences])
+
+  useEffect(() => {
+    const needle = query.trim()
+    if (needle.length < 2) {
+      setGlobalCityResults([])
+      setCitySearchError(null)
+      setCitySearchLoading(false)
+      return
+    }
+
+    const controller = new AbortController()
+    setCitySearchLoading(true)
+    setCitySearchError(null)
+    const timer = window.setTimeout(() => {
+      const params = new URLSearchParams({
+        name: needle,
+        count: '10',
+        language: 'en',
+        format: 'json',
+      })
+      fetch(`https://geocoding-api.open-meteo.com/v1/search?${params.toString()}`, {
+        signal: controller.signal,
+      })
+        .then((response) => {
+          if (!response.ok) throw new Error('City search failed.')
+          return response.json() as Promise<GeocodingResponse>
+        })
+        .then((body) => {
+          const results = (body.results ?? [])
+            .filter((city) => city.name && city.country_code && city.timezone)
+            .map((city): NotificationCity => ({
+              id: `global-${city.id ?? `${city.name}-${city.country_code}-${city.timezone}`}`
+                .toLowerCase()
+                .replace(/[^a-z0-9-]+/g, '-'),
+              name: city.name ?? 'Unknown city',
+              countryCode: city.country_code ?? 'ZZ',
+              tz: city.timezone ?? 'UTC',
+              region: city.admin1 || city.country,
+            }))
+          setGlobalCityResults(results)
+        })
+        .catch((err) => {
+          if ((err as Error).name === 'AbortError') return
+          setGlobalCityResults([])
+          setCitySearchError('Could not search global cities. Try again shortly.')
+        })
+        .finally(() => {
+          if (!controller.signal.aborted) setCitySearchLoading(false)
+        })
+    }, 250)
+
+    return () => {
+      window.clearTimeout(timer)
+      controller.abort()
+    }
+  }, [query])
 
   const ensureLocalPreference = async () => {
     if (!sb || !userId) return
@@ -138,7 +239,7 @@ export function NotificationSettings({ userId, userTz }: Props) {
     setSaving(false)
   }
 
-  const addCity = async (city: City) => {
+  const addCity = async (city: NotificationCity) => {
     if (!sb || !userId) {
       setMessage('Sign in to add city notifications.')
       return
@@ -209,11 +310,11 @@ export function NotificationSettings({ userId, userTz }: Props) {
   }
 
   return (
-    <div className="rounded-xl border border-sunset-300/25 bg-sunset-400/10 px-3 py-3">
-      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-sunset-200">
+    <div className="rounded-xl border border-pink-300/30 bg-pink-400/10 px-3 py-3 shadow-[0_0_22px_rgba(244,114,182,0.12)]">
+      <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-pink-200">
         5PM notifications
       </div>
-      <p className="mb-3 text-xs leading-relaxed text-sunset-50/85">
+      <p className="mb-3 text-xs leading-relaxed text-pink-50/85">
         Get reminded before your own 5PM window and before selected cities hit 5PM.
       </p>
 
@@ -221,18 +322,18 @@ export function NotificationSettings({ userId, userTz }: Props) {
         type="button"
         onClick={() => void enableNotifications()}
         disabled={!userId || saving || !supported || !vapidReady}
-        className="btn-glow-gold min-h-[44px] w-full text-sm disabled:cursor-not-allowed disabled:opacity-60"
+        className="min-h-[44px] w-full rounded-xl border border-pink-300/35 bg-pink-400/20 px-4 py-2 text-sm font-semibold text-pink-50 shadow-[0_0_18px_rgba(244,114,182,0.22)] transition-colors hover:bg-pink-400/30 disabled:cursor-not-allowed disabled:opacity-60"
       >
         {saving ? 'Saving...' : permission === 'granted' ? 'Refresh notification device' : 'Enable notifications'}
       </button>
 
       {!userId ? <p className="mt-2 text-xs text-sunset-100/70">Sign in to manage notifications.</p> : null}
-      {!supported ? <p className="mt-2 text-xs text-red-100">This browser does not support Web Push.</p> : null}
+      {!supported ? <p className="mt-2 text-xs text-pink-100">This browser does not support Web Push.</p> : null}
       {supported && !vapidReady ? (
         <p className="mt-2 text-xs text-amber-100">Add `VITE_VAPID_PUBLIC_KEY` to enable push subscriptions.</p>
       ) : null}
       {permission === 'denied' ? (
-        <p className="mt-2 text-xs text-red-100">Notifications are blocked in your browser settings.</p>
+        <p className="mt-2 text-xs text-pink-100">Notifications are blocked in your browser settings.</p>
       ) : null}
       {message ? <p className="mt-2 text-xs text-sunset-50/85">{message}</p> : null}
 
@@ -244,8 +345,8 @@ export function NotificationSettings({ userId, userTz }: Props) {
           id="notification-city-search"
           value={query}
           onChange={(event) => setQuery(event.target.value)}
-          placeholder="Search Rio, Tokyo, London..."
-          className="w-full rounded-lg border border-white/15 bg-black/25 px-3 py-2 text-sm text-sunset-50 placeholder:text-sunset-100/40 focus:border-sunset-300 focus:outline-none"
+          placeholder="Search any city in the world..."
+          className="w-full rounded-lg border border-pink-200/20 bg-black/25 px-3 py-2 text-sm text-pink-50 placeholder:text-pink-100/40 focus:border-pink-300 focus:outline-none"
         />
         <div className="mt-2 flex flex-wrap gap-2">
           {OFFSET_OPTIONS.map((offset) => (
@@ -274,12 +375,16 @@ export function NotificationSettings({ userId, userTz }: Props) {
                 <span className="ml-2 text-xs text-sunset-100/55">
                   {countryName(city.countryCode)} - {city.tz}
                 </span>
+                {city.region ? <span className="ml-2 text-xs text-pink-100/55">{city.region}</span> : null}
               </button>
             ))}
           </div>
+        ) : citySearchLoading ? (
+          <p className="mt-2 text-xs text-pink-100/70">Searching global cities...</p>
         ) : query.trim() ? (
           <p className="mt-2 text-xs text-sunset-100/60">No matching cities found.</p>
         ) : null}
+        {citySearchError ? <p className="mt-2 text-xs text-pink-100">{citySearchError}</p> : null}
       </div>
 
       <div className="mt-3 flex flex-col gap-2">

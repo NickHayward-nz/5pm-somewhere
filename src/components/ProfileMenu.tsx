@@ -291,8 +291,6 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
                 </button>
               </div>
 
-              <NotificationSettings userId={userId} userTz={userTz} />
-
               {/* 3 — My Moments */}
               <button
                 type="button"
@@ -377,6 +375,8 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
               >
                 Support
               </a>
+
+              <NotificationSettings userId={userId} userTz={userTz} />
             </div>
 
             <CopyrightFooter variant="card" className="!mt-4" />
