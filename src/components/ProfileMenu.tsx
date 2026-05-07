@@ -10,6 +10,8 @@ import { NotificationSettings } from './NotificationSettings'
 import { startBillingPortal, startPremiumCheckout } from '../lib/premium'
 
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
+const PROFILE_SHARE_TITLE = '5PM Somewhere'
+const PROFILE_SHARE_TEXT = 'Join me on 5PM Somewhere and share your 5PM moment.'
 
 type MontageKind = 'weekly' | 'monthly'
 
@@ -87,6 +89,13 @@ function MontageVideo({ src }: { src: string }) {
   )
 }
 
+function buildProfileShareLink(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return window.location.origin
+  }
+  return 'https://5pmsomewhere.app'
+}
+
 export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMoments }: Props) {
   const sb = getSupabase()
   const [profileOpen, setProfileOpen] = useState(false)
@@ -97,8 +106,10 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
   const [checkoutStarting, setCheckoutStarting] = useState(false)
   const [billingPortalStarting, setBillingPortalStarting] = useState(false)
   const [montageState, setMontageState] = useState<MontageState>({ status: 'idle' })
+  const [shareStatus, setShareStatus] = useState<string | null>(null)
 
   const displayName = userEmail?.trim() || ''
+  const profileShareLink = buildProfileShareLink()
 
   useEffect(() => {
     if (!montageOpen) {
@@ -180,6 +191,34 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
     } catch (e) {
        
       console.error(e)
+    }
+  }
+
+  const handleShareProfile = async () => {
+    const sharePayload = {
+      title: PROFILE_SHARE_TITLE,
+      text: PROFILE_SHARE_TEXT,
+      url: profileShareLink,
+    }
+
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share(sharePayload)
+        setShareStatus('Share sheet opened.')
+        return
+      }
+
+      await navigator.clipboard?.writeText?.(profileShareLink)
+      setShareStatus('Link copied.')
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+
+      try {
+        await navigator.clipboard?.writeText?.(profileShareLink)
+        setShareStatus('Link copied.')
+      } catch {
+        setShareStatus('Copy the link above to share.')
+      }
     }
   }
 
@@ -272,6 +311,30 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
                   Sign in
                 </button>
               )}
+
+              <div className="rounded-xl border border-amber-300/70 bg-amber-300/90 px-3 py-3 text-midnight-900 shadow-[0_0_18px_rgba(251,191,36,0.28)]">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-midnight-900/70">
+                  Share 5PM Somewhere
+                </div>
+                <p className="mb-2 text-sm font-medium leading-snug">
+                  Invite friends to watch and post their 5PM moments.
+                </p>
+                <div className="mb-2 rounded-lg border border-midnight-900/15 bg-white/70 px-2.5 py-2 font-mono text-xs text-midnight-900 break-all">
+                  {profileShareLink}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleShareProfile()}
+                  className="min-h-[44px] w-full rounded-xl bg-midnight-900 px-4 py-2 text-sm font-semibold text-amber-100 shadow hover:bg-midnight-800 touch-manipulation"
+                >
+                  Share link
+                </button>
+                {shareStatus ? (
+                  <div className="mt-2 text-center text-xs font-medium text-midnight-900/70">
+                    {shareStatus}
+                  </div>
+                ) : null}
+              </div>
 
               {/* 2 — Terms & Privacy */}
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
