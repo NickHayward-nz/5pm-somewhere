@@ -312,30 +312,6 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
                 </button>
               )}
 
-              <div className="rounded-xl border border-amber-300/70 bg-amber-300/90 px-3 py-3 text-midnight-900 shadow-[0_0_18px_rgba(251,191,36,0.28)]">
-                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-midnight-900/70">
-                  Share 5PM Somewhere
-                </div>
-                <p className="mb-2 text-sm font-medium leading-snug">
-                  Invite friends to watch and post their 5PM moments.
-                </p>
-                <div className="mb-2 rounded-lg border border-midnight-900/15 bg-white/70 px-2.5 py-2 font-mono text-xs text-midnight-900 break-all">
-                  {profileShareLink}
-                </div>
-                <button
-                  type="button"
-                  onClick={() => void handleShareProfile()}
-                  className="min-h-[44px] w-full rounded-xl bg-midnight-900 px-4 py-2 text-sm font-semibold text-amber-100 shadow hover:bg-midnight-800 touch-manipulation"
-                >
-                  Share link
-                </button>
-                {shareStatus ? (
-                  <div className="mt-2 text-center text-xs font-medium text-midnight-900/70">
-                    {shareStatus}
-                  </div>
-                ) : null}
-              </div>
-
               {/* 2 — Terms & Privacy */}
               <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
                 <button
@@ -438,6 +414,30 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
               >
                 Support
               </a>
+
+              <div className="rounded-xl border border-amber-300/30 bg-amber-300/10 px-3 py-3 text-sunset-100 shadow-[0_0_18px_rgba(251,191,36,0.12)]">
+                <div className="mb-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-amber-200/85">
+                  Share 5PM Somewhere
+                </div>
+                <p className="mb-2 text-sm font-medium leading-snug text-sunset-100/85">
+                  Invite friends to watch and post their 5PM moments.
+                </p>
+                <div className="mb-2 rounded-lg border border-amber-200/20 bg-midnight-900/45 px-2.5 py-2 font-mono text-xs text-sunset-100/85 break-all">
+                  {profileShareLink}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => void handleShareProfile()}
+                  className="min-h-[44px] w-full rounded-xl border border-amber-300/45 bg-amber-300/20 px-4 py-2 text-sm font-semibold text-amber-100 shadow hover:bg-amber-300/30 touch-manipulation"
+                >
+                  Share link
+                </button>
+                {shareStatus ? (
+                  <div className="mt-2 text-center text-xs font-medium text-amber-100/75">
+                    {shareStatus}
+                  </div>
+                ) : null}
+              </div>
 
               <NotificationSettings userId={userId} userTz={userTz} />
             </div>
