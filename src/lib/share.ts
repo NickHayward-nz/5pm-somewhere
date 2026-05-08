@@ -19,9 +19,9 @@
  */
 function buildAppLink(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin
+    return `${window.location.origin}/share`
   }
-  return 'https://5pmsomewhere.app'
+  return 'https://5pmsomewhere.app/share'
 }
 
 /**

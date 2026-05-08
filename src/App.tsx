@@ -63,6 +63,88 @@ function showToast(message: string) {
   setTimeout(() => toast.remove(), 4000)
 }
 
+function isSharePath() {
+  return typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/share'
+}
+
+function HowItWorksCard() {
+  return (
+    <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left shadow-lg sm:mt-4 sm:px-4">
+      <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-sunset-100/70">
+        How it works
+      </div>
+      <div className="grid gap-2 text-[11px] leading-snug text-sunset-100/80 sm:grid-cols-3 sm:text-xs">
+        <div>
+          <span className="font-semibold text-sunset-50">1. Capture</span> your short moment at 5:00 PM local time.
+        </div>
+        <div>
+          <span className="font-semibold text-sunset-50">2. Watch</span> live 5:00 PM moments from around the world.
+        </div>
+        <div>
+          <span className="font-semibold text-sunset-50">3. Build</span> streaks, reach, and Premium highlights.
+        </div>
+      </div>
+    </div>
+  )
+}
+
+type ShareLandingProps = {
+  onWatchLive: () => void
+  onSignIn: () => void
+  onEnterApp: () => void
+}
+
+function ShareLanding({ onWatchLive, onSignIn, onEnterApp }: ShareLandingProps) {
+  return (
+    <div className="app-one-screen-root flex flex-col overflow-hidden vhs-noise bg-sunset-gradient">
+      <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col items-center justify-center px-4 py-6 text-center">
+        <img
+          src="/Logo.png"
+          alt="5PM Somewhere Logo"
+          className="mb-4 h-24 w-auto object-contain sm:h-32"
+        />
+        <div className="w-full rounded-[2rem] border border-white/15 bg-midnight-900/70 p-5 shadow-2xl backdrop-blur-md sm:p-7">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-sunset-100/70">
+            Shared from 5PM Somewhere
+          </div>
+          <h1 className="mb-3 text-2xl font-semibold text-sunset-50 sm:text-4xl">
+            See what 5:00 PM looks like around the world.
+          </h1>
+          <p className="mx-auto mb-5 max-w-xl text-sm leading-relaxed text-sunset-100/85 sm:text-base">
+            Capture your own daily 5:00 PM moment, watch live uploads as the sunset moves around the
+            globe, and share the view with friends.
+          </p>
+          <div className="flex flex-col gap-2 sm:flex-row sm:justify-center">
+            <button
+              type="button"
+              onClick={onWatchLive}
+              className="btn-glow-gold min-h-[48px] px-5 text-sm touch-manipulation"
+            >
+              Watch live moments
+            </button>
+            <button
+              type="button"
+              onClick={onSignIn}
+              className="btn-glow-muted min-h-[48px] px-5 text-sm touch-manipulation"
+            >
+              Sign in to capture
+            </button>
+            <button
+              type="button"
+              onClick={onEnterApp}
+              className="btn-glow-muted min-h-[48px] px-5 text-sm touch-manipulation"
+            >
+              Enter app
+            </button>
+          </div>
+          <HowItWorksCard />
+        </div>
+      </div>
+      <CopyrightFooter variant="main" className="shrink-0" />
+    </div>
+  )
+}
+
 function App() {
   const now = useNow(250)
   const [userId, setUserId] = useState<string | null>(null)
@@ -73,9 +155,12 @@ function App() {
   const [dailyLimitModalOpen, setDailyLimitModalOpen] = useState(false)
   const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
   const [signInForCaptureOpen, setSignInForCaptureOpen] = useState(false)
+  const [shareLandingSignInOpen, setShareLandingSignInOpen] = useState(false)
+  const [shareLandingOpen, setShareLandingOpen] = useState(isSharePath)
   const [checkoutReturnStatus, setCheckoutReturnStatus] = useState<CheckoutReturnStatus>(null)
   const recordOpenRef = useRef(false)
   const checkoutRefetchDoneRef = useRef(false)
+  const signedInToastShownRef = useRef(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
   // Dev-only local override: `?premium=1` / `?premium=0` still flips the
@@ -107,10 +192,14 @@ function App() {
     })
     const {
       data: { subscription },
-    } = sb.auth.onAuthStateChange((_event: AuthChangeEvent, session: Session | null) => {
+    } = sb.auth.onAuthStateChange((event: AuthChangeEvent, session: Session | null) => {
       if (session != null) {
         setUserId(session.user?.id ?? null)
         setUserEmail(session.user?.email ?? null)
+        if (event === 'SIGNED_IN' && !signedInToastShownRef.current) {
+          signedInToastShownRef.current = true
+          showToast("You're signed in.")
+        }
       } else {
         if (!recordOpenRef.current) {
           setUserId(null)
@@ -263,6 +352,41 @@ function App() {
     return Interval.fromDateTimes(start, end)
   }, [now])
 
+  const signInModalOpen = signInForCaptureOpen || shareLandingSignInOpen
+  const signInContextMessage = shareLandingSignInOpen
+    ? 'Sign in to capture your own 5:00 PM moment and save it to your account.'
+    : 'To create and save your 5PM moment, sign in first. After you sign in, tap Capture again during your window.'
+
+  if (shareLandingOpen) {
+    return (
+      <>
+        <ShareLanding
+          onWatchLive={() => setLiveStreamOpen(true)}
+          onSignIn={() => setShareLandingSignInOpen(true)}
+          onEnterApp={() => {
+            window.history.pushState({}, '', '/')
+            setShareLandingOpen(false)
+          }}
+        />
+        <LiveStream
+          open={liveStreamOpen}
+          onClose={() => setLiveStreamOpen(false)}
+          userId={userId}
+          reachStats={reachStats}
+          currentStreak={currentStreak}
+        />
+        <SignInModal
+          open={signInModalOpen}
+          onClose={() => {
+            setSignInForCaptureOpen(false)
+            setShareLandingSignInOpen(false)
+          }}
+          contextMessage={signInContextMessage}
+        />
+      </>
+    )
+  }
+
   return (
     <div className="app-one-screen-root flex flex-col overflow-hidden vhs-noise bg-sunset-gradient">
       <div className="app-wrapper-landscape flex-1 min-h-0 flex flex-col overflow-hidden mx-auto w-full max-w-6xl max-h-full px-3 py-2 sm:px-4 sm:py-3 lg:py-5">
@@ -374,6 +498,7 @@ function App() {
                   Watch Live 5PM Moments 🌍
                 </button>
               </div>
+              <HowItWorksCard />
 
             </div>
           </section>
@@ -395,9 +520,12 @@ function App() {
         <CopyrightFooter variant="main" className="shrink-0" />
       </div>
       <SignInModal
-        open={signInForCaptureOpen}
-        onClose={() => setSignInForCaptureOpen(false)}
-        contextMessage="To create and save your 5PM moment, sign in first. After you sign in, tap Capture again during your window."
+        open={signInModalOpen}
+        onClose={() => {
+          setSignInForCaptureOpen(false)
+          setShareLandingSignInOpen(false)
+        }}
+        contextMessage={signInContextMessage}
       />
       <FirstUploadConsentModal
         open={uploadConsentOpen}

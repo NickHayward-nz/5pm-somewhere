@@ -12,6 +12,7 @@ import { startBillingPortal, startPremiumCheckout } from '../lib/premium'
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
 const PROFILE_SHARE_TITLE = '5PM Somewhere'
 const PROFILE_SHARE_TEXT = 'Join me on 5PM Somewhere and share your 5PM moment.'
+const SHARE_PATH = '/share'
 
 type MontageKind = 'weekly' | 'monthly'
 
@@ -91,9 +92,9 @@ function MontageVideo({ src }: { src: string }) {
 
 function buildProfileShareLink(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {
-    return window.location.origin
+    return `${window.location.origin}${SHARE_PATH}`
   }
-  return 'https://5pmsomewhere.app'
+  return `https://5pmsomewhere.app${SHARE_PATH}`
 }
 
 export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMoments }: Props) {
@@ -107,6 +108,7 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
   const [billingPortalStarting, setBillingPortalStarting] = useState(false)
   const [montageState, setMontageState] = useState<MontageState>({ status: 'idle' })
   const [shareStatus, setShareStatus] = useState<string | null>(null)
+  const [premiumRequiresSignIn, setPremiumRequiresSignIn] = useState(false)
 
   const displayName = userEmail?.trim() || ''
   const profileShareLink = buildProfileShareLink()
@@ -157,6 +159,10 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
 
   const goPremium = async () => {
     if (checkoutStarting) return
+    if (!userId) {
+      setPremiumRequiresSignIn(true)
+      return
+    }
 
     setCheckoutStarting(true)
     const result = await startPremiumCheckout()
@@ -484,12 +490,18 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-sunset-100/80">
-              Premium feature
+              {!userId ? 'Sign in required' : 'Premium feature'}
             </h3>
             <p className="mb-4 text-sm text-sunset-100/90">
-              Upgrade to Premium for{' '}
-              {premiumPitch === 'weekly' ? 'your weekly montage' : 'your monthly highlights'}. Subscription
-              checkout opens securely with Stripe.
+              {!userId
+                ? 'Sign in first, then upgrade to Premium to unlock montages and highlights.'
+                : (
+                    <>
+                      Upgrade to Premium for{' '}
+                      {premiumPitch === 'weekly' ? 'your weekly montage' : 'your monthly highlights'}. Subscription
+                      checkout opens securely with Stripe.
+                    </>
+                  )}
             </p>
             <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
               <button
@@ -501,11 +513,57 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
               </button>
               <button
                 type="button"
-                onClick={() => void goPremium()}
+                onClick={() => {
+                  if (!userId) {
+                    setPremiumPitch(null)
+                    setSignInOpen(true)
+                    return
+                  }
+                  void goPremium()
+                }}
                 disabled={checkoutStarting}
                 className="btn-glow-gold min-h-[44px] px-4 text-sm disabled:cursor-wait disabled:opacity-70"
               >
-                {checkoutStarting ? 'Opening…' : 'Go Premium'}
+                {!userId ? 'Sign in' : checkoutStarting ? 'Opening…' : 'Go Premium'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {premiumRequiresSignIn && (
+        <div
+          className="fixed inset-0 z-[10004] flex items-center justify-center bg-black/75 px-4"
+          onClick={() => setPremiumRequiresSignIn(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-sunset-500/40 bg-midnight-900/95 p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-sunset-100/80">
+              Sign in required
+            </h3>
+            <p className="mb-4 text-sm text-sunset-100/90">
+              Sign in first so Premium can be attached to your account.
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPremiumRequiresSignIn(false)}
+                className="btn-glow-muted min-h-[44px] px-4 text-sm"
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setPremiumRequiresSignIn(false)
+                  setProfileOpen(false)
+                  setSignInOpen(true)
+                }}
+                className="btn-glow-gold min-h-[44px] px-4 text-sm"
+              >
+                Sign in
               </button>
             </div>
           </div>

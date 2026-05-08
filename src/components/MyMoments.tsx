@@ -24,7 +24,12 @@ type ShareNavigator = Navigator & {
   canShare?: (data: ShareData) => boolean
 }
 
-const APP_URL = 'https://5pm-somewhere-alpha.vercel.app'
+function buildAppUrl(): string {
+  if (typeof window !== 'undefined' && window.location?.origin) {
+    return `${window.location.origin}/share`
+  }
+  return 'https://5pmsomewhere.app/share'
+}
 
 function buildShareText(city: string): string {
   return `My 5PM moment from ${city} 🌅 Watch it on 5PM Somewhere!`
@@ -33,6 +38,7 @@ function buildShareText(city: string): string {
 async function shareMoment(params: { moment: MomentRow }): Promise<void> {
   const { moment } = params
   const text = buildShareText(moment.city)
+  const appUrl = buildAppUrl()
 
   // Attempt to share the actual video file (so the share sheet treats it as a video).
   const videoFile = await getVideoFile(moment.video_url)
@@ -40,7 +46,7 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
   const nav = navigator as ShareNavigator
   if (!nav?.share) {
     // Minimal fallback: copy link + text.
-    const payload = `${text}\n${APP_URL}`
+    const payload = `${text}\n${appUrl}`
     try {
       await navigator.clipboard.writeText(payload)
       return
@@ -58,7 +64,7 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
         await nav.share({
           title: '5PM Somewhere',
           text,
-          url: APP_URL,
+          url: appUrl,
           files: [videoFile],
         })
         return
@@ -71,7 +77,7 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
   // Fallback: if we cannot attach files, share the video URL as the `url` (so the share sheet
   // can treat it like a video) and include the app link in the text.
   try {
-    const payloadText = `${text}\n${APP_URL}`
+    const payloadText = `${text}\n${appUrl}`
     const canShareUrl = nav.canShare?.({ url: moment.video_url }) !== false
     if (canShareUrl) {
       await nav.share({
@@ -85,7 +91,7 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
     // ignore and fall through
   }
 
-  await nav.share({ title: '5PM Somewhere', text, url: APP_URL })
+  await nav.share({ title: '5PM Somewhere', text, url: appUrl })
 }
 
 async function getVideoFile(videoUrl: string): Promise<File | null> {
