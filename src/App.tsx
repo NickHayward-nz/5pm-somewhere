@@ -67,7 +67,25 @@ function isSharePath() {
   return typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/share'
 }
 
-function HowItWorksCard() {
+function isHowItWorksPath() {
+  return typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/how-it-works'
+}
+
+function HowItWorksCard({ compact = false, onOpen }: { compact?: boolean; onOpen?: () => void }) {
+  if (compact) {
+    return (
+      <div className="mt-3 flex justify-center sm:mt-4">
+        <button
+          type="button"
+          className="btn-glow-muted min-h-[44px] px-5 text-sm touch-manipulation"
+          onClick={onOpen}
+        >
+          How it works
+        </button>
+      </div>
+    )
+  }
+
   return (
     <div className="mt-3 rounded-2xl border border-white/10 bg-white/5 px-3 py-3 text-left shadow-lg sm:mt-4 sm:px-4">
       <div className="mb-2 text-[10px] font-semibold uppercase tracking-[0.16em] text-sunset-100/70">
@@ -84,6 +102,107 @@ function HowItWorksCard() {
           <span className="font-semibold text-sunset-50">3. Build</span> streaks, reach, and Premium highlights.
         </div>
       </div>
+    </div>
+  )
+}
+
+type HowItWorksPageProps = {
+  isPremium: boolean
+  onBack: () => void
+  onWatchLive: () => void
+  onSignIn: () => void
+}
+
+function HowItWorksPage({ isPremium, onBack, onWatchLive, onSignIn }: HowItWorksPageProps) {
+  return (
+    <div className="app-one-screen-root flex flex-col overflow-hidden vhs-noise bg-sunset-gradient">
+      <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-4 py-4 sm:py-6">
+        <div className="mb-3 flex items-center justify-between gap-3">
+          <img src="/Logo.png" alt="5PM Somewhere Logo" className="h-16 w-auto object-contain sm:h-20" />
+          <button
+            type="button"
+            onClick={onBack}
+            className="btn-glow-muted min-h-[44px] px-4 text-sm touch-manipulation"
+          >
+            Back
+          </button>
+        </div>
+
+        <div className="min-h-0 flex-1 overflow-y-auto rounded-[2rem] border border-white/15 bg-midnight-900/75 p-4 shadow-2xl backdrop-blur-md sm:p-6">
+          <div className="mb-2 text-xs font-semibold uppercase tracking-[0.2em] text-sunset-100/70">
+            How it works
+          </div>
+          <h1 className="mb-3 text-2xl font-semibold text-sunset-50 sm:text-4xl">
+            One short moment, every day at 5:00 PM.
+          </h1>
+          <p className="mb-5 max-w-3xl text-sm leading-relaxed text-sunset-100/85 sm:text-base">
+            5PM Somewhere is a daily video ritual. When it reaches 5:00 PM in your local timezone,
+            capture a short clip, send it into the live stream, and watch other people&apos;s 5:00 PM
+            moments as the day moves around the world.
+          </p>
+
+          <div className="grid gap-3 md:grid-cols-3">
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="mb-2 text-sm font-semibold text-sunset-50">Capture your moment</div>
+              <p className="text-xs leading-relaxed text-sunset-100/75">
+                Tap capture during your 5:00 PM window, record a quick video, add an optional caption,
+                then post it to the stream.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="mb-2 text-sm font-semibold text-sunset-50">Watch live 5:00 PMs</div>
+              <p className="text-xs leading-relaxed text-sunset-100/75">
+                The live moments page shows recent uploads from people whose 5:00 PM window has just
+                opened somewhere in the world.
+              </p>
+            </div>
+            <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
+              <div className="mb-2 text-sm font-semibold text-sunset-50">Build your streak</div>
+              <p className="text-xs leading-relaxed text-sunset-100/75">
+                Posting consistently builds streak perks, queue priority, reach, and a reason to come
+                back for tomorrow&apos;s sunset.
+              </p>
+            </div>
+          </div>
+
+          <div className="mt-5 rounded-2xl border border-amber-300/30 bg-amber-300/10 p-4">
+            <div className="mb-2 text-xs font-semibold uppercase tracking-[0.16em] text-amber-200">
+              Premium benefits
+            </div>
+            <div className="grid gap-2 text-xs leading-relaxed text-sunset-100/80 sm:grid-cols-2">
+              <div>Longer recordings: up to 30 seconds instead of the free recording length.</div>
+              <div>More daily uploads: capture up to 3 moments per day.</div>
+              <div>Premium priority: stronger placement in the live stream queue.</div>
+              <div>Premium styling: exclusive visual treatment on captured moments.</div>
+              <div>Weekly montage playback for your best eligible moments.</div>
+              <div>Monthly highlights when enough moments are available.</div>
+            </div>
+            <div className="mt-3 text-[11px] text-amber-100/75">
+              {isPremium
+                ? 'Premium is active on your account.'
+                : 'Sign in from the Profile menu to upgrade when you are ready.'}
+            </div>
+          </div>
+
+          <div className="mt-5 flex flex-col gap-2 sm:flex-row">
+            <button
+              type="button"
+              onClick={onWatchLive}
+              className="btn-glow-gold min-h-[48px] px-5 text-sm touch-manipulation"
+            >
+              Watch live moments
+            </button>
+            <button
+              type="button"
+              onClick={onSignIn}
+              className="btn-glow-muted min-h-[48px] px-5 text-sm touch-manipulation"
+            >
+              Sign in to capture
+            </button>
+          </div>
+        </div>
+      </div>
+      <CopyrightFooter variant="main" className="shrink-0" />
     </div>
   )
 }
@@ -156,7 +275,9 @@ function App() {
   const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
   const [signInForCaptureOpen, setSignInForCaptureOpen] = useState(false)
   const [shareLandingSignInOpen, setShareLandingSignInOpen] = useState(false)
+  const [howItWorksSignInOpen, setHowItWorksSignInOpen] = useState(false)
   const [shareLandingOpen, setShareLandingOpen] = useState(isSharePath)
+  const [howItWorksOpen, setHowItWorksOpen] = useState(isHowItWorksPath)
   const [checkoutReturnStatus, setCheckoutReturnStatus] = useState<CheckoutReturnStatus>(null)
   const recordOpenRef = useRef(false)
   const checkoutRefetchDoneRef = useRef(false)
@@ -182,6 +303,15 @@ function App() {
   useEffect(() => {
     recordOpenRef.current = recordOpen
   }, [recordOpen])
+
+  useEffect(() => {
+    const syncRouteState = () => {
+      setShareLandingOpen(isSharePath())
+      setHowItWorksOpen(isHowItWorksPath())
+    }
+    window.addEventListener('popstate', syncRouteState)
+    return () => window.removeEventListener('popstate', syncRouteState)
+  }, [])
 
   useEffect(() => {
     const sb = getSupabase()
@@ -352,21 +482,31 @@ function App() {
     return Interval.fromDateTimes(start, end)
   }, [now])
 
-  const signInModalOpen = signInForCaptureOpen || shareLandingSignInOpen
-  const signInContextMessage = shareLandingSignInOpen
+  const openMainApp = () => {
+    window.history.pushState({}, '', '/')
+    setShareLandingOpen(false)
+    setHowItWorksOpen(false)
+  }
+
+  const openHowItWorks = () => {
+    window.history.pushState({}, '', '/how-it-works')
+    setShareLandingOpen(false)
+    setHowItWorksOpen(true)
+  }
+
+  const signInModalOpen = signInForCaptureOpen || shareLandingSignInOpen || howItWorksSignInOpen
+  const signInContextMessage = shareLandingSignInOpen || howItWorksSignInOpen
     ? 'Sign in to capture your own 5:00 PM moment and save it to your account.'
     : 'To create and save your 5PM moment, sign in first. After you sign in, tap Capture again during your window.'
 
-  if (shareLandingOpen) {
+  if (howItWorksOpen) {
     return (
       <>
-        <ShareLanding
+        <HowItWorksPage
+          isPremium={isPremium}
+          onBack={openMainApp}
           onWatchLive={() => setLiveStreamOpen(true)}
-          onSignIn={() => setShareLandingSignInOpen(true)}
-          onEnterApp={() => {
-            window.history.pushState({}, '', '/')
-            setShareLandingOpen(false)
-          }}
+          onSignIn={() => setHowItWorksSignInOpen(true)}
         />
         <LiveStream
           open={liveStreamOpen}
@@ -380,6 +520,35 @@ function App() {
           onClose={() => {
             setSignInForCaptureOpen(false)
             setShareLandingSignInOpen(false)
+            setHowItWorksSignInOpen(false)
+          }}
+          contextMessage={signInContextMessage}
+        />
+      </>
+    )
+  }
+
+  if (shareLandingOpen) {
+    return (
+      <>
+        <ShareLanding
+          onWatchLive={() => setLiveStreamOpen(true)}
+          onSignIn={() => setShareLandingSignInOpen(true)}
+          onEnterApp={openMainApp}
+        />
+        <LiveStream
+          open={liveStreamOpen}
+          onClose={() => setLiveStreamOpen(false)}
+          userId={userId}
+          reachStats={reachStats}
+          currentStreak={currentStreak}
+        />
+        <SignInModal
+          open={signInModalOpen}
+          onClose={() => {
+            setSignInForCaptureOpen(false)
+            setShareLandingSignInOpen(false)
+            setHowItWorksSignInOpen(false)
           }}
           contextMessage={signInContextMessage}
         />
@@ -498,7 +667,7 @@ function App() {
                   Watch Live 5PM Moments 🌍
                 </button>
               </div>
-              <HowItWorksCard />
+              <HowItWorksCard compact onOpen={openHowItWorks} />
 
             </div>
           </section>
@@ -524,6 +693,7 @@ function App() {
         onClose={() => {
           setSignInForCaptureOpen(false)
           setShareLandingSignInOpen(false)
+          setHowItWorksSignInOpen(false)
         }}
         contextMessage={signInContextMessage}
       />
