@@ -74,10 +74,10 @@ function isHowItWorksPath() {
 function HowItWorksCard({ compact = false, onOpen }: { compact?: boolean; onOpen?: () => void }) {
   if (compact) {
     return (
-      <div className="mt-3 flex justify-center sm:mt-4">
+      <div className="mt-3 flex flex-col sm:mt-4 sm:flex-row">
         <button
           type="button"
-          className="btn-glow-muted min-h-[44px] px-5 text-sm touch-manipulation"
+          className="app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation"
           onClick={onOpen}
         >
           How it works
