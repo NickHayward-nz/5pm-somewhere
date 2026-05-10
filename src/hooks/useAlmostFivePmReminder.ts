@@ -56,6 +56,7 @@ export function useAlmostFivePmReminder(userId: string | null, userTz: string) {
           new Notification(ALMOST_FIVE_TITLE, {
             body: ALMOST_FIVE_BODY,
             icon: '/Logo.png',
+            badge: '/notification-badge.png',
             tag: key,
           })
         } catch {

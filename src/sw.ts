@@ -20,6 +20,9 @@ type PushPayload = {
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
 
+/** Small monochrome asset for status bar / badge (avoid full-color logo here). */
+const NOTIFICATION_BADGE_URL = '/notification-badge.png'
+
 self.addEventListener('push', (event) => {
   const fallback: Required<Pick<PushPayload, 'title' | 'body' | 'url' | 'icon'>> = {
     title: "It's 5PM Somewhere",
@@ -41,7 +44,7 @@ self.addEventListener('push', (event) => {
     self.registration.showNotification(title, {
       body: payload.body ?? fallback.body,
       icon: payload.icon ?? fallback.icon,
-      badge: payload.badge ?? payload.icon ?? fallback.icon,
+      badge: payload.badge ?? NOTIFICATION_BADGE_URL,
       tag: payload.tag,
       data: { ...(payload.data ?? {}), url },
     }),

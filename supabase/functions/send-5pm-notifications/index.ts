@@ -103,6 +103,7 @@ function notificationPayload(preference: DuePreference, siteUrl: string) {
     title,
     body,
     icon: '/Logo.png',
+    badge: '/notification-badge.png',
     url: siteUrl,
     tag: `fivepm:${preference.city_id}:${preference.localDate}`,
     data: {
