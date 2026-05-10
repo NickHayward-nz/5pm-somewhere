@@ -107,13 +107,15 @@ function HowItWorksCard({ compact = false, onOpen }: { compact?: boolean; onOpen
 }
 
 type HowItWorksPageProps = {
+  isSignedIn: boolean
   isPremium: boolean
   onBack: () => void
   onWatchLive: () => void
   onSignIn: () => void
+  onUpgrade: () => void
 }
 
-function HowItWorksPage({ isPremium, onBack, onWatchLive, onSignIn }: HowItWorksPageProps) {
+function HowItWorksPage({ isSignedIn, isPremium, onBack, onWatchLive, onSignIn, onUpgrade }: HowItWorksPageProps) {
   return (
     <div className="app-one-screen-root flex flex-col overflow-hidden vhs-noise bg-sunset-gradient">
       <div className="mx-auto flex min-h-0 w-full max-w-4xl flex-1 flex-col px-4 py-4 sm:py-6">
@@ -180,7 +182,9 @@ function HowItWorksPage({ isPremium, onBack, onWatchLive, onSignIn }: HowItWorks
             <div className="mt-3 text-[11px] text-amber-100/75">
               {isPremium
                 ? 'Premium is active on your account.'
-                : 'Sign in from the Profile menu to upgrade when you are ready.'}
+                : isSignedIn
+                  ? 'Upgrade to Premium when you are ready.'
+                  : 'Sign in from the Profile menu to upgrade when you are ready.'}
             </div>
           </div>
 
@@ -192,13 +196,15 @@ function HowItWorksPage({ isPremium, onBack, onWatchLive, onSignIn }: HowItWorks
             >
               Watch live moments
             </button>
-            <button
-              type="button"
-              onClick={onSignIn}
-              className="btn-glow-muted min-h-[48px] px-5 text-sm touch-manipulation"
-            >
-              Sign in to capture
-            </button>
+            {!isPremium ? (
+              <button
+                type="button"
+                onClick={isSignedIn ? onUpgrade : onSignIn}
+                className="btn-glow-muted min-h-[48px] px-5 text-sm touch-manipulation"
+              >
+                {isSignedIn ? 'Upgrade to Premium' : 'Sign in to capture'}
+              </button>
+            ) : null}
           </div>
         </div>
       </div>
@@ -503,10 +509,19 @@ function App() {
     return (
       <>
         <HowItWorksPage
+          isSignedIn={Boolean(userId)}
           isPremium={isPremium}
           onBack={openMainApp}
           onWatchLive={() => setLiveStreamOpen(true)}
           onSignIn={() => setHowItWorksSignInOpen(true)}
+          onUpgrade={async () => {
+            const result = await startPremiumCheckout()
+            if (!result.ok) {
+              window.alert(result.error)
+              return
+            }
+            window.location.href = result.url
+          }}
         />
         <LiveStream
           open={liveStreamOpen}
