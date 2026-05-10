@@ -29,6 +29,8 @@ type DuePreference = PreferenceRow & {
   offsetMinutes: number
 }
 
+const FIVE_PM_NOTIFICATION_TTL_SECONDS = 10 * 60
+
 function jsonResponse(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), {
     status,
@@ -102,7 +104,7 @@ function notificationPayload(preference: DuePreference, siteUrl: string) {
     body,
     icon: '/Logo.png',
     url: siteUrl,
-    tag: `fivepm:${preference.city_id}:${preference.localDate}:${preference.offsetMinutes}`,
+    tag: `fivepm:${preference.city_id}:${preference.localDate}`,
     data: {
       cityId: preference.city_id,
       timezone: preference.timezone,
@@ -110,6 +112,12 @@ function notificationPayload(preference: DuePreference, siteUrl: string) {
       offsetMinutes: preference.offsetMinutes,
     },
   }
+}
+
+function notificationTtlSeconds(preference: DuePreference): number {
+  return preference.offsetMinutes > 0
+    ? preference.offsetMinutes * 60
+    : FIVE_PM_NOTIFICATION_TTL_SECONDS
 }
 
 function pushErrorStatusCode(err: unknown): number | null {
@@ -205,6 +213,7 @@ serve(async (req) => {
             },
           },
           JSON.stringify(notificationPayload(preference, siteUrl)),
+          { TTL: notificationTtlSeconds(preference) },
         )
         sent += 1
       } catch (err) {
