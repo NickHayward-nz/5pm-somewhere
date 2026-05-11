@@ -28,7 +28,7 @@ function buildAppUrl(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {
     return `${window.location.origin}/share`
   }
-  return 'https://5pmsomewhere.app/share'
+  return 'https://5pmsomewhere.live/share'
 }
 
 function buildShareText(city: string): string {

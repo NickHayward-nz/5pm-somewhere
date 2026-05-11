@@ -2,6 +2,16 @@
 
 The **Vite frontend** deploys here. The **montage worker** (`workers/montage-worker.mjs`, FFmpeg) is **not** deployed to Vercel — it runs elsewhere so **Hobby** limits (serverless memory/duration) do not block production builds.
 
+## Production domain
+
+The canonical app domain is `https://5pmsomewhere.live`.
+
+To make it live, add `5pmsomewhere.live` in **Vercel → Project → Settings → Domains**, then point the domain's DNS records at Vercel using the values Vercel provides. After the DNS check passes, update Supabase Auth redirect URLs and Edge Function secrets that reference the public app URL:
+
+```bash
+supabase secrets set SITE_URL=https://5pmsomewhere.live
+```
+
 ## Push did not trigger a new deploy
 
 Check in order:

@@ -94,7 +94,7 @@ function buildProfileShareLink(): string {
   if (typeof window !== 'undefined' && window.location?.origin) {
     return `${window.location.origin}${SHARE_PATH}`
   }
-  return `https://5pmsomewhere.app${SHARE_PATH}`
+  return `https://5pmsomewhere.live${SHARE_PATH}`
 }
 
 export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMoments }: Props) {

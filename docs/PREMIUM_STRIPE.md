@@ -40,7 +40,7 @@ manually through the dashboard.)
 # Run each line in your shell (PowerShell users: use a normal terminal, not Cursor's).
 supabase secrets set STRIPE_SECRET_KEY=sk_test_XXXXXXXXXXXXXXXX
 supabase secrets set STRIPE_PRICE_ID=price_XXXXXXXXXXXXXXXX
-supabase secrets set SITE_URL=https://your-production-domain.example
+supabase secrets set SITE_URL=https://5pmsomewhere.live
 
 # Deploy (npm scripts wrap these):
 npm run deploy:checkout-fn          # create-checkout-session
@@ -102,7 +102,8 @@ the function locally (`supabase functions serve stripe-webhook --env-file .env`)
   `sk_live_...` + the live-mode price id + the live-mode webhook secret.
 - Update the three `supabase secrets set ...` calls accordingly.
 - Re-deploy all Stripe functions.
-- Deploy a new client build so `SITE_URL` redirects to the correct domain.
+- Deploy a new client build and set `SITE_URL=https://5pmsomewhere.live` so
+  Checkout, Billing Portal, and notification opens return to the production domain.
 
 ## 8. PWA-only distribution
 

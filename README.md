@@ -1,4 +1,10 @@
-# React + TypeScript + Vite
+# 5PM Somewhere
+
+Production app: https://5pmsomewhere.live
+
+## Development
+
+This app is built with React, TypeScript, and Vite.
 
 This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
 

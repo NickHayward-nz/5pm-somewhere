@@ -31,7 +31,7 @@ serve(async (req) => {
   }
 
   const stripeKey = Deno.env.get('STRIPE_SECRET_KEY')
-  const siteUrl = Deno.env.get('SITE_URL') ?? 'https://5pmsomewhere.app'
+  const siteUrl = Deno.env.get('SITE_URL') ?? 'https://5pmsomewhere.live'
   const supabaseUrl = Deno.env.get('SUPABASE_URL')
   const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')
 
