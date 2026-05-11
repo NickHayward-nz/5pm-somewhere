@@ -98,22 +98,11 @@ function dominantReactionType(moments) {
   return 'cheers'
 }
 
-function startOfUtcDay(date) {
-  return new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth(), date.getUTCDate()))
-}
-
-function addDays(date, days) {
-  return new Date(date.getTime() + days * DAY_MS)
-}
-
 function completedWeekPeriod(now) {
-  const today = startOfUtcDay(now)
-  const day = today.getUTCDay()
-  const daysSinceMonday = (day + 6) % 7
-  const currentWeekStart = addDays(today, -daysSinceMonday)
+  // TEMP: rolling 7-day window so weekly montages can be generated on demand during testing.
   return {
-    start: addDays(currentWeekStart, -7),
-    end: currentWeekStart,
+    start: new Date(now.getTime() - 7 * DAY_MS),
+    end: now,
   }
 }
 
