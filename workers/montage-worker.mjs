@@ -180,7 +180,7 @@ async function trimSegment(ffmpeg, inputPath, outPath, clipLenSec) {
     '-t',
     String(len),
     '-vf',
-    'scale=1280:-2:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30',
+    'scale=w=1280:h=720:force_original_aspect_ratio=decrease,pad=1280:720:(ow-iw)/2:(oh-ih)/2,fps=30',
     '-c:v',
     'libx264',
     '-preset',
