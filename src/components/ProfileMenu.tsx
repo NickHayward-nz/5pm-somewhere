@@ -28,6 +28,12 @@ type MontageRow = {
   created_at: string
 }
 
+type MontageDownloadResponse = {
+  signedUrl?: string
+  filename?: string
+  error?: string
+}
+
 type MontageState =
   | { status: 'idle' | 'loading' }
   | { status: 'empty' }
@@ -109,6 +115,7 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
   const [montageState, setMontageState] = useState<MontageState>({ status: 'idle' })
   const [shareStatus, setShareStatus] = useState<string | null>(null)
   const [montageShareStatus, setMontageShareStatus] = useState<string | null>(null)
+  const [montageShareBusy, setMontageShareBusy] = useState(false)
   const [premiumRequiresSignIn, setPremiumRequiresSignIn] = useState(false)
 
   const displayName = userEmail?.trim() || ''
@@ -118,9 +125,11 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
     if (!montageOpen) {
       setMontageState({ status: 'idle' })
       setMontageShareStatus(null)
+      setMontageShareBusy(false)
       return
     }
     setMontageShareStatus(null)
+    setMontageShareBusy(false)
     if (!userId) {
       setMontageState({ status: 'error', message: 'Sign in to view your montage.' })
       return
@@ -232,32 +241,68 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
   }
 
   const handleShareMontageVideo = async (montage: MontageRow) => {
-    const url = montage.playback_url
-    if (!url) return
+    if (!sb || montageShareBusy) return
     const title =
       montage.title ??
-      (montageOpen === 'weekly' ? 'My weekly montage — 5PM Somewhere' : 'My monthly highlights — 5PM Somewhere')
-    const sharePayload = {
-      title,
-      text: 'Watch my montage on 5PM Somewhere.',
-      url,
-    }
+      (montage.kind === 'weekly' ? 'My weekly montage - 5PM Somewhere' : 'My monthly highlights - 5PM Somewhere')
+
+    setMontageShareBusy(true)
+    setMontageShareStatus('Preparing MP4...')
     try {
-      if (typeof navigator.share === 'function') {
-        await navigator.share(sharePayload)
+      const { data, error } = await sb.functions.invoke<MontageDownloadResponse>(
+        'get-montage-download-url',
+        { body: { montageId: montage.id } },
+      )
+      if (error) throw new Error(error.message || 'Could not prepare share link.')
+      if (!data?.signedUrl) throw new Error(data?.error || 'Could not prepare share link.')
+
+      const filename = data.filename ?? `5pm-${montage.kind}-montage.mp4`
+      const downloadUrl = data.signedUrl
+      const mp4Response = await fetch(downloadUrl)
+      if (!mp4Response.ok) throw new Error('Could not download montage MP4.')
+      const blob = await mp4Response.blob()
+      const file = new File([blob], filename, { type: blob.type || 'video/mp4' })
+      const canShareFiles =
+        typeof navigator.share === 'function' &&
+        (typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] }))
+
+      if (canShareFiles) {
+        await navigator.share({
+          title,
+          text: 'Watch my montage on 5PM Somewhere.',
+          files: [file],
+        })
         setMontageShareStatus('Share sheet opened.')
         return
       }
-      await navigator.clipboard?.writeText?.(url)
-      setMontageShareStatus('Playback link copied.')
+
+      if (typeof navigator.share === 'function') {
+        await navigator.share({
+          title,
+          text: 'Watch my montage on 5PM Somewhere.',
+          url: downloadUrl,
+        })
+        setMontageShareStatus('Share sheet opened with a temporary MP4 link.')
+        return
+      }
+
+      await navigator.clipboard?.writeText?.(downloadUrl)
+      setMontageShareStatus('Temporary MP4 download link copied.')
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       try {
-        await navigator.clipboard?.writeText?.(url)
-        setMontageShareStatus('Playback link copied.')
+        if (montage.playback_url) {
+          await navigator.clipboard?.writeText?.(montage.playback_url)
+          setMontageShareStatus('MP4 sharing failed. Playback link copied instead.')
+          return
+        }
       } catch {
-        setMontageShareStatus('Could not copy automatically — copy the stream URL from the address bar if your browser allows.')
+        /* fall through to generic error */
       }
+      const message = err instanceof Error ? err.message : 'Could not prepare montage share.'
+      setMontageShareStatus(message)
+    } finally {
+      setMontageShareBusy(false)
     }
   }
 
@@ -657,15 +702,18 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
                 {montageState.montage.status === 'ready' && montageState.montage.playback_url ? (
                   <>
                     <MontageVideo src={montageState.montage.playback_url} />
-                    {montageOpen === 'weekly' ? (
-                      <button
-                        type="button"
-                        onClick={() => void handleShareMontageVideo(montageState.montage)}
-                        className="btn-glow-muted mt-3 w-full min-h-[44px] text-sm touch-manipulation"
-                      >
-                        Share this montage
-                      </button>
-                    ) : null}
+                    <button
+                      type="button"
+                      onClick={() => void handleShareMontageVideo(montageState.montage)}
+                      disabled={montageShareBusy}
+                      className="btn-glow-muted mt-3 w-full min-h-[44px] text-sm touch-manipulation disabled:cursor-wait disabled:opacity-70"
+                    >
+                      {montageShareBusy
+                        ? 'Preparing share...'
+                        : montageOpen === 'weekly'
+                          ? 'Share this montage'
+                          : 'Share these highlights'}
+                    </button>
                     {montageShareStatus ? (
                       <div className="mt-2 text-center text-xs text-sunset-100/75">{montageShareStatus}</div>
                     ) : null}

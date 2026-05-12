@@ -458,6 +458,7 @@ async function processOneUser(sb, opts) {
         mux_asset_id: assetId,
         mux_playback_id: playbackId ?? null,
         playback_url: playbackUrl,
+        storage_path: objectPath,
         duration_sec: 30,
         error_message: null,
       })
