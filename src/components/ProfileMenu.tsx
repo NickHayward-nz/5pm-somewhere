@@ -258,22 +258,32 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
 
       const filename = data.filename ?? `5pm-${montage.kind}-montage.mp4`
       const downloadUrl = data.signedUrl
-      const mp4Response = await fetch(downloadUrl)
-      if (!mp4Response.ok) throw new Error('Could not download montage MP4.')
-      const blob = await mp4Response.blob()
-      const file = new File([blob], filename, { type: blob.type || 'video/mp4' })
-      const canShareFiles =
-        typeof navigator.share === 'function' &&
-        (typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] }))
 
-      if (canShareFiles) {
-        await navigator.share({
-          title,
-          text: 'Watch my montage on 5PM Somewhere.',
-          files: [file],
-        })
-        setMontageShareStatus('Share sheet opened.')
-        return
+      // Fetching the MP4 in-page requires Storage CORS to allow your web origin. If fetch fails
+      // (common on desktop), we still share or copy the signed MP4 URL — not the HLS playback URL.
+      let mp4Blob: Blob | null = null
+      try {
+        const mp4Response = await fetch(downloadUrl)
+        if (mp4Response.ok) mp4Blob = await mp4Response.blob()
+      } catch {
+        mp4Blob = null
+      }
+
+      if (mp4Blob) {
+        const file = new File([mp4Blob], filename, { type: mp4Blob.type || 'video/mp4' })
+        const canShareFiles =
+          typeof navigator.share === 'function' &&
+          (typeof navigator.canShare !== 'function' || navigator.canShare({ files: [file] }))
+
+        if (canShareFiles) {
+          await navigator.share({
+            title,
+            text: 'Watch my montage on 5PM Somewhere.',
+            files: [file],
+          })
+          setMontageShareStatus('Share sheet opened.')
+          return
+        }
       }
 
       if (typeof navigator.share === 'function') {
@@ -282,22 +292,32 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
           text: 'Watch my montage on 5PM Somewhere.',
           url: downloadUrl,
         })
-        setMontageShareStatus('Share sheet opened with a temporary MP4 link.')
+        setMontageShareStatus(
+          mp4Blob
+            ? 'Share sheet opened with a temporary MP4 link.'
+            : 'Share sheet opened. Use Save / Open in app for the MP4 (in-browser download was blocked).',
+        )
         return
       }
 
       await navigator.clipboard?.writeText?.(downloadUrl)
-      setMontageShareStatus('Temporary MP4 download link copied.')
+      setMontageShareStatus(
+        mp4Blob
+          ? 'Temporary MP4 download link copied.'
+          : 'Temporary MP4 link copied. If Instagram needs a file, open the link to download the MP4.',
+      )
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
       try {
         if (montage.playback_url) {
           await navigator.clipboard?.writeText?.(montage.playback_url)
-          setMontageShareStatus('MP4 sharing failed. Playback link copied instead.')
+          setMontageShareStatus(
+            'Could not get an MP4 share link. Stream playback link copied instead — check that get-montage-download-url is deployed and the DB migration ran.',
+          )
           return
         }
       } catch {
-        /* fall through to generic error */
+        /* fall through */
       }
       const message = err instanceof Error ? err.message : 'Could not prepare montage share.'
       setMontageShareStatus(message)

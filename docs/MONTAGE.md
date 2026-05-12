@@ -82,6 +82,12 @@ curl -X POST "https://<your-worker-host>/" \
   -d '{"type":"weekly"}'
 ```
 
+## Sharing the MP4 from the app (Storage CORS)
+
+The profile UI can fetch the signed MP4 URL in the browser to pass a `File` into the native share sheet (better for Instagram-style targets). That **GET** is cross-origin (your site → `*.supabase.co` storage). If the **`montages`** bucket does not allow your production web origin in **Storage CORS**, the fetch will fail and the app will fall back to sharing or copying the **signed MP4 URL** instead (still an MP4 link, not the Mux HLS URL).
+
+In Supabase Dashboard: **Storage → Configuration (or bucket settings) → CORS** — add your site origin(s), e.g. `https://5pmsomewhere.live` and local dev if needed.
+
 ## Notes
 
 - The worker can run for several minutes (FFmpeg + Mux polling); use a host that allows long requests or run batch sizes accordingly.
