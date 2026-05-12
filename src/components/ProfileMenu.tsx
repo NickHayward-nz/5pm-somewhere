@@ -108,6 +108,7 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
   const [billingPortalStarting, setBillingPortalStarting] = useState(false)
   const [montageState, setMontageState] = useState<MontageState>({ status: 'idle' })
   const [shareStatus, setShareStatus] = useState<string | null>(null)
+  const [montageShareStatus, setMontageShareStatus] = useState<string | null>(null)
   const [premiumRequiresSignIn, setPremiumRequiresSignIn] = useState(false)
 
   const displayName = userEmail?.trim() || ''
@@ -116,8 +117,10 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
   useEffect(() => {
     if (!montageOpen) {
       setMontageState({ status: 'idle' })
+      setMontageShareStatus(null)
       return
     }
+    setMontageShareStatus(null)
     if (!userId) {
       setMontageState({ status: 'error', message: 'Sign in to view your montage.' })
       return
@@ -224,6 +227,36 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
         setShareStatus('Link copied.')
       } catch {
         setShareStatus('Copy the link above to share.')
+      }
+    }
+  }
+
+  const handleShareMontageVideo = async (montage: MontageRow) => {
+    const url = montage.playback_url
+    if (!url) return
+    const title =
+      montage.title ??
+      (montageOpen === 'weekly' ? 'My weekly montage — 5PM Somewhere' : 'My monthly highlights — 5PM Somewhere')
+    const sharePayload = {
+      title,
+      text: 'Watch my montage on 5PM Somewhere.',
+      url,
+    }
+    try {
+      if (typeof navigator.share === 'function') {
+        await navigator.share(sharePayload)
+        setMontageShareStatus('Share sheet opened.')
+        return
+      }
+      await navigator.clipboard?.writeText?.(url)
+      setMontageShareStatus('Playback link copied.')
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'AbortError') return
+      try {
+        await navigator.clipboard?.writeText?.(url)
+        setMontageShareStatus('Playback link copied.')
+      } catch {
+        setMontageShareStatus('Could not copy automatically — copy the stream URL from the address bar if your browser allows.')
       }
     }
   }
@@ -622,7 +655,21 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
                 </div>
 
                 {montageState.montage.status === 'ready' && montageState.montage.playback_url ? (
-                  <MontageVideo src={montageState.montage.playback_url} />
+                  <>
+                    <MontageVideo src={montageState.montage.playback_url} />
+                    {montageOpen === 'weekly' ? (
+                      <button
+                        type="button"
+                        onClick={() => void handleShareMontageVideo(montageState.montage)}
+                        className="btn-glow-muted mt-3 w-full min-h-[44px] text-sm touch-manipulation"
+                      >
+                        Share this montage
+                      </button>
+                    ) : null}
+                    {montageShareStatus ? (
+                      <div className="mt-2 text-center text-xs text-sunset-100/75">{montageShareStatus}</div>
+                    ) : null}
+                  </>
                 ) : montageState.montage.status === 'failed' ? (
                   <div className="mt-3 rounded-xl border border-red-300/30 bg-red-900/20 px-4 py-3 text-sm text-red-100">
                     Montage generation failed: {montageState.montage.error_message ?? 'Unknown error'}
