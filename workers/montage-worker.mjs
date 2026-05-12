@@ -219,22 +219,16 @@ async function concatSegments(ffmpeg, segmentPaths, outPath) {
   await execFileAsync(ffmpeg, args)
 }
 
-async function addMusicTitle(ffmpeg, videoIn, audioStoragePath, sb, titleLine, outPath) {
+async function addMusicTitle(ffmpeg, videoIn, audioStoragePath, sb, _titleLine, outPath) {
   const { data: musicBlob, error: dlErr } = await sb.storage.from('music').download(audioStoragePath)
   if (dlErr) throw dlErr
   const dir = path.dirname(outPath)
   const musicTmp = path.join(dir, 'music-audio.bin')
   await fs.writeFile(musicTmp, Buffer.from(await musicBlob.arrayBuffer()))
 
-  const titleFile = path.join(dir, 'title.txt')
-  await fs.writeFile(titleFile, titleLine, 'utf8')
-  const titlePathForFfmpeg = titleFile.replace(/\\/g, '/').replace(/:/g, '\\:').replace(/'/g, "\\'")
-
-  const fc = [
-    `[0:v]drawtext=textfile='${titlePathForFfmpeg}':fontsize=26:fontcolor=white:box=1:boxcolor=black@0.45:boxborderw=8:x=(w-text_w)/2:y=36[v]`,
-    `[1:a]volume=0.92[m]`,
-    `[0:a][m]amix=inputs=2:duration=first:dropout_transition=0[aout]`,
-  ].join(';')
+  // ffmpeg-static builds omit drawtext (needs libfreetype). Mix music under montage audio;
+  // period title stays on user_montages.title for the app UI.
+  const fc = [`[1:a]volume=0.92[m]`, `[0:a][m]amix=inputs=2:duration=first:dropout_transition=0[aout]`].join(';')
 
   await execFileAsync(ffmpeg, [
     '-y',
@@ -247,17 +241,13 @@ async function addMusicTitle(ffmpeg, videoIn, audioStoragePath, sb, titleLine, o
     '-filter_complex',
     fc,
     '-map',
-    '[v]',
+    '0:v',
     '-map',
     '[aout]',
     '-t',
     '30',
     '-c:v',
-    'libx264',
-    '-preset',
-    'veryfast',
-    '-crf',
-    '23',
+    'copy',
     '-c:a',
     'aac',
     '-shortest',
