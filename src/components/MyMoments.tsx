@@ -3,6 +3,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { DateTime } from 'luxon'
 import { getSupabase } from '../lib/supabase'
 import { CopyrightFooter } from './CopyrightFooter'
+import { SHARE_SOCIAL_TAGS } from '../lib/share'
 
 type MomentRow = {
   id: string
@@ -32,7 +33,8 @@ function buildAppUrl(): string {
 }
 
 function buildShareText(city: string): string {
-  return `My 5PM moment from ${city} 🌅 Watch it on 5PM Somewhere!`
+  return `My 5PM moment from ${city} 🌅 Watch it on 5PM Somewhere!
+${SHARE_SOCIAL_TAGS}`
 }
 
 async function shareMoment(params: { moment: MomentRow }): Promise<void> {

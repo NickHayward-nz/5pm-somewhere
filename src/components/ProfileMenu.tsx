@@ -8,10 +8,14 @@ import { PrivacyPolicyText, TermsOfServiceText } from './PolicyLegalContent'
 import { PwaInstallPrompt } from './PwaInstallPrompt'
 import { NotificationSettings } from './NotificationSettings'
 import { startBillingPortal, startPremiumCheckout } from '../lib/premium'
+import { SHARE_SOCIAL_TAGS } from '../lib/share'
 
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
 const PROFILE_SHARE_TITLE = '5PM Somewhere'
-const PROFILE_SHARE_TEXT = 'Join me on 5PM Somewhere and share your 5PM moment.'
+const PROFILE_SHARE_TEXT = `Join me on 5PM Somewhere and share your 5PM moment.
+${SHARE_SOCIAL_TAGS}`
+const MONTAGE_SHARE_TEXT = `Watch my montage on 5PM Somewhere.
+${SHARE_SOCIAL_TAGS}`
 const SHARE_PATH = '/share'
 
 type MontageKind = 'weekly' | 'monthly'
@@ -278,7 +282,7 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
         if (canShareFiles) {
           await navigator.share({
             title,
-            text: 'Watch my montage on 5PM Somewhere.',
+            text: MONTAGE_SHARE_TEXT,
             files: [file],
           })
           setMontageShareStatus('Share sheet opened.')
@@ -289,7 +293,7 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
       if (typeof navigator.share === 'function') {
         await navigator.share({
           title,
-          text: 'Watch my montage on 5PM Somewhere.',
+          text: MONTAGE_SHARE_TEXT,
           url: downloadUrl,
         })
         setMontageShareStatus(
@@ -300,7 +304,7 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
         return
       }
 
-      await navigator.clipboard?.writeText?.(downloadUrl)
+      await navigator.clipboard?.writeText?.(`${MONTAGE_SHARE_TEXT}\n${downloadUrl}`)
       setMontageShareStatus(
         mp4Blob
           ? 'Temporary MP4 download link copied.'
@@ -310,7 +314,7 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
       if (err instanceof DOMException && err.name === 'AbortError') return
       try {
         if (montage.playback_url) {
-          await navigator.clipboard?.writeText?.(montage.playback_url)
+          await navigator.clipboard?.writeText?.(`${MONTAGE_SHARE_TEXT}\n${montage.playback_url}`)
           setMontageShareStatus(
             'Could not get an MP4 share link. Stream playback link copied instead — check that get-montage-download-url is deployed and the DB migration ran.',
           )

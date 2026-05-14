@@ -28,7 +28,9 @@ function buildAppLink(): string {
  * Text appended to every share. Supported browsers will typically present
  * this as the caption / message body for the user to edit before posting.
  */
-export const SHARE_CAPTION = `Captured at 5PM Somewhere → ${buildAppLink()}`
+export const SHARE_SOCIAL_TAGS = '@5pmsomewhere.live #5pmsomewhere'
+export const SHARE_CAPTION = `Captured at 5PM Somewhere → ${buildAppLink()}
+${SHARE_SOCIAL_TAGS}`
 
 /**
  * Paint a thin sunset-gradient border matching the app's bg-sunset-gradient
