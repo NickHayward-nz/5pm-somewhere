@@ -12,7 +12,7 @@ export function msUntilNextFivePmLocal(localNow: DateTime): number {
 
 export const ALMOST_FIVE_TITLE = "It's almost 5:00 PM!"
 export const ALMOST_FIVE_BODY =
-  "Your 5-minute window to capture today's moment opens in 10 minutes"
+  "Your 5:00 PM capture window opens in 10 minutes — get ready to record."
 
 /** Half-width of the “10 minutes before” band (ms), so we still fire if the tab wakes a bit late. */
 export const REMINDER_BAND_MS = 90_000

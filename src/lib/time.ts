@@ -57,7 +57,10 @@ export function formatClock(dt: DateTime) {
   return dt.toFormat('h:mm:ss a')
 }
 
-export function getLocalCaptureWindow(now = DateTime.local(), windowMinutes: 5 | 8) {
+export function getLocalCaptureWindow(
+  now = DateTime.local(),
+  windowMinutes: number = 15,
+) {
   const start = now.set({ hour: 17, minute: 0, second: 0, millisecond: 0 })
   const end = start.plus({ minutes: windowMinutes })
   const active = now >= start && now < end
