@@ -98,12 +98,16 @@ the function locally (`supabase functions serve stripe-webhook --env-file .env`)
 
 ## 7. Going to production
 
-- Switch the dashboard from **Test mode** to **Live mode** and copy
-  `sk_live_...` + the live-mode price id + the live-mode webhook secret.
-- Update the three `supabase secrets set ...` calls accordingly.
-- Re-deploy all Stripe functions.
-- Deploy a new client build and set `SITE_URL=https://5pmsomewhere.live` so
-  Checkout, Billing Portal, and notification opens return to the production domain.
+See **`docs/STRIPE_GO_LIVE.md`** for the full step-by-step checklist (Stripe
+Dashboard, live webhook URL, Supabase secrets, smoke test, and optional DB cleanup).
+
+Summary:
+
+- Switch Stripe to **Live mode**; create a live price; register a **live** webhook.
+- `supabase secrets set` for `STRIPE_SECRET_KEY` (`sk_live_...`),
+  `STRIPE_PRICE_ID`, `STRIPE_WEBHOOK_SECRET`, and `SITE_URL`.
+- `npm run deploy:stripe`
+- No frontend env vars change — the client never holds Stripe keys.
 
 ## 8. PWA-only distribution
 
