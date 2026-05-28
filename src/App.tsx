@@ -28,6 +28,12 @@ import {
   startPremiumCheckout,
   type CheckoutReturnStatus,
 } from './lib/premium'
+import {
+  captureEvent,
+  capturePageView,
+  identifyUser,
+  resetAnalytics,
+} from './lib/analytics'
 
 type FeaturedCity = {
   city: City
@@ -172,6 +178,7 @@ function HowItWorksPage({ isSignedIn, isPremium, onBack, onWatchLive, onSignIn, 
               Premium benefits
             </div>
             <div className="grid gap-2 text-xs leading-relaxed text-sunset-100/80 sm:grid-cols-2">
+              <div>Longer 5:00 PM window: 30 minutes to capture (free users get 15 minutes).</div>
               <div>Longer recordings: up to 30 seconds instead of the free recording length.</div>
               <div>More daily uploads: capture up to 3 moments per day.</div>
               <div>Premium priority: stronger placement in the live stream queue.</div>
@@ -290,11 +297,9 @@ function App() {
   const signedInToastShownRef = useRef(false)
   const userCity = 'Auckland'
   const userCountry = 'New Zealand'
-  // Dev-only local override: `?premium=1` / `?premium=0` still flips the
-  // stored flag so we can exercise premium flows without a real Stripe
-  // purchase. In production the authoritative source is
-  // `profiles.is_premium`, which the Stripe webhook maintains.
+  // Dev-only: `?premium=1` exercises capture flows without Stripe. Ignored in production.
   const premiumQuery = useMemo(() => {
+    if (!import.meta.env.DEV) return false
     try {
       const qs = new URLSearchParams(window.location.search)
       const q = qs.get('premium')
@@ -320,6 +325,10 @@ function App() {
   }, [])
 
   useEffect(() => {
+    capturePageView(howItWorksOpen ? '/how-it-works' : shareLandingOpen ? '/share' : '/')
+  }, [howItWorksOpen, shareLandingOpen])
+
+  useEffect(() => {
     const sb = getSupabase()
     if (!sb) return
     void sb.auth.getUser().then(({ data }: { data: { user: User | null } }) => {
@@ -333,10 +342,18 @@ function App() {
         setUserId(session.user?.id ?? null)
         setUserEmail(session.user?.email ?? null)
         if (event === 'SIGNED_IN' && !signedInToastShownRef.current) {
+          captureEvent('auth_signed_in', { auth_event: event })
+          if (session.user?.id) {
+            identifyUser({ id: session.user.id, email: session.user.email })
+          }
           signedInToastShownRef.current = true
           showToast("You're signed in.")
         }
       } else {
+        if (event === 'SIGNED_OUT') {
+          captureEvent('auth_signed_out')
+          resetAnalytics()
+        }
         if (!recordOpenRef.current) {
           setUserId(null)
           setUserEmail(null)
@@ -353,8 +370,10 @@ function App() {
     const status = consumeCheckoutReturnStatus()
     setCheckoutReturnStatus(status)
     if (status === 'success') {
+      captureEvent('premium_checkout_returned', { status })
       showToast('🎉 Welcome to Premium! Refreshing your perks…')
     } else if (status === 'cancelled') {
+      captureEvent('premium_checkout_returned', { status })
       showToast('Checkout cancelled — you can upgrade any time.')
     }
   }, [])
@@ -379,6 +398,18 @@ function App() {
   const maxUploadsPerDay = isPremium ? 3 : 1 + extraDailyUploads
   const hasUsedDailyQuota = uploadsToday >= maxUploadsPerDay
   const captureButtonDisabled = checkingDailyLimit
+
+  useEffect(() => {
+    if (!userId) return
+    identifyUser({
+      id: userId,
+      email: userEmail,
+      isPremium,
+      timezone: userTz,
+      currentStreak,
+      totalUploads: profile?.total_uploads ?? null,
+    })
+  }, [currentStreak, isPremium, profile?.total_uploads, userEmail, userId, userTz])
 
   const { candidates, bestCandidate } = useMemo(() => {
     if (!CITIES.length) {
@@ -515,6 +546,7 @@ function App() {
           onWatchLive={() => setLiveStreamOpen(true)}
           onSignIn={() => setHowItWorksSignInOpen(true)}
           onUpgrade={async () => {
+            captureEvent('premium_checkout_cta_clicked', { surface: 'how_it_works' })
             const result = await startPremiumCheckout()
             if (!result.ok) {
               window.alert(result.error)
@@ -649,25 +681,50 @@ function App() {
                   disabled={captureButtonDisabled}
                   title="Upload your 5PM moment during your active window"
                   onClick={() => {
+                    captureEvent('capture_intent', {
+                      active_window: captureWindow.active,
+                      is_premium: captureIsPremium,
+                      has_used_daily_quota: hasUsedDailyQuota,
+                      uploads_today: uploadsToday,
+                      max_uploads_per_day: maxUploadsPerDay,
+                      streak_days: currentStreak,
+                    })
                     if (!captureWindow.active) {
+                      captureEvent('capture_blocked', {
+                        reason: 'outside_window',
+                        diff_minutes: captureWindow.diffMinutes,
+                        timezone: userTz,
+                      })
                       showToast(
                         "You're outside your personal 5:00 PM window — come back at 5:00 PM local time!",
                       )
                       return
                     }
                     if (hasUsedDailyQuota) {
-                      trackDailyLimitHit({ userId, tz: userTz })
+                      trackDailyLimitHit({
+                        userId,
+                        tz: userTz,
+                        uploads_today: uploadsToday,
+                        max_uploads_per_day: maxUploadsPerDay,
+                      })
+                      captureEvent('capture_blocked', { reason: 'daily_limit' })
                       setDailyLimitModalOpen(true)
                       return
                     }
                     if (!userId) {
+                      captureEvent('capture_blocked', { reason: 'sign_in_required' })
                       setSignInForCaptureOpen(true)
                       return
                     }
                     if (!profile?.upload_terms_accepted_at) {
+                      captureEvent('capture_blocked', { reason: 'upload_terms_required' })
                       setUploadConsentOpen(true)
                       return
                     }
+                    captureEvent('capture_modal_opened', {
+                      is_premium: captureIsPremium,
+                      timezone: userTz,
+                    })
                     setRecordOpen(true)
                   }}
                 >
@@ -726,6 +783,7 @@ function App() {
             window.alert(error.message ?? 'Could not save your agreement. Please try again.')
             return
           }
+          captureEvent('upload_terms_accepted', { userId })
           await refetchProfile()
           setUploadConsentOpen(false)
           setRecordOpen(true)
@@ -809,6 +867,7 @@ function App() {
               <button
                 type="button"
                 onClick={async () => {
+                  captureEvent('premium_checkout_cta_clicked', { surface: 'daily_limit_modal' })
                   const result = await startPremiumCheckout()
                   if (!result.ok) {
                     window.alert(result.error)

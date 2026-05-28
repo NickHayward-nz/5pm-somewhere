@@ -10,6 +10,7 @@
 // `?checkout=success`.
 
 import { getSupabase } from './supabase'
+import { captureEvent } from './analytics'
 
 export type StartCheckoutResult =
   | { ok: true; url: string }
@@ -21,11 +22,16 @@ export type StartCheckoutResult =
  * `window.location.href` to that URL.
  */
 export async function startPremiumCheckout(): Promise<StartCheckoutResult> {
+  captureEvent('premium_checkout_started')
   const sb = getSupabase()
-  if (!sb) return { ok: false, error: 'Supabase client is not configured.' }
+  if (!sb) {
+    captureEvent('premium_checkout_failed', { reason: 'supabase_not_configured' })
+    return { ok: false, error: 'Supabase client is not configured.' }
+  }
 
   const { data: sessionData } = await sb.auth.getSession()
   if (!sessionData.session) {
+    captureEvent('premium_checkout_failed', { reason: 'not_signed_in' })
     return { ok: false, error: 'You need to sign in before upgrading to premium.' }
   }
 
@@ -35,11 +41,14 @@ export async function startPremiumCheckout(): Promise<StartCheckoutResult> {
   )
 
   if (error) {
+    captureEvent('premium_checkout_failed', { reason: 'edge_function_error' })
     return { ok: false, error: error.message ?? 'Checkout failed to start.' }
   }
   if (!data?.url) {
+    captureEvent('premium_checkout_failed', { reason: 'missing_url' })
     return { ok: false, error: data?.error ?? 'Checkout did not return a URL.' }
   }
+  captureEvent('premium_checkout_session_created')
   return { ok: true, url: data.url }
 }
 
@@ -49,11 +58,16 @@ export async function startPremiumCheckout(): Promise<StartCheckoutResult> {
  * from Stripe's hosted UI.
  */
 export async function startBillingPortal(): Promise<StartCheckoutResult> {
+  captureEvent('billing_portal_started')
   const sb = getSupabase()
-  if (!sb) return { ok: false, error: 'Supabase client is not configured.' }
+  if (!sb) {
+    captureEvent('billing_portal_failed', { reason: 'supabase_not_configured' })
+    return { ok: false, error: 'Supabase client is not configured.' }
+  }
 
   const { data: sessionData } = await sb.auth.getSession()
   if (!sessionData.session) {
+    captureEvent('billing_portal_failed', { reason: 'not_signed_in' })
     return { ok: false, error: 'You need to sign in before managing your subscription.' }
   }
 
@@ -63,11 +77,14 @@ export async function startBillingPortal(): Promise<StartCheckoutResult> {
   )
 
   if (error) {
+    captureEvent('billing_portal_failed', { reason: 'edge_function_error' })
     return { ok: false, error: error.message ?? 'Billing portal failed to open.' }
   }
   if (!data?.url) {
+    captureEvent('billing_portal_failed', { reason: 'missing_url' })
     return { ok: false, error: data?.error ?? 'Billing portal did not return a URL.' }
   }
+  captureEvent('billing_portal_session_created')
   return { ok: true, url: data.url }
 }
 

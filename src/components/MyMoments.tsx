@@ -4,6 +4,7 @@ import { DateTime } from 'luxon'
 import { getSupabase } from '../lib/supabase'
 import { CopyrightFooter } from './CopyrightFooter'
 import { SHARE_SOCIAL_TAGS } from '../lib/share'
+import { captureEvent } from '../lib/analytics'
 
 type MomentRow = {
   id: string
@@ -41,6 +42,11 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
   const { moment } = params
   const text = buildShareText(moment.city)
   const appUrl = buildAppUrl()
+  captureEvent('video_share_started', {
+    surface: 'my_moments',
+    moment_id: moment.id,
+    city: moment.city,
+  })
 
   // Attempt to share the actual video file (so the share sheet treats it as a video).
   const videoFile = await getVideoFile(moment.video_url)
@@ -51,9 +57,19 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
     const payload = `${text}\n${appUrl}`
     try {
       await navigator.clipboard.writeText(payload)
+      captureEvent('video_share_result', {
+        surface: 'my_moments',
+        result: 'clipboard',
+        moment_id: moment.id,
+      })
       return
     } catch {
       window.alert(payload)
+      captureEvent('video_share_result', {
+        surface: 'my_moments',
+        result: 'alert_fallback',
+        moment_id: moment.id,
+      })
       return
     }
   }
@@ -68,6 +84,11 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
           text,
           url: appUrl,
           files: [videoFile],
+        })
+        captureEvent('video_share_result', {
+          surface: 'my_moments',
+          result: 'file_shared',
+          moment_id: moment.id,
         })
         return
       }
@@ -87,6 +108,11 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
         text: payloadText,
         url: moment.video_url,
       })
+      captureEvent('video_share_result', {
+        surface: 'my_moments',
+        result: 'video_url_shared',
+        moment_id: moment.id,
+      })
       return
     }
   } catch {
@@ -94,6 +120,11 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
   }
 
   await nav.share({ title: '5PM Somewhere', text, url: appUrl })
+  captureEvent('video_share_result', {
+    surface: 'my_moments',
+    result: 'app_url_shared',
+    moment_id: moment.id,
+  })
 }
 
 async function getVideoFile(videoUrl: string): Promise<File | null> {

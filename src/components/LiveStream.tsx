@@ -4,6 +4,7 @@ import { getSupabase } from '../lib/supabase'
 import { formatReachViews, incrementMomentView, type ReachStats } from '../lib/reach'
 import { getStreakTier } from '../lib/capture'
 import { CopyrightFooter } from './CopyrightFooter'
+import { captureEvent } from '../lib/analytics'
 
 export type MomentRow = {
   id: string
@@ -133,13 +134,17 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     fetchMore().then((rows) => {
       setQueue(rows)
       setLoading(false)
+      captureEvent('live_stream_opened', {
+        queue_size: rows.length,
+        current_streak: currentStreak,
+      })
       if (rows.length === 0) {
         setError(
           `No moments in the last ${LIVE_WINDOW_HOURS} hours — check back soon.`,
         )
       }
     })
-  }, [open, fetchMore])
+  }, [open, fetchMore, currentStreak])
 
   useEffect(() => {
     if (!open || queue.length === 0) return
@@ -257,6 +262,13 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
           alreadyReacted = false
         }
       }
+
+      captureEvent('moment_reaction_toggled', {
+        moment_id: momentId,
+        reaction_type: REACTION_FIELD_TO_TYPE[field],
+        state: alreadyReacted ? 'removed' : 'added',
+        signed_in: Boolean(userId),
+      })
 
       if (alreadyReacted) {
         // Undo: decrement
@@ -654,6 +666,11 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     if (!currentMomentId || (userId && currentOwnerId === userId)) return
 
     void incrementMomentView(currentMomentId)
+    captureEvent('moment_viewed', {
+      moment_id: currentMomentId,
+      owner_user_id: currentOwnerId,
+      viewer_signed_in: Boolean(userId),
+    })
   }, [currentMomentId, currentOwnerId, userId])
 
   const handleLoadedMetadata = useCallback(() => {}, [])
