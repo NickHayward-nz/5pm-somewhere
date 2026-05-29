@@ -13,6 +13,7 @@ import {
 import { CopyrightFooter } from './CopyrightFooter'
 import { pruneExcessMomentsForFreeUser } from '../lib/momentsRetention'
 import { prepareShareableVideo, shareVideoNatively, SHARE_CAPTION, drawSunsetBorder } from '../lib/share'
+import { captureEvent } from '../lib/analytics'
 
 type Props = {
   open: boolean
@@ -108,6 +109,7 @@ export function RecordMoment(props: Props) {
 
     let stream: MediaStream | null = null
     try {
+      captureEvent('camera_permission_requested', { is_premium: isPremium, timezone: userTz })
       stream = await navigator.mediaDevices.getUserMedia({
         video: { facingMode: 'user' },
         audio: true,
@@ -118,6 +120,7 @@ export function RecordMoment(props: Props) {
         setStep('idle')
         return
       }
+      captureEvent('camera_permission_granted', { is_premium: isPremium, timezone: userTz })
       streamRef.current = stream
       const video = videoRef.current
       const canvas = canvasRef.current
@@ -425,10 +428,7 @@ export function RecordMoment(props: Props) {
           chunksRef.current = []
           recorder.start()
           recordingStartRef.current = Date.now()
-          // TEMP: if userId is missing, use a valid test UUID for analytics
-          const testUserId = '00000000-0000-0000-0000-000000000000'
-          const effectiveId = userId || testUserId
-          trackCaptureStarted({ userId: effectiveId, isPremium, tz: userTz })
+          trackCaptureStarted({ userId, isPremium, tz: userTz, city, country })
           const tick = () => {
             const start = recordingStartRef.current
             if (!start) return
@@ -449,6 +449,11 @@ export function RecordMoment(props: Props) {
       const err = e as Error & { name?: string; stack?: string }
        
       console.error('getUserMedia failed:', err.name, err.message, err.stack)
+      captureEvent('camera_permission_failed', {
+        error_name: err.name ?? 'Error',
+        is_premium: isPremium,
+        timezone: userTz,
+      })
       setError('Unable to access camera or microphone.')
       setStep('error')
       cleanup()
@@ -477,6 +482,7 @@ export function RecordMoment(props: Props) {
     setSharing(true)
     setShareStatus(null)
     try {
+      captureEvent('video_share_started', { surface: 'post_capture', is_premium: isPremium })
       // Premium users already have the sunset border baked into the recording (see drawFrame).
       // Free users need the border added on-the-fly before sharing. Either way we append
       // the share caption via the native share sheet so captions/link ride along.
@@ -487,6 +493,11 @@ export function RecordMoment(props: Props) {
       const result = await shareVideoNatively(prepared, {
         title: "I'm 5PM Somewhere",
         caption: SHARE_CAPTION,
+      })
+      captureEvent('video_share_result', {
+        surface: 'post_capture',
+        result,
+        is_premium: isPremium,
       })
       if (result === 'shared') {
         setShareStatus('Shared! 🎉')
@@ -504,6 +515,10 @@ export function RecordMoment(props: Props) {
     } catch (err) {
        
       console.error('Share failed:', err)
+      captureEvent('video_share_failed', {
+        surface: 'post_capture',
+        error_name: err instanceof Error ? err.name : 'UnknownError',
+      })
       setShareStatus('Could not prepare the share. Try again, or tap Done and share from My Moments.')
     } finally {
       setSharing(false)
@@ -516,9 +531,15 @@ export function RecordMoment(props: Props) {
     const start = recordingStartRef.current
     const sec = start ? Math.floor((Date.now() - start) / 1000) : 0
     if (sec < MIN_SEC) {
+      captureEvent('recording_too_short', {
+        duration_sec: sec,
+        min_sec: MIN_SEC,
+        is_premium: isPremium,
+      })
       setError(`Please record at least ${MIN_SEC} seconds.`)
       return
     }
+    captureEvent('recording_stopped', { duration_sec: sec, is_premium: isPremium })
     setDurationSec(sec)
     recorder.stop()
   }
@@ -527,6 +548,13 @@ export function RecordMoment(props: Props) {
     if (!previewUrl) return
     setStep('uploading')
     setError(null)
+    captureEvent('video_upload_started', {
+      duration_sec: durationSec,
+      is_premium: isPremium,
+      timezone: userTz,
+      city,
+      country,
+    })
     try {
       const sb = getSupabase()
       if (!sb) throw new Error('Supabase is not configured.')
@@ -562,6 +590,10 @@ export function RecordMoment(props: Props) {
       if (storageError || !storageData?.path) {
         throw storageError || new Error('Upload failed at storage step')
       }
+      captureEvent('video_storage_uploaded', {
+        duration_sec: durationSec,
+        is_premium: isPremium,
+      })
 
       const { data: publicUrlData } = sb.storage.from('moments').getPublicUrl(storageData.path)
       const videoUrl = publicUrlData.publicUrl
@@ -618,6 +650,15 @@ export function RecordMoment(props: Props) {
         onProfileUpdated()
       }
       trackVideoUploaded({ userId: authUserId, durationSec, isPremium, tz: userTz })
+      captureEvent('video_upload_succeeded', {
+        duration_sec: durationSec,
+        is_premium: isPremium,
+        timezone: userTz,
+        city,
+        country,
+        streak_days_before_upload: profile?.current_streak ?? 0,
+        total_uploads_before_upload: profile?.total_uploads ?? 0,
+      })
       incrementUploadsToday(userId, userTz)
       setStep('success')
     } catch (e) {
@@ -626,6 +667,11 @@ export function RecordMoment(props: Props) {
       console.error('Error name:', err.name)
       console.error('Error message:', err.message)
       console.error('Full error:', err)
+      captureEvent('video_upload_failed', {
+        error_name: err.name ?? 'Error',
+        duration_sec: durationSec,
+        is_premium: isPremium,
+      })
       setError('Upload failed. Please try again.')
       setStep('error')
       window.alert('Upload failed: ' + (err.message || 'Unknown error'))

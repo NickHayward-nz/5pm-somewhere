@@ -15,9 +15,15 @@
     "deploy:send-5pm-notifications": "supabase functions deploy send-5pm-notifications --no-verify-jwt",
     "deploy:checkout-fn": "supabase functions deploy create-checkout-session",
     "deploy:billing-portal-fn": "supabase functions deploy create-billing-portal-session --no-verify-jwt",
-    "deploy:stripe-webhook": "supabase functions deploy stripe-webhook --no-verify-jwt"
+    "deploy:stripe-webhook": "supabase functions deploy stripe-webhook --no-verify-jwt",
+    "deploy:stripe": "npm run deploy:checkout-fn && npm run deploy:billing-portal-fn && npm run deploy:stripe-webhook",
+    "check:edge-fmt": "deno fmt --check supabase/functions",
+    "check:edge-lint": "deno lint --config supabase/functions/deno.json supabase/functions",
+    "check:edge-types": "deno check --config supabase/functions/deno.json supabase/functions/_shared/stripeCustomer.ts supabase/functions/create-billing-portal-session/index.ts supabase/functions/create-checkout-session/index.ts supabase/functions/get-montage-download-url/index.ts supabase/functions/montage-cron/index.ts supabase/functions/save-push-subscription/index.ts supabase/functions/send-5pm-notifications/index.ts supabase/functions/stripe-webhook/index.ts",
+    "check:edge": "npm run check:edge-fmt && npm run check:edge-lint && npm run check:edge-types"
   },
   "dependencies": {
+    "@sentry/react": "^10.53.1",
     "@supabase/supabase-js": "^2.49.1",
     "ffmpeg-static": "^5.3.0",
     "ffprobe-static": "^3.1.0",

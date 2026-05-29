@@ -1,0 +1,9 @@
+{
+  "nodeModulesDir": "auto",
+  "lint": {
+    "rules": {
+      "tags": ["recommended"],
+      "exclude": ["no-import-prefix", "ban-unused-ignore"]
+    }
+  }
+}

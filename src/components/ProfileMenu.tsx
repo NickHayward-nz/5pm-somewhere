@@ -9,6 +9,7 @@ import { PwaInstallPrompt } from './PwaInstallPrompt'
 import { NotificationSettings } from './NotificationSettings'
 import { startBillingPortal, startPremiumCheckout } from '../lib/premium'
 import { SHARE_SOCIAL_TAGS } from '../lib/share'
+import { captureEvent } from '../lib/analytics'
 
 const SUPPORT_EMAIL = 'its.5pm.somewhere.app@gmail.com'
 const PROFILE_SHARE_TITLE = '5PM Somewhere'
@@ -134,11 +135,14 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
     }
     setMontageShareStatus(null)
     setMontageShareBusy(false)
+    captureEvent('montage_opened', { kind: montageOpen })
     if (!userId) {
+      captureEvent('montage_load_result', { kind: montageOpen, result: 'sign_in_required' })
       setMontageState({ status: 'error', message: 'Sign in to view your montage.' })
       return
     }
     if (!sb) {
+      captureEvent('montage_load_result', { kind: montageOpen, result: 'supabase_not_configured' })
       setMontageState({ status: 'error', message: 'Supabase is not configured.' })
       return
     }
@@ -158,13 +162,21 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
 
       if (cancelled) return
       if (error) {
+        captureEvent('montage_load_result', { kind: montageOpen, result: 'error' })
         setMontageState({ status: 'error', message: error.message || 'Could not load your montage.' })
         return
       }
       if (!data) {
+        captureEvent('montage_load_result', { kind: montageOpen, result: 'empty' })
         setMontageState({ status: 'empty' })
         return
       }
+      captureEvent('montage_load_result', {
+        kind: montageOpen,
+        result: 'loaded',
+        montage_id: data.id,
+        montage_status: data.status,
+      })
       setMontageState({ status: 'loaded', montage: data as MontageRow })
     })()
 
@@ -176,10 +188,12 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
   const goPremium = async () => {
     if (checkoutStarting) return
     if (!userId) {
+      captureEvent('premium_checkout_cta_clicked', { surface: 'profile_menu_requires_sign_in' })
       setPremiumRequiresSignIn(true)
       return
     }
 
+    captureEvent('premium_checkout_cta_clicked', { surface: 'profile_menu' })
     setCheckoutStarting(true)
     const result = await startPremiumCheckout()
     setCheckoutStarting(false)
@@ -194,6 +208,7 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
   const manageSubscription = async () => {
     if (billingPortalStarting) return
 
+    captureEvent('billing_portal_cta_clicked', { surface: 'profile_menu' })
     setBillingPortalStarting(true)
     const result = await startBillingPortal()
     setBillingPortalStarting(false)
@@ -226,19 +241,23 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
     try {
       if (typeof navigator.share === 'function') {
         await navigator.share(sharePayload)
+        captureEvent('profile_share_result', { result: 'share_sheet' })
         setShareStatus('Share sheet opened.')
         return
       }
 
       await navigator.clipboard?.writeText?.(profileShareLink)
+      captureEvent('profile_share_result', { result: 'clipboard' })
       setShareStatus('Link copied.')
     } catch (err) {
       if (err instanceof DOMException && err.name === 'AbortError') return
 
       try {
         await navigator.clipboard?.writeText?.(profileShareLink)
+        captureEvent('profile_share_result', { result: 'clipboard_after_error' })
         setShareStatus('Link copied.')
       } catch {
+        captureEvent('profile_share_result', { result: 'manual_copy_required' })
         setShareStatus('Copy the link above to share.')
       }
     }
@@ -250,6 +269,10 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
       montage.title ??
       (montage.kind === 'weekly' ? 'My weekly montage - 5PM Somewhere' : 'My monthly highlights - 5PM Somewhere')
 
+    captureEvent('montage_share_started', {
+      kind: montage.kind,
+      montage_id: montage.id,
+    })
     setMontageShareBusy(true)
     setMontageShareStatus('Preparing MP4...')
     try {
@@ -285,6 +308,11 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
             text: MONTAGE_SHARE_TEXT,
             files: [file],
           })
+          captureEvent('montage_share_result', {
+            kind: montage.kind,
+            montage_id: montage.id,
+            result: 'file_shared',
+          })
           setMontageShareStatus('Share sheet opened.')
           return
         }
@@ -296,6 +324,11 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
           text: MONTAGE_SHARE_TEXT,
           url: downloadUrl,
         })
+        captureEvent('montage_share_result', {
+          kind: montage.kind,
+          montage_id: montage.id,
+          result: mp4Blob ? 'download_url_shared_after_file_unsupported' : 'download_url_shared',
+        })
         setMontageShareStatus(
           mp4Blob
             ? 'Share sheet opened with a temporary MP4 link.'
@@ -305,6 +338,11 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
       }
 
       await navigator.clipboard?.writeText?.(`${MONTAGE_SHARE_TEXT}\n${downloadUrl}`)
+      captureEvent('montage_share_result', {
+        kind: montage.kind,
+        montage_id: montage.id,
+        result: 'clipboard_download_url',
+      })
       setMontageShareStatus(
         mp4Blob
           ? 'Temporary MP4 download link copied.'
@@ -315,6 +353,11 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
       try {
         if (montage.playback_url) {
           await navigator.clipboard?.writeText?.(`${MONTAGE_SHARE_TEXT}\n${montage.playback_url}`)
+          captureEvent('montage_share_result', {
+            kind: montage.kind,
+            montage_id: montage.id,
+            result: 'clipboard_playback_url_after_error',
+          })
           setMontageShareStatus(
             'Could not get an MP4 share link. Stream playback link copied instead — check that get-montage-download-url is deployed and the DB migration ran.',
           )
@@ -324,6 +367,11 @@ export function ProfileMenu({ userEmail, userId, userTz, isPremium, onOpenMyMome
         /* fall through */
       }
       const message = err instanceof Error ? err.message : 'Could not prepare montage share.'
+      captureEvent('montage_share_failed', {
+        kind: montage.kind,
+        montage_id: montage.id,
+        error_name: err instanceof Error ? err.name : 'UnknownError',
+      })
       setMontageShareStatus(message)
     } finally {
       setMontageShareBusy(false)

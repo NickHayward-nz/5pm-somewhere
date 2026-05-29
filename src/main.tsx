@@ -5,7 +5,9 @@ import './index.css'
 import App from './App.tsx'
 import './pwa.ts'
 import { initAnalytics } from './lib/analytics.ts'
+import { initMonitoring } from './lib/monitoring.ts'
 
+initMonitoring()
 initAnalytics()
 
 createRoot(document.getElementById('root')!).render(

@@ -3,6 +3,10 @@ import { DateTime } from 'luxon'
 import { getSupabase } from './supabase'
 import { captureEvent } from './analytics'
 
+/** Minutes after 5:00 PM local time when capture is allowed (inclusive). */
+export const CAPTURE_WINDOW_MINUTES_FREE = 15
+export const CAPTURE_WINDOW_MINUTES_PREMIUM = 30
+
 export type CaptureWindowState = {
   active: boolean
   diffMinutes: number
@@ -48,7 +52,7 @@ export const STREAK_TIERS: StreakTier[] = [
     perks: [
       'Larger visibility boost',
       'Significant queue priority',
-      'Unlock +2 minutes recording window (5:00 PM–5:07 PM)',
+      'Unlock +2 minutes on your 5:00 PM capture window',
     ],
     visibilityBoost: 'large',
     extraWindowMinutes: 2,
@@ -173,10 +177,12 @@ export function computeCaptureWindow(
   const diffMinutes = (local.hour - 17) * 60 + local.minute
 
   // Base capture windows (minutes after 5:00 PM local time):
-  //   Free users    → 5 min  (5:00–5:05)
-  //   Premium users → 7 min  (5:00–5:07), a flat +2 minutes over free per spec
+  //   Free users    → 15 min (5:00–5:15)
+  //   Premium users → 30 min (5:00–5:30)
   // Streak tiers may add additional minutes on top of the base window.
-  const baseMaxMinutes = isPremium ? 7 : 5
+  const baseMaxMinutes = isPremium
+    ? CAPTURE_WINDOW_MINUTES_PREMIUM
+    : CAPTURE_WINDOW_MINUTES_FREE
   const tier = getStreakTier(currentStreak)
   const extra = tier?.extraWindowMinutes ?? 0
   const maxMinutes = baseMaxMinutes + extra

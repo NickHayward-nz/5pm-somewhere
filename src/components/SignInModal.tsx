@@ -2,6 +2,7 @@
 import { useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 import { CopyrightFooter } from './CopyrightFooter'
+import { captureEvent } from '../lib/analytics'
 
 type Props = {
   open: boolean
@@ -25,6 +26,7 @@ export function SignInModal({ open, onClose, contextMessage }: Props) {
     }
     try {
       const redirectTo = `${window.location.origin}/auth/callback`
+      captureEvent('auth_sign_in_started', { provider: 'google' })
       await sb.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -34,6 +36,7 @@ export function SignInModal({ open, onClose, contextMessage }: Props) {
     } catch (e) {
        
       console.error(e)
+      captureEvent('auth_sign_in_failed', { provider: 'google' })
       window.alert('Unable to start Google sign-in. Please try again.')
     }
   }
@@ -44,6 +47,7 @@ export function SignInModal({ open, onClose, contextMessage }: Props) {
       return
     }
     try {
+      captureEvent('auth_magic_link_requested', { provider: 'email' })
       await sb.auth.signInWithOtp({
         email: email.trim(),
         options: {
@@ -54,6 +58,7 @@ export function SignInModal({ open, onClose, contextMessage }: Props) {
     } catch (e) {
        
       console.error(e)
+      captureEvent('auth_magic_link_failed', { provider: 'email' })
       window.alert('Unable to send magic link.')
     }
   }
