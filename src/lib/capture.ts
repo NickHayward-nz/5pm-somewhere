@@ -193,6 +193,25 @@ export function computeCaptureWindow(
   return { active, diffMinutes, label }
 }
 
+/**
+ * True when a non‑premium user is past their free capture window but still
+ * within the premium window (e.g. 5:16–5:30 for default tiers).
+ */
+export function isInPremiumExtensionCaptureWindow(
+  now: DateTime,
+  userTz: string,
+  isPremium: boolean,
+  currentStreak: number | null | undefined,
+): boolean {
+  if (isPremium) return false
+  const local = now.setZone(userTz)
+  const diffMinutes = (local.hour - 17) * 60 + local.minute
+  const extra = getStreakTier(currentStreak)?.extraWindowMinutes ?? 0
+  const freeMax = CAPTURE_WINDOW_MINUTES_FREE + extra
+  const premiumMax = CAPTURE_WINDOW_MINUTES_PREMIUM + extra
+  return diffMinutes > freeMax && diffMinutes <= premiumMax
+}
+
 /** Returns true if last_post_date is today in the user's timezone (Luxon). */
 export function hasPostedToday(lastPostDate: string | null, userTz: string): boolean {
   if (!lastPostDate) return false

@@ -13,6 +13,7 @@ import {
   getStreakTier,
   getUploadsToday,
   getUserTimezone,
+  isInPremiumExtensionCaptureWindow,
   trackDailyLimitHit,
 } from './lib/capture'
 import { useProfile } from './hooks/useProfile'
@@ -285,6 +286,7 @@ function App() {
   const [liveStreamOpen, setLiveStreamOpen] = useState(false)
   const [myMomentsOpen, setMyMomentsOpen] = useState(false)
   const [dailyLimitModalOpen, setDailyLimitModalOpen] = useState(false)
+  const [premiumWindowModalOpen, setPremiumWindowModalOpen] = useState(false)
   const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
   const [signInForCaptureOpen, setSignInForCaptureOpen] = useState(false)
   const [shareLandingSignInOpen, setShareLandingSignInOpen] = useState(false)
@@ -690,6 +692,22 @@ function App() {
                       streak_days: currentStreak,
                     })
                     if (!captureWindow.active) {
+                      if (
+                        isInPremiumExtensionCaptureWindow(
+                          now,
+                          userTz,
+                          captureIsPremium,
+                          currentStreak,
+                        )
+                      ) {
+                        captureEvent('capture_blocked', {
+                          reason: 'premium_extension_window',
+                          diff_minutes: captureWindow.diffMinutes,
+                          timezone: userTz,
+                        })
+                        setPremiumWindowModalOpen(true)
+                        return
+                      }
                       captureEvent('capture_blocked', {
                         reason: 'outside_window',
                         diff_minutes: captureWindow.diffMinutes,
@@ -824,6 +842,67 @@ function App() {
           onClose={() => setMyMomentsOpen(false)}
           userId={userId}
         />
+      )}
+      {premiumWindowModalOpen && (
+        <div
+          className="fixed inset-0 z-[10000] flex items-center justify-center bg-black/70 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="premium-window-title"
+          onClick={() => setPremiumWindowModalOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl bg-midnight-900/95 p-4 shadow-xl border border-sunset-500/40"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-3">
+              <div
+                id="premium-window-title"
+                className="text-xs font-semibold tracking-[0.14em] uppercase text-sunset-100/80"
+              >
+                Capture window ended
+              </div>
+              <button
+                type="button"
+                onClick={() => setPremiumWindowModalOpen(false)}
+                className="text-[11px] text-sunset-100/70 hover:text-sunset-50"
+              >
+                Close
+              </button>
+            </div>
+            <p className="text-sm text-sunset-100/90 mb-4">
+              Your free 15-minute capture window has ended, but you&apos;re still within today&apos;s
+              5:00 PM period. Upgrade to Premium for an additional 15 minutes to capture your moment
+              (5:00–5:30 PM local time).
+            </p>
+            <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+              <button
+                type="button"
+                onClick={() => setPremiumWindowModalOpen(false)}
+                className="btn-glow-muted w-full sm:w-auto min-h-[44px] px-4 text-sm touch-manipulation"
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                onClick={async () => {
+                  captureEvent('premium_checkout_cta_clicked', {
+                    surface: 'premium_window_modal',
+                  })
+                  const result = await startPremiumCheckout()
+                  if (!result.ok) {
+                    window.alert(result.error)
+                    return
+                  }
+                  window.location.href = result.url
+                }}
+                className="btn-glow-gold w-full sm:w-auto min-h-[44px] px-4 text-sm touch-manipulation"
+              >
+                Upgrade to Premium
+              </button>
+            </div>
+          </div>
+        </div>
       )}
       {dailyLimitModalOpen && (
         <div
