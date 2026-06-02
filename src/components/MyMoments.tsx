@@ -5,6 +5,8 @@ import { getSupabase } from '../lib/supabase'
 import { CopyrightFooter } from './CopyrightFooter'
 import { SHARE_SOCIAL_TAGS } from '../lib/share'
 import { captureEvent } from '../lib/analytics'
+import { FREE_USER_MOMENT_LIMIT } from '../lib/momentsRetention'
+import { PremiumUpsellModal } from './PremiumUpsellModal'
 
 type MomentRow = {
   id: string
@@ -20,6 +22,7 @@ type Props = {
   open: boolean
   onClose: () => void
   userId: string
+  isPremium: boolean
 }
 
 type ShareNavigator = Navigator & {
@@ -272,12 +275,13 @@ function VideoPlayModal(props: {
   )
 }
 
-export default function MyMoments({ open, onClose, userId }: Props) {
+export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
   const sb = useMemo(() => getSupabase(), [])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [moments, setMoments] = useState<MomentRow[]>([])
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({})
+  const [libraryUpsellOpen, setLibraryUpsellOpen] = useState(false)
 
   const [playModal, setPlayModal] = useState<{
     open: boolean
@@ -289,8 +293,11 @@ export default function MyMoments({ open, onClose, userId }: Props) {
     caption: null,
   })
 
+  const atLibraryLimit = !isPremium && moments.length >= FREE_USER_MOMENT_LIMIT
+
   useEffect(() => {
     if (!open) return
+    setLibraryUpsellOpen(false)
     setLoading(true)
     setError(null)
 
@@ -312,11 +319,15 @@ export default function MyMoments({ open, onClose, userId }: Props) {
         setLoading(false)
         return
       }
-      setMoments((data ?? []) as MomentRow[])
+      const rows = (data ?? []) as MomentRow[]
+      setMoments(rows)
       setThumbs({})
       setLoading(false)
+      if (!isPremium && rows.length >= FREE_USER_MOMENT_LIMIT) {
+        captureEvent('premium_upsell_shown', { surface: 'my_moments_library_banner' })
+      }
     })()
-  }, [open, sb, userId])
+  }, [open, sb, userId, isPremium])
 
   useEffect(() => {
     if (!open) return
@@ -395,6 +406,25 @@ export default function MyMoments({ open, onClose, userId }: Props) {
         </div>
 
         <div className="p-4 overflow-auto" style={{ maxHeight: '70vh' }}>
+          {atLibraryLimit && !loading && !error && (
+            <div className="mb-4 rounded-xl border border-amber-300/35 bg-amber-300/10 px-3 py-3 text-xs leading-relaxed text-amber-100/90 sm:text-sm">
+              <p className="mb-2">
+                Free accounts keep your {FREE_USER_MOMENT_LIMIT} most recent moments. Upgrade to Premium to
+                keep your full library—older moments won&apos;t be removed when you post new ones.
+              </p>
+              <button
+                type="button"
+                onClick={() => {
+                  captureEvent('premium_upsell_cta_clicked', { surface: 'my_moments_library_banner' })
+                  setLibraryUpsellOpen(true)
+                }}
+                className="btn-glow-gold min-h-[40px] px-4 text-xs touch-manipulation"
+              >
+                Upgrade to Premium
+              </button>
+            </div>
+          )}
+
           {loading && (
             <div className="flex items-center justify-center py-16">
               <div className="h-12 w-12 animate-spin rounded-full border-2 border-sunset-400 border-t-transparent" />
@@ -483,6 +513,14 @@ export default function MyMoments({ open, onClose, userId }: Props) {
         url={playModal.url}
         caption={playModal.caption}
         onClose={() => setPlayModal({ open: false, url: '', caption: null })}
+      />
+
+      <PremiumUpsellModal
+        open={libraryUpsellOpen}
+        onClose={() => setLibraryUpsellOpen(false)}
+        title="Keep every moment"
+        message={`Free accounts keep your ${FREE_USER_MOMENT_LIMIT} most recent moments. Upgrade to Premium to keep your full history without automatic removals.`}
+        surface="my_moments_library_modal"
       />
     </div>
   )

@@ -21,10 +21,14 @@ export function momentsStoragePathFromPublicUrl(videoUrl: string): string | null
  * For free users only: keep the newest FREE_USER_MOMENT_LIMIT rows; remove older files and DB rows.
  * Does not touch `user_montages` or the `montages` bucket (premium montage outputs).
  */
+export type PruneExcessMomentsResult = {
+  prunedCount: number
+}
+
 export async function pruneExcessMomentsForFreeUser(
   sb: SupabaseClient,
   userId: string,
-): Promise<void> {
+): Promise<PruneExcessMomentsResult> {
   const { data: rows, error: selErr } = await sb
     .from('moments')
     .select('id, video_url')
@@ -32,7 +36,9 @@ export async function pruneExcessMomentsForFreeUser(
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
 
-  if (selErr || !rows?.length || rows.length <= FREE_USER_MOMENT_LIMIT) return
+  if (selErr || !rows?.length || rows.length <= FREE_USER_MOMENT_LIMIT) {
+    return { prunedCount: 0 }
+  }
 
   const excess = rows.slice(FREE_USER_MOMENT_LIMIT)
   const ids = excess.map((r) => r.id)
@@ -59,4 +65,6 @@ export async function pruneExcessMomentsForFreeUser(
      
     console.warn('momentsRetention: moments delete', delErr.message)
   }
+
+  return { prunedCount: excess.length }
 }

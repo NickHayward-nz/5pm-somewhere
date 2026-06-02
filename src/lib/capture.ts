@@ -6,6 +6,8 @@ import { captureEvent } from './analytics'
 /** Minutes after 5:00 PM local time when capture is allowed (inclusive). */
 export const CAPTURE_WINDOW_MINUTES_FREE = 15
 export const CAPTURE_WINDOW_MINUTES_PREMIUM = 30
+/** Warn free users this many minutes before their capture window ends. */
+export const FREE_WINDOW_CLOSING_SOON_MINUTES = 5
 
 export type CaptureWindowState = {
   active: boolean
@@ -210,6 +212,32 @@ export function isInPremiumExtensionCaptureWindow(
   const freeMax = CAPTURE_WINDOW_MINUTES_FREE + extra
   const premiumMax = CAPTURE_WINDOW_MINUTES_PREMIUM + extra
   return diffMinutes > freeMax && diffMinutes <= premiumMax
+}
+
+export type FreeWindowClosingSoonState = {
+  active: boolean
+  minutesLeft: number
+}
+
+/** True during the last N minutes of a free user’s active capture window. */
+export function getFreeCaptureWindowClosingSoon(
+  now: DateTime,
+  userTz: string,
+  isPremium: boolean,
+  currentStreak: number | null | undefined,
+  warnMinutes: number = FREE_WINDOW_CLOSING_SOON_MINUTES,
+): FreeWindowClosingSoonState {
+  if (isPremium) return { active: false, minutesLeft: 0 }
+  const local = now.setZone(userTz)
+  const diffMinutes = (local.hour - 17) * 60 + local.minute
+  const extra = getStreakTier(currentStreak)?.extraWindowMinutes ?? 0
+  const freeMax = CAPTURE_WINDOW_MINUTES_FREE + extra
+  if (diffMinutes < 0 || diffMinutes > freeMax) return { active: false, minutesLeft: 0 }
+  const minutesLeft = freeMax - diffMinutes
+  return {
+    active: minutesLeft <= warnMinutes,
+    minutesLeft,
+  }
 }
 
 /** Returns true if last_post_date is today in the user's timezone (Luxon). */

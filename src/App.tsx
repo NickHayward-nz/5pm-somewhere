@@ -10,6 +10,7 @@ import { Globe } from './components/Globe'
 import { getSupabase } from './lib/supabase'
 import {
   computeCaptureWindow,
+  getFreeCaptureWindowClosingSoon,
   getStreakTier,
   getUploadsToday,
   getUserTimezone,
@@ -287,6 +288,7 @@ function App() {
   const [myMomentsOpen, setMyMomentsOpen] = useState(false)
   const [dailyLimitModalOpen, setDailyLimitModalOpen] = useState(false)
   const [premiumWindowModalOpen, setPremiumWindowModalOpen] = useState(false)
+  const [windowClosingBannerDismissed, setWindowClosingBannerDismissed] = useState(false)
   const [uploadConsentOpen, setUploadConsentOpen] = useState(false)
   const [signInForCaptureOpen, setSignInForCaptureOpen] = useState(false)
   const [shareLandingSignInOpen, setShareLandingSignInOpen] = useState(false)
@@ -500,6 +502,30 @@ function App() {
     [now, userTz, captureIsPremium, currentStreak],
   )
 
+  const freeWindowClosingSoon = useMemo(
+    () => getFreeCaptureWindowClosingSoon(now, userTz, captureIsPremium, currentStreak),
+    [now, userTz, captureIsPremium, currentStreak],
+  )
+
+  const windowClosingDismissKey = useMemo(() => {
+    const day = now.setZone(userTz).toFormat('yyyy-LL-dd')
+    return `fivepm_window_closing_dismissed_${day}`
+  }, [now, userTz])
+
+  useEffect(() => {
+    try {
+      setWindowClosingBannerDismissed(localStorage.getItem(windowClosingDismissKey) === '1')
+    } catch {
+      setWindowClosingBannerDismissed(false)
+    }
+  }, [windowClosingDismissKey])
+
+  const showWindowClosingBanner =
+    captureWindow.active &&
+    freeWindowClosingSoon.active &&
+    !captureIsPremium &&
+    !windowClosingBannerDismissed
+
   const captureButtonGold =
     captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit
 
@@ -668,6 +694,38 @@ function App() {
                     {featuredCountryName ? (
                       <span className="whitespace-nowrap">{featuredCountryName}</span>
                     ) : null}
+                  </div>
+                </div>
+              )}
+
+              {showWindowClosingBanner && (
+                <div
+                  className="mt-2 sm:mt-4 rounded-xl border border-amber-300/35 bg-amber-300/10 px-3 py-2.5 text-xs leading-relaxed text-amber-100/90 sm:text-sm"
+                  role="status"
+                >
+                  <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+                    <span>
+                      {freeWindowClosingSoon.minutesLeft <= 0
+                        ? 'Your free capture window is ending now.'
+                        : freeWindowClosingSoon.minutesLeft === 1
+                          ? 'About 1 minute left in your free capture window.'
+                          : `About ${freeWindowClosingSoon.minutesLeft} minutes left in your free capture window.`}{' '}
+                      Premium gives you until 5:30 PM local time.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        try {
+                          localStorage.setItem(windowClosingDismissKey, '1')
+                        } catch {
+                          // ignore
+                        }
+                        setWindowClosingBannerDismissed(true)
+                      }}
+                      className="shrink-0 text-[11px] font-medium uppercase tracking-wide text-amber-200/90 hover:text-amber-50 touch-manipulation"
+                    >
+                      Dismiss
+                    </button>
                   </div>
                 </div>
               )}
@@ -841,6 +899,7 @@ function App() {
           open={myMomentsOpen}
           onClose={() => setMyMomentsOpen(false)}
           userId={userId}
+          isPremium={isPremium}
         />
       )}
       {premiumWindowModalOpen && (

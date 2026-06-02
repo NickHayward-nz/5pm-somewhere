@@ -4,6 +4,7 @@ import { DateTime } from 'luxon'
 import { getSupabase } from '../lib/supabase'
 import {
   computeLiveStreamPriority,
+  getUploadsToday,
   incrementUploadsToday,
   trackCaptureStarted,
   trackVideoUploaded,
@@ -11,7 +12,8 @@ import {
   type ProfileStreak,
 } from '../lib/capture'
 import { CopyrightFooter } from './CopyrightFooter'
-import { pruneExcessMomentsForFreeUser } from '../lib/momentsRetention'
+import { FREE_USER_MOMENT_LIMIT, pruneExcessMomentsForFreeUser } from '../lib/momentsRetention'
+import { PremiumUpsellModal } from './PremiumUpsellModal'
 import { prepareShareableVideo, shareVideoNatively, SHARE_CAPTION, drawSunsetBorder } from '../lib/share'
 import { captureEvent } from '../lib/analytics'
 
@@ -29,6 +31,8 @@ type Props = {
 
 type Step = 'idle' | 'countdown' | 'recording' | 'preview' | 'uploading' | 'success' | 'error'
 
+type PostSuccessUpsell = 'moment_retention' | 'first_daily' | null
+
 export function RecordMoment(props: Props) {
   const { open, onClose, userId, userTz, city, country, isPremium, profile, onProfileUpdated } = props
   const [step, setStep] = useState<Step>('idle')
@@ -39,8 +43,11 @@ export function RecordMoment(props: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
   const [shareStatus, setShareStatus] = useState<string | null>(null)
+  const [recordingMaxUpsellOpen, setRecordingMaxUpsellOpen] = useState(false)
+  const [postSuccessUpsell, setPostSuccessUpsell] = useState<PostSuccessUpsell>(null)
 
   const videoRef = useRef<HTMLVideoElement | null>(null)
+  const hitRecordingMaxRef = useRef(false)
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const previewUrlRef = useRef<string | null>(null)
   const recordedBlobRef = useRef<Blob | null>(null)
@@ -70,6 +77,9 @@ export function RecordMoment(props: Props) {
     setPreviewUrl(null)
     setSharing(false)
     setShareStatus(null)
+    setRecordingMaxUpsellOpen(false)
+    setPostSuccessUpsell(null)
+    hitRecordingMaxRef.current = false
     recordedBlobRef.current = null
   }, [open])
 
@@ -415,6 +425,11 @@ export function RecordMoment(props: Props) {
         setPreviewUrl(url)
         setDurationSec(duration)
         setStep('preview')
+        if (hitRecordingMaxRef.current && !isPremium) {
+          hitRecordingMaxRef.current = false
+          setRecordingMaxUpsellOpen(true)
+          captureEvent('premium_upsell_shown', { surface: 'recording_max_modal' })
+        }
         cleanup()
       }
 
@@ -435,6 +450,7 @@ export function RecordMoment(props: Props) {
             const sec = Math.floor((Date.now() - start) / 1000)
             setDurationSec(sec)
             if (sec >= MAX_SEC) {
+              if (!isPremium) hitRecordingMaxRef.current = true
               stopRecording()
               return
             }
@@ -635,8 +651,21 @@ export function RecordMoment(props: Props) {
         throw e
       }
 
+      const uploadsBeforeToday = getUploadsToday(userId, userTz)
+      let postSuccessUpsellKind: PostSuccessUpsell = null
+
       if (!isPremium) {
-        await pruneExcessMomentsForFreeUser(sb, authUserId)
+        const { prunedCount } = await pruneExcessMomentsForFreeUser(sb, authUserId)
+        if (prunedCount > 0) {
+          postSuccessUpsellKind = 'moment_retention'
+          captureEvent('premium_upsell_shown', {
+            surface: 'moment_retention_modal',
+            pruned_count: prunedCount,
+          })
+        } else if (uploadsBeforeToday === 0) {
+          postSuccessUpsellKind = 'first_daily'
+          captureEvent('premium_upsell_shown', { surface: 'first_daily_modal' })
+        }
       }
 
       if (profile) {
@@ -660,6 +689,7 @@ export function RecordMoment(props: Props) {
         total_uploads_before_upload: profile?.total_uploads ?? 0,
       })
       incrementUploadsToday(userId, userTz)
+      setPostSuccessUpsell(postSuccessUpsellKind)
       setStep('success')
     } catch (e) {
       const err = e as Error & { name?: string; message?: string; stack?: string }
@@ -768,6 +798,13 @@ export function RecordMoment(props: Props) {
                   Your 5PM moment is live—thanks for sharing!
                 </p>
 
+                {!isPremium && (
+                  <p className="max-w-sm text-xs leading-relaxed text-amber-100/85">
+                    Premium moments get stronger placement in the live stream and a golden sunset frame on
+                    every capture.
+                  </p>
+                )}
+
                 {shareStatus && (
                   <p className="text-xs text-sunset-100/70 max-w-xs" aria-live="polite">
                     {shareStatus}
@@ -865,6 +902,28 @@ export function RecordMoment(props: Props) {
         </div>
       </div>
       <CopyrightFooter variant="embedded" />
+
+      <PremiumUpsellModal
+        open={recordingMaxUpsellOpen}
+        onClose={() => setRecordingMaxUpsellOpen(false)}
+        title="Maximum clip length"
+        message="Free clips stop at 20 seconds. Upgrade to Premium to record up to 30 seconds per moment."
+        surface="recording_max_modal"
+      />
+      <PremiumUpsellModal
+        open={postSuccessUpsell === 'moment_retention'}
+        onClose={() => setPostSuccessUpsell(null)}
+        title="Moment library full"
+        message={`Free accounts keep your ${FREE_USER_MOMENT_LIMIT} most recent moments. Older ones were removed to make room—upgrade to Premium to keep your full history.`}
+        surface="moment_retention_modal"
+      />
+      <PremiumUpsellModal
+        open={postSuccessUpsell === 'first_daily'}
+        onClose={() => setPostSuccessUpsell(null)}
+        title="Want more today?"
+        message="You’ve posted your first 5PM moment for today. Premium lets you capture up to 3 moments per day."
+        surface="first_daily_modal"
+      />
     </div>
   )
 }
