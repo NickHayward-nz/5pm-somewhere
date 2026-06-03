@@ -44,6 +44,23 @@ function iso(ts?: number | null): string | null {
   return new Date(ts * 1000).toISOString();
 }
 
+type SubscriptionWithLegacyPeriod = Stripe.Subscription & {
+  current_period_end?: number | null;
+};
+
+type SubscriptionItemWithPeriod = Stripe.SubscriptionItem & {
+  current_period_end?: number | null;
+};
+
+function subscriptionPeriodEnd(sub: Stripe.Subscription): number | null {
+  const legacyPeriodEnd = (sub as SubscriptionWithLegacyPeriod)
+    .current_period_end;
+  if (legacyPeriodEnd) return legacyPeriodEnd;
+
+  const firstItem = sub.items.data[0] as SubscriptionItemWithPeriod | undefined;
+  return firstItem?.current_period_end ?? null;
+}
+
 async function setPremiumByCustomer(
   customerId: string,
   userId: string | null,
@@ -133,7 +150,7 @@ serve(async (req) => {
         let plan: string | null = null;
         if (subscriptionId) {
           const sub = await stripe.subscriptions.retrieve(subscriptionId);
-          expiresAt = iso(sub.current_period_end);
+          expiresAt = iso(subscriptionPeriodEnd(sub));
           plan = sub.items.data[0]?.price.id ?? null;
         }
 
@@ -159,7 +176,7 @@ serve(async (req) => {
             isPremium: isActive,
             subscriptionId: sub.id,
             plan: sub.items.data[0]?.price.id ?? null,
-            expiresAt: iso(sub.current_period_end),
+            expiresAt: iso(subscriptionPeriodEnd(sub)),
           },
         );
         break;
@@ -175,7 +192,7 @@ serve(async (req) => {
           {
             isPremium: false,
             subscriptionId: null,
-            expiresAt: iso(sub.current_period_end),
+            expiresAt: iso(subscriptionPeriodEnd(sub)),
           },
         );
         break;
