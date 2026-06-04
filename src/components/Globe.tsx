@@ -7,8 +7,11 @@ import type { City } from '../data/cities'
 import { latLonToVector3 } from '../lib/geo'
 import { getCityTimeInfo, NEAR_FIVE_PM_VISIBLE_MINUTES } from '../lib/time'
 
-const DAY_MAP_URL =
-  'https://raw.githubusercontent.com/mrdoob/three.js/dev/examples/textures/planets/earth_atmos_2048.jpg'
+const EARTH_TEXTURE_BASE = '/textures/earth'
+const DAY_MAP_URL = `${EARTH_TEXTURE_BASE}/earth_atmos_2048.jpg`
+const NORMAL_MAP_URL = `${EARTH_TEXTURE_BASE}/earth_normal_2048.jpg`
+const SPECULAR_MAP_URL = `${EARTH_TEXTURE_BASE}/earth_specular_2048.jpg`
+const CLOUD_MAP_URL = `${EARTH_TEXTURE_BASE}/earth_clouds_1024.png`
 
 const DOT_UPDATE_INTERVAL_MS = 120000
 const SPHERE_SEGMENTS = 64
@@ -63,6 +66,9 @@ export function Globe({ now, cities }: Props) {
 
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
     renderer.setPixelRatio(Math.min(2, window.devicePixelRatio || 1))
+    renderer.outputColorSpace = THREE.SRGBColorSpace
+    renderer.toneMapping = THREE.ACESFilmicToneMapping
+    renderer.toneMappingExposure = 1.05
     const canvas = renderer.domElement
     canvas.style.display = 'block'
     canvas.style.margin = '0'
@@ -88,31 +94,88 @@ export function Globe({ now, cities }: Props) {
     const group = new THREE.Group()
     scene.add(group)
 
-    // Lighting for the globe
-    scene.add(new THREE.AmbientLight(0xffffff, 1.0))
-    const sun = new THREE.DirectionalLight(0xffffff, 1.5)
-    sun.position.set(5, 3, 5)
+    // Lighting for the globe: keep it warm and readable on mobile while adding more depth.
+    scene.add(new THREE.AmbientLight(0xbfd8ff, 0.72))
+    const sun = new THREE.DirectionalLight(0xfff2d6, 2.2)
+    sun.position.set(5, 2.2, 4.8)
     scene.add(sun)
+    const rim = new THREE.DirectionalLight(0x8cc7ff, 0.55)
+    rim.position.set(-4, 1.5, -3)
+    scene.add(rim)
 
     const loader = new THREE.TextureLoader()
     loader.crossOrigin = 'anonymous'
     const earthGeo = new THREE.SphereGeometry(1, 64, 64)
 
-    const earthMat = new THREE.MeshPhongMaterial()
+    const earthMat = new THREE.MeshPhongMaterial({
+      color: 0xffffff,
+      specular: new THREE.Color(0x244a66),
+      shininess: 18,
+      normalScale: new THREE.Vector2(0.65, 0.65),
+    })
     const earth = new THREE.Mesh(earthGeo, earthMat)
     group.add(earth)
 
-    loader.load(
+    const applyTexture = (
+      url: string,
+      onLoad: (tex: THREE.Texture) => void,
+      label: string,
+    ) => {
+      loader.load(
+        url,
+        (tex) => {
+          onLoad(tex)
+          earthMat.needsUpdate = true
+        },
+        undefined,
+        (err) => {
+          console.error(`${label} texture load failed:`, err)
+        },
+      )
+    }
+
+    applyTexture(
       DAY_MAP_URL,
       (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace
         earthMat.map = tex
-        earthMat.needsUpdate = true
+      },
+      'Earth day',
+    )
+    applyTexture(
+      NORMAL_MAP_URL,
+      (tex) => {
+        earthMat.normalMap = tex
+      },
+      'Earth normal',
+    )
+    applyTexture(
+      SPECULAR_MAP_URL,
+      (tex) => {
+        earthMat.specularMap = tex
+      },
+      'Earth specular',
+    )
+
+    const cloudGeo = new THREE.SphereGeometry(1.012, SPHERE_SEGMENTS, SPHERE_SEGMENTS)
+    const cloudMat = new THREE.MeshLambertMaterial({
+      transparent: true,
+      opacity: 0.22,
+      depthWrite: false,
+    })
+    const clouds = new THREE.Mesh(cloudGeo, cloudMat)
+    group.add(clouds)
+    loader.load(
+      CLOUD_MAP_URL,
+      (tex) => {
+        tex.colorSpace = THREE.SRGBColorSpace
+        cloudMat.map = tex
+        cloudMat.needsUpdate = true
       },
       undefined,
       (err) => {
-        console.error('Pastel texture load failed:', err)
-        earthMat.color = new THREE.Color(0xaaddff)
-        earthMat.needsUpdate = true
+        console.error('Earth cloud texture load failed:', err)
+        clouds.visible = false
       },
     )
 
@@ -343,6 +406,7 @@ export function Globe({ now, cities }: Props) {
 
     function tick() {
       controls.update()
+      clouds.rotation.y += 0.00018
 
       const dotNow = DateTime.fromMillis(dotTimeRef.current)
       const timeForDots = dotNow.isValid ? dotNow : DateTime.now()
@@ -422,6 +486,14 @@ export function Globe({ now, cities }: Props) {
       }
       if (el.contains(zoomInBtn)) el.removeChild(zoomInBtn)
       if (el.contains(zoomOutBtn)) el.removeChild(zoomOutBtn)
+      earthGeo.dispose()
+      earthMat.map?.dispose()
+      earthMat.normalMap?.dispose()
+      earthMat.specularMap?.dispose()
+      earthMat.dispose()
+      cloudGeo.dispose()
+      cloudMat.map?.dispose()
+      cloudMat.dispose()
       renderer.dispose()
       if (el.contains(canvas)) el.removeChild(canvas)
     }
