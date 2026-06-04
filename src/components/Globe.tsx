@@ -141,8 +141,8 @@ export function Globe({ now, cities }: Props) {
     scene.add(group)
 
     // Lighting for the globe: keep it warm and readable on mobile while adding more depth.
-    scene.add(new THREE.AmbientLight(0xd8e7ff, 0.58))
-    const sun = new THREE.DirectionalLight(0xfff2d6, 2.85)
+    scene.add(new THREE.AmbientLight(0xc9ddff, 0.42))
+    const sun = new THREE.DirectionalLight(0xfff0d2, 3.65)
     sun.position.set(5, 2.2, 4.8)
     scene.add(sun)
     const rim = new THREE.DirectionalLight(0x8cc7ff, 0.42)
@@ -232,7 +232,6 @@ export function Globe({ now, cities }: Props) {
       blending: THREE.NormalBlending,
       uniforms: {
         uSunDir: { value: new THREE.Vector3(1, 0, 0) },
-        uFivePmLon: { value: 0 },
       },
       vertexShader: `
         varying vec3 vNormal;
@@ -245,35 +244,18 @@ export function Globe({ now, cities }: Props) {
         precision mediump float;
         varying vec3 vNormal;
         uniform vec3 uSunDir;
-        uniform float uFivePmLon;
-
-        const float PI = 3.141592653589793;
-
-        float angularDistance(float a, float b) {
-          float d = mod(a - b + PI, PI * 2.0) - PI;
-          return abs(d);
-        }
 
         void main() {
           vec3 n = normalize(vNormal);
           float daylight = dot(n, normalize(uSunDir));
 
-          // Distinct, readable night side: darken the unlit half without hiding map detail.
-          float night = smoothstep(0.18, -0.28, daylight);
+          // Clearer day/night split: dusk starts close to the terminator,
+          // and the deep night side darkens enough to be obvious while retaining map detail.
+          float night = smoothstep(0.16, -0.34, daylight);
+          float nightAlpha = night * 0.58;
+          vec3 nightColor = vec3(0.006, 0.012, 0.045);
 
-          // Inverse of src/lib/geo.ts: east longitude is atan(-z, x).
-          float lon = atan(-n.z, n.x);
-          float wave = 1.0 - smoothstep(0.0, 0.26, angularDistance(lon, uFivePmLon));
-          float twilightBoost = smoothstep(-0.65, 0.35, daylight);
-          float waveAlpha = wave * twilightBoost * 0.36;
-          float nightAlpha = night * 0.42;
-
-          vec3 nightColor = vec3(0.012, 0.02, 0.065);
-          vec3 waveColor = vec3(1.0, 0.54, 0.12);
-          float alpha = max(nightAlpha, waveAlpha);
-          vec3 color = mix(nightColor, waveColor, clamp(wave * 1.2, 0.0, 1.0));
-
-          gl_FragColor = vec4(color, alpha);
+          gl_FragColor = vec4(nightColor, nightAlpha);
         }
       `,
     })
@@ -285,7 +267,6 @@ export function Globe({ now, cities }: Props) {
       const sunDir = vectorFromLatLon(subsolar.lat, subsolar.lon).normalize()
       sun.position.copy(sunDir).multiplyScalar(6)
       ;(overlayMat.uniforms.uSunDir.value as THREE.Vector3).copy(sunDir)
-      overlayMat.uniforms.uFivePmLon.value = THREE.MathUtils.degToRad(wrapDegrees(subsolar.lon + 75))
     }
     updateSolarLighting(new Date(dotTimeRef.current))
 
