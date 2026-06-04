@@ -48,6 +48,9 @@ const COUNTRY_LABELS = [
 const CITY_LABEL_RADIUS = 1.075
 /** Tangential offset keeps label cards from sitting directly on top of pins */
 const CITY_LABEL_TANGENT_OFFSET = 0.105
+/** Labels stay hidden at the default whole-globe camera distance, then fade in as users zoom closer. */
+const LABEL_FADE_START_DISTANCE = 3.18
+const LABEL_FADE_FULL_DISTANCE = 2.7
 
 type Props = {
   now: DateTime
@@ -585,6 +588,12 @@ export function Globe({ now, cities }: Props) {
       if (markers.instanceColor) markers.instanceColor.needsUpdate = true
       markers.instanceMatrix.needsUpdate = true
 
+      const cameraDistance = camera.position.distanceTo(controls.target)
+      const labelZoomT = THREE.MathUtils.smoothstep(
+        LABEL_FADE_START_DISTANCE - cameraDistance,
+        0,
+        LABEL_FADE_START_DISTANCE - LABEL_FADE_FULL_DISTANCE,
+      )
       const cameraNormal = camera.position.clone().normalize()
       const rect = el.getBoundingClientRect()
       const projectLabel = (
@@ -610,14 +619,14 @@ export function Globe({ now, cities }: Props) {
         label.style.opacity = opacity.toFixed(3)
       }
 
-      const countryOpacity = 0.68
+      const countryOpacity = labelZoomT * 0.68
       for (let i = 0; i < countryLabelEls.length; i++) {
         projectLabel(countryLabelEls[i], countryLabelPositions[i], countryLabelNormals[i], countryOpacity, 0.08)
       }
 
       for (let i = 0; i < cityLabelEls.length; i++) {
         const active = cityLabelActivity[i]
-        const activeOpacity = active * 0.98
+        const activeOpacity = active * labelZoomT * 0.98
         projectLabel(cityLabelEls[i], cityLabelPositions[i], cityLabelNormals[i], activeOpacity, -0.04)
       }
 
