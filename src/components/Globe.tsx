@@ -33,6 +33,52 @@ function lerp(a: number, b: number, t: number) {
   return a + (b - a) * t
 }
 
+function wrapDegrees(deg: number) {
+  return ((((deg + 180) % 360) + 360) % 360) - 180
+}
+
+function vectorFromLatLon(lat: number, lon: number, radius = 1) {
+  const phi = ((90 - lat) * Math.PI) / 180
+  const theta = ((lon + 180) * Math.PI) / 180
+  return new THREE.Vector3(
+    -radius * Math.sin(phi) * Math.cos(theta),
+    radius * Math.cos(phi),
+    radius * Math.sin(phi) * Math.sin(theta),
+  )
+}
+
+function getSubsolarPoint(date: Date) {
+  // Low-cost NOAA-style approximation: accurate enough for visual day/night lighting.
+  const start = Date.UTC(date.getUTCFullYear(), 0, 0)
+  const dayOfYear = Math.floor((date.getTime() - start) / 86400000)
+  const utcHours =
+    date.getUTCHours() +
+    date.getUTCMinutes() / 60 +
+    date.getUTCSeconds() / 3600 +
+    date.getUTCMilliseconds() / 3600000
+  const gamma = (2 * Math.PI / 365) * (dayOfYear - 1 + (utcHours - 12) / 24)
+  const declination =
+    0.006918 -
+    0.399912 * Math.cos(gamma) +
+    0.070257 * Math.sin(gamma) -
+    0.006758 * Math.cos(2 * gamma) +
+    0.000907 * Math.sin(2 * gamma) -
+    0.002697 * Math.cos(3 * gamma) +
+    0.00148 * Math.sin(3 * gamma)
+  const equationOfTimeMinutes =
+    229.18 *
+    (0.000075 +
+      0.001868 * Math.cos(gamma) -
+      0.032077 * Math.sin(gamma) -
+      0.014615 * Math.cos(2 * gamma) -
+      0.040849 * Math.sin(2 * gamma))
+  const lon = wrapDegrees(180 - 15 * utcHours - equationOfTimeMinutes / 4)
+  return {
+    lat: (declination * 180) / Math.PI,
+    lon,
+  }
+}
+
 function intensityToColor(intensity: number) {
   const t = Math.min(1, Math.max(0, intensity))
   return new THREE.Color(
@@ -95,8 +141,8 @@ export function Globe({ now, cities }: Props) {
     scene.add(group)
 
     // Lighting for the globe: keep it warm and readable on mobile while adding more depth.
-    scene.add(new THREE.AmbientLight(0xbfd8ff, 0.72))
-    const sun = new THREE.DirectionalLight(0xfff2d6, 2.2)
+    scene.add(new THREE.AmbientLight(0xe5efff, 1.08))
+    const sun = new THREE.DirectionalLight(0xfff2d6, 1.9)
     sun.position.set(5, 2.2, 4.8)
     scene.add(sun)
     const rim = new THREE.DirectionalLight(0x8cc7ff, 0.55)
@@ -178,6 +224,72 @@ export function Globe({ now, cities }: Props) {
         clouds.visible = false
       },
     )
+
+    const overlayGeo = new THREE.SphereGeometry(1.018, SPHERE_SEGMENTS, SPHERE_SEGMENTS)
+    const overlayMat = new THREE.ShaderMaterial({
+      transparent: true,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      uniforms: {
+        uSunDir: { value: new THREE.Vector3(1, 0, 0) },
+        uFivePmLon: { value: 0 },
+      },
+      vertexShader: `
+        varying vec3 vNormal;
+        void main() {
+          vNormal = normalize(position);
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+      fragmentShader: `
+        precision mediump float;
+        varying vec3 vNormal;
+        uniform vec3 uSunDir;
+        uniform float uFivePmLon;
+
+        const float PI = 3.141592653589793;
+
+        float angularDistance(float a, float b) {
+          float d = mod(a - b + PI, PI * 2.0) - PI;
+          return abs(d);
+        }
+
+        void main() {
+          vec3 n = normalize(vNormal);
+          float daylight = dot(n, normalize(uSunDir));
+
+          // Soft blue-violet night-side veil creates a visible terminator without blacking out the globe.
+          float night = smoothstep(0.12, -0.2, daylight);
+
+          // Inverse of src/lib/geo.ts: east longitude is atan(-z, x).
+          float lon = atan(-n.z, n.x);
+          float wave = 1.0 - smoothstep(0.0, 0.3, angularDistance(lon, uFivePmLon));
+          float twilightBoost = smoothstep(-0.55, 0.25, daylight);
+          float waveAlpha = wave * twilightBoost * 0.44;
+
+          vec3 nightColor = vec3(0.03, 0.05, 0.14) * night * 0.24;
+          vec3 waveColor = vec3(1.0, 0.56, 0.16) * waveAlpha;
+          float alpha = max(night * 0.12, waveAlpha);
+
+          gl_FragColor = vec4(nightColor + waveColor, alpha);
+        }
+      `,
+    })
+    const solarOverlay = new THREE.Mesh(overlayGeo, overlayMat)
+    group.add(solarOverlay)
+
+    function updateSolarLighting(date: Date) {
+      const subsolar = getSubsolarPoint(date)
+      const sunDir = vectorFromLatLon(subsolar.lat, subsolar.lon).normalize()
+      sun.position.copy(sunDir).multiplyScalar(6)
+      ;(overlayMat.uniforms.uSunDir.value as THREE.Vector3).copy(sunDir)
+      overlayMat.uniforms.uFivePmLon.value = THREE.MathUtils.degToRad(wrapDegrees(subsolar.lon + 75))
+    }
+    updateSolarLighting(new Date(dotTimeRef.current))
+
+    const solarInterval = setInterval(() => {
+      updateSolarLighting(new Date())
+    }, 60000)
 
     const atmoGeo = new THREE.SphereGeometry(1.04, SPHERE_SEGMENTS, SPHERE_SEGMENTS)
     const atmo = new THREE.Mesh(
@@ -474,6 +586,7 @@ export function Globe({ now, cities }: Props) {
 
     return () => {
       clearInterval(dotInterval)
+      clearInterval(solarInterval)
       if (rafRef.current !== null) cancelAnimationFrame(rafRef.current)
       rafRef.current = null
       ro.disconnect()
@@ -494,6 +607,14 @@ export function Globe({ now, cities }: Props) {
       cloudGeo.dispose()
       cloudMat.map?.dispose()
       cloudMat.dispose()
+      overlayGeo.dispose()
+      overlayMat.dispose()
+      atmoGeo.dispose()
+      ;(atmo.material as THREE.Material).dispose()
+      markerGeo.dispose()
+      markerMat.dispose()
+      spriteTex.dispose()
+      spriteMat.dispose()
       renderer.dispose()
       if (el.contains(canvas)) el.removeChild(canvas)
     }
