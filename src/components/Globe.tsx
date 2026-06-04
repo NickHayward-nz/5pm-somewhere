@@ -141,11 +141,11 @@ export function Globe({ now, cities }: Props) {
     scene.add(group)
 
     // Lighting for the globe: keep it warm and readable on mobile while adding more depth.
-    scene.add(new THREE.AmbientLight(0xe5efff, 1.08))
-    const sun = new THREE.DirectionalLight(0xfff2d6, 1.9)
+    scene.add(new THREE.AmbientLight(0xd8e7ff, 0.58))
+    const sun = new THREE.DirectionalLight(0xfff2d6, 2.85)
     sun.position.set(5, 2.2, 4.8)
     scene.add(sun)
-    const rim = new THREE.DirectionalLight(0x8cc7ff, 0.55)
+    const rim = new THREE.DirectionalLight(0x8cc7ff, 0.42)
     rim.position.set(-4, 1.5, -3)
     scene.add(rim)
 
@@ -229,7 +229,7 @@ export function Globe({ now, cities }: Props) {
     const overlayMat = new THREE.ShaderMaterial({
       transparent: true,
       depthWrite: false,
-      blending: THREE.AdditiveBlending,
+      blending: THREE.NormalBlending,
       uniforms: {
         uSunDir: { value: new THREE.Vector3(1, 0, 0) },
         uFivePmLon: { value: 0 },
@@ -258,20 +258,22 @@ export function Globe({ now, cities }: Props) {
           vec3 n = normalize(vNormal);
           float daylight = dot(n, normalize(uSunDir));
 
-          // Soft blue-violet night-side veil creates a visible terminator without blacking out the globe.
-          float night = smoothstep(0.12, -0.2, daylight);
+          // Distinct, readable night side: darken the unlit half without hiding map detail.
+          float night = smoothstep(0.18, -0.28, daylight);
 
           // Inverse of src/lib/geo.ts: east longitude is atan(-z, x).
           float lon = atan(-n.z, n.x);
-          float wave = 1.0 - smoothstep(0.0, 0.3, angularDistance(lon, uFivePmLon));
-          float twilightBoost = smoothstep(-0.55, 0.25, daylight);
-          float waveAlpha = wave * twilightBoost * 0.44;
+          float wave = 1.0 - smoothstep(0.0, 0.26, angularDistance(lon, uFivePmLon));
+          float twilightBoost = smoothstep(-0.65, 0.35, daylight);
+          float waveAlpha = wave * twilightBoost * 0.36;
+          float nightAlpha = night * 0.42;
 
-          vec3 nightColor = vec3(0.03, 0.05, 0.14) * night * 0.24;
-          vec3 waveColor = vec3(1.0, 0.56, 0.16) * waveAlpha;
-          float alpha = max(night * 0.12, waveAlpha);
+          vec3 nightColor = vec3(0.012, 0.02, 0.065);
+          vec3 waveColor = vec3(1.0, 0.54, 0.12);
+          float alpha = max(nightAlpha, waveAlpha);
+          vec3 color = mix(nightColor, waveColor, clamp(wave * 1.2, 0.0, 1.0));
 
-          gl_FragColor = vec4(nightColor + waveColor, alpha);
+          gl_FragColor = vec4(color, alpha);
         }
       `,
     })
