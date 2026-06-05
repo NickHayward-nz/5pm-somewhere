@@ -1,6 +1,7 @@
 /// <reference lib="webworker" />
 // © 2026 Chromatic Productions Ltd. All rights reserved.
 
+import { clientsClaim } from 'workbox-core'
 import { cleanupOutdatedCaches, precacheAndRoute } from 'workbox-precaching'
 
 declare const self: ServiceWorkerGlobalScope & {
@@ -16,6 +17,9 @@ type PushPayload = {
   badge?: string
   data?: Record<string, unknown>
 }
+
+self.skipWaiting()
+clientsClaim()
 
 precacheAndRoute(self.__WB_MANIFEST)
 cleanupOutdatedCaches()
