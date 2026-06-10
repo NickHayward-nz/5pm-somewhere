@@ -16,32 +16,10 @@ const EMPTY_REACH_STATS: ReachStats = {
   globalRank: null,
 }
 
-const VIEWER_KEY_STORAGE = 'fivepm_reach_viewer_key'
-
 function toNumber(value: number | string | null | undefined): number {
   if (typeof value === 'number') return value
   if (typeof value === 'string') return Number(value) || 0
   return 0
-}
-
-function createViewerKey(): string {
-  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
-    return crypto.randomUUID()
-  }
-  return `${Date.now().toString(36)}_${Math.random().toString(36).slice(2)}`
-}
-
-function getViewerKey(): string {
-  if (typeof window === 'undefined') return createViewerKey()
-  try {
-    const existing = localStorage.getItem(VIEWER_KEY_STORAGE)
-    if (existing) return existing
-    const next = createViewerKey()
-    localStorage.setItem(VIEWER_KEY_STORAGE, next)
-    return next
-  } catch {
-    return createViewerKey()
-  }
 }
 
 export function formatReachViews(totalViews: number): string {
@@ -52,18 +30,12 @@ export function formatReachViews(totalViews: number): string {
 }
 
 export async function incrementMomentView(momentId: string): Promise<boolean> {
-  const sb = getSupabase()
-  if (!sb) return false
-
-  const { data, error } = await sb.rpc('increment_moment_view', {
-    p_moment_id: momentId,
-    p_viewer_key: getViewerKey(),
-  })
-  if (error) {
-    console.error('Failed to increment moment view:', error)
-    return false
-  }
-  return data === true
+  void momentId
+  // Direct client-side view-count RPC access was removed because the old API
+  // trusted a browser-supplied viewer key and could be spammed. Keep view
+  // counting disabled until it is reintroduced via a server-side endpoint that
+  // derives the dedupe key from request metadata.
+  return false
 }
 
 export async function fetchMyReachStats(): Promise<ReachStats> {
