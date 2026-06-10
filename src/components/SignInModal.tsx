@@ -11,6 +11,16 @@ type Props = {
   contextMessage?: string | null
 }
 
+function getMagicLinkErrorMessage(message?: string) {
+  const lowerMessage = message?.toLowerCase() ?? ''
+
+  if (lowerMessage.includes('rate limit') || lowerMessage.includes('too many')) {
+    return 'Too many sign-in emails have been requested recently. Please try again later, or use Google sign-in for now.'
+  }
+
+  return 'Unable to send magic link. Please try again, or use Google sign-in for now.'
+}
+
 export function SignInModal({ open, onClose, contextMessage }: Props) {
   const sb = getSupabase()
   const [email, setEmail] = useState('')
@@ -46,20 +56,35 @@ export function SignInModal({ open, onClose, contextMessage }: Props) {
       window.alert('Supabase not configured')
       return
     }
+
+    const trimmedEmail = email.trim()
+    if (!trimmedEmail) {
+      window.alert('Please enter your email address first.')
+      return
+    }
+
     try {
       captureEvent('auth_magic_link_requested', { provider: 'email' })
-      await sb.auth.signInWithOtp({
-        email: email.trim(),
+      const { error } = await sb.auth.signInWithOtp({
+        email: trimmedEmail,
         options: {
           emailRedirectTo: `${window.location.origin}/auth/callback`,
         },
       })
+
+      if (error) {
+        console.error(error)
+        captureEvent('auth_magic_link_failed', { provider: 'email', reason: error.message })
+        window.alert(getMagicLinkErrorMessage(error.message))
+        return
+      }
+
       window.alert('Magic link sent! Check your email.')
     } catch (e) {
        
       console.error(e)
       captureEvent('auth_magic_link_failed', { provider: 'email' })
-      window.alert('Unable to send magic link.')
+      window.alert('Unable to send magic link. Please try again, or use Google sign-in for now.')
     }
   }
 
