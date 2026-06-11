@@ -4,6 +4,19 @@ import react from '@vitejs/plugin-react'
 import { VitePWA } from 'vite-plugin-pwa'
 
 export default defineConfig({
+  // Only expose browser env vars that the app intentionally reads. Vercel can
+  // inject VITE_VERCEL_* build metadata; without this allow-list Vite will make
+  // that metadata available in import.meta.env and it can leak into bundles.
+  envPrefix: [
+    'VITE_SUPABASE_',
+    'VITE_LIVE_STREAM_',
+    'VITE_POSTHOG_',
+    'VITE_PLAUSIBLE_',
+    'VITE_SENTRY_',
+    'VITE_APP_',
+    'VITE_ANALYTICS_',
+    'VITE_VAPID_',
+  ],
   plugins: [
     react(),
     VitePWA({
