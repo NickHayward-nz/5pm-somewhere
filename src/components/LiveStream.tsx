@@ -575,7 +575,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
       } catch (err) {
         if (!cancelled) {
           console.error('Stream blob fetch failed:', err)
-          setCurrentBlobUrl(current.video_url)
+          setCurrentBlobUrl(null)
         }
       }
     })()
@@ -815,7 +815,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
                 <video
                   ref={videoRef}
                   key={currentVideoKey}
-                  src={currentBlobUrl || current.video_url}
+                  src={currentBlobUrl || undefined}
                   poster={POSTER_PLACEHOLDER}
                   autoPlay
                   playsInline
