@@ -597,12 +597,14 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     }
   }, [])
 
-  // Force video dimensions on orientation change or window resize so frame renders in all modes
+  // Keep the rendered element fitted to the actual video rectangle so the
+  // baked rounded sunset border clips cleanly against the page background.
   useEffect(() => {
     const handleResize = () => {
       if (videoRef.current && containerRef.current) {
-        videoRef.current.style.width = '100%'
-        videoRef.current.style.height = 'auto'
+        videoRef.current.style.width = 'auto'
+        videoRef.current.style.height = '100%'
+        videoRef.current.style.maxWidth = '100%'
         videoRef.current.style.maxHeight = '100%'
       }
     }
@@ -811,7 +813,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
           )}
           {current && !loading && (
             <>
-              <div className="flex-1 min-h-0 relative">
+              <div className="flex-1 min-h-0 relative flex items-center justify-center">
                 <video
                   ref={videoRef}
                   key={currentVideoKey}
@@ -823,10 +825,11 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
                   controls={false}
                   preload="auto"
                   loop={false}
-                  className="z-[1] block w-full h-full max-h-full object-contain"
+                  className="z-[1] block max-w-full max-h-full object-contain"
                   style={{
-                    width: '100%',
+                    width: 'auto',
                     height: '100%',
+                    maxWidth: '100%',
                     maxHeight: '100%',
                     objectFit: 'contain',
                     display: 'block',
@@ -834,6 +837,8 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
                     visibility: 'visible',
                     opacity: 1,
                     background: 'transparent',
+                    borderRadius: '3.5%',
+                    clipPath: 'inset(0 round 3.5%)',
                   }}
                   onEnded={handleEnded}
                   onPlay={handlePlay}
