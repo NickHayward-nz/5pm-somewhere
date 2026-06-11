@@ -631,6 +631,7 @@ export function RecordMoment(props: Props) {
         city,
         country,
         video_url: videoUrl,
+        storage_path: storageData.path,
         caption: caption || null,
         duration: durationSec,
         pretty_count: 0,

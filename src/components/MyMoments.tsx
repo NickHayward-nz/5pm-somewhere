@@ -7,6 +7,7 @@ import { SHARE_SOCIAL_TAGS } from '../lib/share'
 import { captureEvent } from '../lib/analytics'
 import { FREE_USER_MOMENT_LIMIT } from '../lib/momentsRetention'
 import { PremiumUpsellModal } from './PremiumUpsellModal'
+import { getPlayableMomentVideoUrl } from '../lib/momentVideo'
 
 type MomentRow = {
   id: string
@@ -41,8 +42,8 @@ function buildShareText(city: string): string {
 ${SHARE_SOCIAL_TAGS}`
 }
 
-async function shareMoment(params: { moment: MomentRow }): Promise<void> {
-  const { moment } = params
+async function shareMoment(params: { moment: MomentRow; playableVideoUrl?: string | null }): Promise<void> {
+  const { moment, playableVideoUrl } = params
   const text = buildShareText(moment.city)
   const appUrl = buildAppUrl()
   captureEvent('video_share_started', {
@@ -52,7 +53,9 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
   })
 
   // Attempt to share the actual video file (so the share sheet treats it as a video).
-  const videoFile = await getVideoFile(moment.video_url)
+  // Signed URLs are deliberately temporary, so they are only used to fetch an
+  // attachment; we do not share signed URLs as durable links.
+  const videoFile = playableVideoUrl ? await getVideoFile(playableVideoUrl) : null
 
   const nav = navigator as ShareNavigator
   if (!nav?.share) {
@@ -100,29 +103,8 @@ async function shareMoment(params: { moment: MomentRow }): Promise<void> {
     // Ignore file-share failures and try text+url share.
   }
 
-  // Fallback: if we cannot attach files, share the video URL as the `url` (so the share sheet
-  // can treat it like a video) and include the app link in the text.
-  try {
-    const payloadText = `${text}\n${appUrl}`
-    const canShareUrl = nav.canShare?.({ url: moment.video_url }) !== false
-    if (canShareUrl) {
-      await nav.share({
-        title: '5PM Somewhere',
-        text: payloadText,
-        url: moment.video_url,
-      })
-      captureEvent('video_share_result', {
-        surface: 'my_moments',
-        result: 'video_url_shared',
-        moment_id: moment.id,
-      })
-      return
-    }
-  } catch {
-    // ignore and fall through
-  }
-
-  await nav.share({ title: '5PM Somewhere', text, url: appUrl })
+  // Fallback: share the durable app link rather than a temporary signed video URL.
+  await nav.share({ title: '5PM Somewhere', text: `${text}\n${appUrl}`, url: appUrl })
   captureEvent('video_share_result', {
     surface: 'my_moments',
     result: 'app_url_shared',
@@ -281,6 +263,7 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [moments, setMoments] = useState<MomentRow[]>([])
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({})
+  const [playableUrls, setPlayableUrls] = useState<Record<string, string>>({})
   const [libraryUpsellOpen, setLibraryUpsellOpen] = useState(false)
 
   const [playModal, setPlayModal] = useState<{
@@ -322,6 +305,7 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
       const rows = (data ?? []) as MomentRow[]
       setMoments(rows)
       setThumbs({})
+      setPlayableUrls({})
       setLoading(false)
       if (!isPremium && rows.length >= FREE_USER_MOMENT_LIMIT) {
         captureEvent('premium_upsell_shown', { surface: 'my_moments_library_banner' })
@@ -341,8 +325,15 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
     ;(async () => {
       for (const m of missing) {
         if (cancelled) return
+        const videoUrl = await getPlayableMomentVideoUrl({
+          sb,
+          momentId: m.id,
+          fallbackUrl: m.video_url,
+        })
+        if (cancelled) return
+        setPlayableUrls((prev) => ({ ...prev, [m.id]: videoUrl }))
         const thumb = await generateFirstFrameThumbnail({
-          videoUrl: m.video_url,
+          videoUrl,
           targetWidth: 480,
           targetHeight: 270,
         })
@@ -354,7 +345,7 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
     return () => {
       cancelled = true
     }
-  }, [open, moments, thumbs])
+  }, [open, moments, thumbs, sb])
 
   const appLogoAlt = '5PM Somewhere logo'
 
@@ -467,9 +458,17 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
                       </div>
                       <button
                         type="button"
-                        onClick={() =>
-                          setPlayModal({ open: true, url: m.video_url, caption: m.caption })
-                        }
+                        onClick={() => {
+                          void (async () => {
+                            const url = playableUrls[m.id] || await getPlayableMomentVideoUrl({
+                              sb,
+                              momentId: m.id,
+                              fallbackUrl: m.video_url,
+                            })
+                            setPlayableUrls((prev) => ({ ...prev, [m.id]: url }))
+                            setPlayModal({ open: true, url, caption: m.caption })
+                          })()
+                        }}
                         className="absolute inset-0 flex items-center justify-center"
                         aria-label="Play video"
                       >
@@ -491,7 +490,15 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
                         <button
                           type="button"
                           onClick={() => {
-                            void shareMoment({ moment: m })
+                            void (async () => {
+                              const url = playableUrls[m.id] || await getPlayableMomentVideoUrl({
+                                sb,
+                                momentId: m.id,
+                                fallbackUrl: m.video_url,
+                              })
+                              setPlayableUrls((prev) => ({ ...prev, [m.id]: url }))
+                              await shareMoment({ moment: m, playableVideoUrl: url })
+                            })()
                           }}
                           className="btn-glow-gold text-xs touch-manipulation flex-1"
                         >

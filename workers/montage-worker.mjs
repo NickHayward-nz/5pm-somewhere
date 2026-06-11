@@ -166,11 +166,39 @@ async function pickMusicPath(sb, folder) {
   return `${folder}/${name}`
 }
 
+function storagePathFromMomentsUrl(videoUrl) {
+  if (!videoUrl) return null
+  try {
+    const url = new URL(videoUrl)
+    for (const marker of ['/storage/v1/object/public/moments/', '/storage/v1/object/sign/moments/']) {
+      const i = url.pathname.indexOf(marker)
+      if (i !== -1) return decodeURIComponent(url.pathname.slice(i + marker.length))
+    }
+  } catch {
+    return null
+  }
+  return null
+}
+
 async function downloadToFile(url, destPath) {
   const res = await fetch(url)
   if (!res.ok) throw new Error(`Download failed ${res.status}: ${url.slice(0, 80)}`)
   const buf = Buffer.from(await res.arrayBuffer())
   await fs.writeFile(destPath, buf)
+}
+
+async function downloadMomentToFile(sb, moment, destPath) {
+  const storagePath = moment.storage_path || storagePathFromMomentsUrl(moment.video_url)
+  if (storagePath) {
+    const { data: blob, error } = await sb.storage.from('moments').download(storagePath)
+    if (!error && blob) {
+      await fs.writeFile(destPath, Buffer.from(await blob.arrayBuffer()))
+      return
+    }
+    console.warn('moments storage download failed, falling back to URL', error?.message || error)
+  }
+  if (!moment.video_url) throw new Error('Moment has no video_url or storage_path')
+  await downloadToFile(moment.video_url, destPath)
 }
 
 /**
@@ -324,7 +352,7 @@ export default async function handler(req, res) {
           pickMoments: async () => {
             const { data, error } = await sb
               .from('moments')
-              .select('id, video_url, created_at, pretty_count, funny_count, cheers_count, duration')
+              .select('id, video_url, storage_path, created_at, pretty_count, funny_count, cheers_count, duration')
               .eq('user_id', userId)
               .gte('created_at', weeklyPeriod.start.toISOString())
               .lt('created_at', weeklyPeriod.end.toISOString())
@@ -350,7 +378,7 @@ export default async function handler(req, res) {
           pickMoments: async () => {
             const { data, error } = await sb
               .from('moments')
-              .select('id, video_url, created_at, pretty_count, funny_count, cheers_count, view_count, duration')
+              .select('id, video_url, storage_path, created_at, pretty_count, funny_count, cheers_count, view_count, duration')
               .eq('user_id', userId)
               .gte('created_at', monthlyPeriod.start.toISOString())
               .lt('created_at', monthlyPeriod.end.toISOString())
@@ -373,7 +401,7 @@ export default async function handler(req, res) {
 async function processOneUser(sb, opts) {
   const { kind, userId, periodStart, periodEnd, titleFormatter, pickMoments } = opts
   let moments = await pickMoments()
-  moments = moments.filter((m) => m.video_url)
+  moments = moments.filter((m) => m.storage_path || m.video_url)
   if (moments.length < 3) {
     return { userId, skipped: true, reason: 'fewer_than_3_clips', count: moments.length }
   }
@@ -419,7 +447,7 @@ async function processOneUser(sb, opts) {
     for (let i = 0; i < moments.length; i++) {
       const raw = path.join(tmp, `raw-${i}.bin`)
       const seg = path.join(tmp, `seg-${i}.mp4`)
-      await downloadToFile(moments[i].video_url, raw)
+      await downloadMomentToFile(sb, moments[i], raw)
       await trimSegment(ffmpegPath, raw, seg, clipTarget)
       segments.push(seg)
     }

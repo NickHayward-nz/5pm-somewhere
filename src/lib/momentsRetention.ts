@@ -17,6 +17,12 @@ export function momentsStoragePathFromPublicUrl(videoUrl: string): string | null
   }
 }
 
+type MomentRetentionRow = {
+  id: string
+  video_url: string | null
+  storage_path?: string | null
+}
+
 /**
  * For free users only: keep the newest FREE_USER_MOMENT_LIMIT rows; remove older files and DB rows.
  * Does not touch `user_montages` or the `montages` bucket (premium montage outputs).
@@ -31,19 +37,20 @@ export async function pruneExcessMomentsForFreeUser(
 ): Promise<PruneExcessMomentsResult> {
   const { data: rows, error: selErr } = await sb
     .from('moments')
-    .select('id, video_url')
+    .select('id, video_url, storage_path')
     .eq('user_id', userId)
     .order('created_at', { ascending: false })
     .order('id', { ascending: false })
 
-  if (selErr || !rows?.length || rows.length <= FREE_USER_MOMENT_LIMIT) {
+  const momentRows = (rows ?? []) as MomentRetentionRow[]
+  if (selErr || !momentRows.length || momentRows.length <= FREE_USER_MOMENT_LIMIT) {
     return { prunedCount: 0 }
   }
 
-  const excess = rows.slice(FREE_USER_MOMENT_LIMIT)
+  const excess = momentRows.slice(FREE_USER_MOMENT_LIMIT)
   const ids = excess.map((r) => r.id)
   const paths = excess
-    .map((r) => momentsStoragePathFromPublicUrl(r.video_url))
+    .map((r) => r.storage_path || momentsStoragePathFromPublicUrl(r.video_url ?? ''))
     .filter((p): p is string => Boolean(p))
 
   const { error: rxErr } = await sb.from('user_reactions').delete().in('moment_id', ids)
