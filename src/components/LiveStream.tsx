@@ -108,7 +108,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     loadingMoreRef.current = true
     const cutoff = new Date(Date.now() - LIVE_WINDOW_MINUTES * 60 * 1000).toISOString()
     const { data: videos, error } = await sb
-      .from('moments')
+      .from('public_live_moments')
       .select('*')
       .gte('created_at', cutoff)
       .order('uploader_streak_priority', { ascending: false })
@@ -181,7 +181,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
       if (!sb) return
       try {
         const { data, error } = await sb
-          .from('moments')
+          .from('public_live_moments')
           .select('pretty_count, funny_count, cheers_count')
           .eq('id', momentId)
           .maybeSingle()
@@ -243,6 +243,11 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
 
       const currentVideoId = current?.id
       if (momentId !== currentVideoId) return
+
+      if (!userId) {
+        window.alert('Please sign in to react to 5PM moments.')
+        return
+      }
 
       let alreadyReacted: boolean
       if (userId) {
