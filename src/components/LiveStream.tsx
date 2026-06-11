@@ -94,6 +94,11 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
   const [streamSoundOn, setStreamSoundOn] = useState(false)
   const [playBlocked, setPlayBlocked] = useState(false)
   const [streakOpen, setStreakOpen] = useState(false)
+  const [reportOpen, setReportOpen] = useState(false)
+  const [reportReason, setReportReason] = useState('unsafe_or_inappropriate')
+  const [reportNote, setReportNote] = useState('')
+  const [reportStatus, setReportStatus] = useState<string | null>(null)
+  const [reportBusy, setReportBusy] = useState(false)
   const currentVideoIdRef = useRef<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -129,6 +134,9 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     setPlayBlocked(false)
     setQueue([])
     setCurrentIndex(0)
+    setReportOpen(false)
+    setReportStatus(null)
+    setReportNote('')
     setError(null)
     setLoading(true)
     fetchMore().then((rows) => {
@@ -706,6 +714,49 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     [goNext],
   )
 
+  const handleSubmitReport = useCallback(async () => {
+    if (!currentMomentId || reportBusy) return
+    if (!userId) {
+      setReportStatus('Please sign in to report a moment so we can reduce spam reports.')
+      return
+    }
+    const sb = getSupabase()
+    if (!sb) {
+      setReportStatus('Reporting is not available right now.')
+      return
+    }
+
+    setReportBusy(true)
+    setReportStatus(null)
+    try {
+      const { error } = await sb.from('moment_reports').insert({
+        moment_id: currentMomentId,
+        reporter_user_id: userId,
+        reason: reportReason,
+        note: reportNote.trim() || null,
+      })
+      if (error) {
+        if (error.code === '23505') {
+          setReportStatus('Thanks — you have already reported this moment.')
+        } else {
+          throw error
+        }
+      } else {
+        captureEvent('moment_report_submitted', { reason: reportReason })
+        setReportStatus('Thanks — this moment has been sent for review.')
+        setReportNote('')
+      }
+    } catch (err) {
+      console.error('Moment report failed:', err)
+      captureEvent('moment_report_failed', {
+        error_name: err instanceof Error ? err.name : 'UnknownError',
+      })
+      setReportStatus('Could not submit the report. Please try again.')
+    } finally {
+      setReportBusy(false)
+    }
+  }, [currentMomentId, reportBusy, reportNote, reportReason, userId])
+
   const currentVideoKey = `${current?.id ?? 'video'}-${currentIndex}`
   const streakTier = getStreakTier(currentStreak)
 
@@ -922,6 +973,17 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
                   >
                     🍻 {cheersCount || 0}
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setReportStatus(null)
+                      setReportOpen(true)
+                      captureEvent('moment_report_opened', { signed_in: Boolean(userId) })
+                    }}
+                    className="rounded-full border border-sunset-500/30 bg-midnight-900/70 px-3 py-1.5 text-xs text-sunset-100/80 hover:bg-midnight-700/90"
+                  >
+                    Report
+                  </button>
                 </div>
                 {streamStatsCards}
               </div>
@@ -982,6 +1044,104 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
           Close
         </button>
       </div>
+      {reportOpen && current && (
+        <div
+          className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/70 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="report-moment-title"
+          onClick={() => setReportOpen(false)}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-sunset-500/40 bg-midnight-900/95 p-4 shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex items-center justify-between gap-3">
+              <div
+                id="report-moment-title"
+                className="text-xs font-semibold uppercase tracking-[0.14em] text-sunset-100/80"
+              >
+                Report moment
+              </div>
+              <button
+                type="button"
+                onClick={() => setReportOpen(false)}
+                className="text-[11px] text-sunset-100/70 hover:text-sunset-50"
+              >
+                Close
+              </button>
+            </div>
+
+            {!userId ? (
+              <div className="space-y-3">
+                <p className="text-sm leading-relaxed text-sunset-100/85">
+                  Please sign in before reporting a moment. This helps us reduce spam reports while the
+                  moderation tools are still lightweight.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => setReportOpen(false)}
+                  className="btn-glow-muted min-h-[44px] w-full text-sm"
+                >
+                  Got it
+                </button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                <p className="text-sm leading-relaxed text-sunset-100/85">
+                  Send this public moment to the admin review queue if it looks unsafe, private, spammy,
+                  or not right for 5PM Somewhere.
+                </p>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-sunset-100/70">
+                  Reason
+                  <select
+                    value={reportReason}
+                    onChange={(e) => setReportReason(e.target.value)}
+                    className="mt-1 w-full rounded-xl border border-sunset-500/30 bg-midnight-700/80 px-3 py-2 text-sm normal-case tracking-normal text-sunset-50 focus:outline-none focus:ring-2 focus:ring-sunset-400/70"
+                  >
+                    <option value="unsafe_or_inappropriate">Unsafe or inappropriate</option>
+                    <option value="private_information">Shows private information</option>
+                    <option value="spam_or_fake">Spam or fake content</option>
+                    <option value="harassment_or_hate">Harassment or hate</option>
+                    <option value="other">Something else</option>
+                  </select>
+                </label>
+                <label className="block text-xs font-semibold uppercase tracking-[0.12em] text-sunset-100/70">
+                  Optional note
+                  <textarea
+                    value={reportNote}
+                    onChange={(e) => setReportNote(e.target.value.slice(0, 500))}
+                    placeholder="Briefly tell us what’s wrong…"
+                    className="mt-1 min-h-[88px] w-full rounded-xl border border-sunset-500/30 bg-midnight-700/80 px-3 py-2 text-sm normal-case tracking-normal text-sunset-50 placeholder:text-sunset-100/45 focus:outline-none focus:ring-2 focus:ring-sunset-400/70"
+                  />
+                </label>
+                {reportStatus ? (
+                  <p className="text-xs leading-relaxed text-sunset-100/75" aria-live="polite">
+                    {reportStatus}
+                  </p>
+                ) : null}
+                <div className="flex flex-col gap-2 sm:flex-row sm:justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setReportOpen(false)}
+                    className="btn-glow-muted min-h-[44px] px-4 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => void handleSubmitReport()}
+                    disabled={reportBusy}
+                    className="btn-glow-gold min-h-[44px] px-4 text-sm disabled:opacity-60"
+                  >
+                    {reportBusy ? 'Sending…' : 'Submit report'}
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
       {streakOpen && userId && currentStreak > 0 && (
         <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/70 px-4">
           <div className="w-full max-w-sm rounded-2xl bg-midnight-900/95 p-4 shadow-xl border border-sunset-500/40">
