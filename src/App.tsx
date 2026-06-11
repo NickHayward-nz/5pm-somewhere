@@ -897,6 +897,10 @@ function App() {
               : null
           }
           onProfileUpdated={refetchProfile}
+          onWatchLive={() => {
+            setRecordOpen(false)
+            setLiveStreamOpen(true)
+          }}
         />
       )}
       <LiveStream

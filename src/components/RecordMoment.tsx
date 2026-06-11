@@ -16,6 +16,11 @@ import { FREE_USER_MOMENT_LIMIT, pruneExcessMomentsForFreeUser } from '../lib/mo
 import { PremiumUpsellModal } from './PremiumUpsellModal'
 import { prepareShareableVideo, shareVideoNatively, SHARE_CAPTION, drawSunsetBorder } from '../lib/share'
 import { captureEvent } from '../lib/analytics'
+import {
+  notificationPermission,
+  pushNotificationsSupported,
+  subscribeCurrentDeviceToPush,
+} from '../lib/pushNotifications'
 
 type Props = {
   open: boolean
@@ -27,6 +32,7 @@ type Props = {
   isPremium: boolean
   profile: ProfileStreak | null
   onProfileUpdated: () => void
+  onWatchLive?: () => void
 }
 
 type Step = 'idle' | 'countdown' | 'recording' | 'preview' | 'uploading' | 'success' | 'error'
@@ -86,7 +92,7 @@ function getRecordingOptions(): MediaRecorderOptions {
 }
 
 export function RecordMoment(props: Props) {
-  const { open, onClose, userId, userTz, city, country, isPremium, profile, onProfileUpdated } = props
+  const { open, onClose, userId, userTz, city, country, isPremium, profile, onProfileUpdated, onWatchLive } = props
   const [step, setStep] = useState<Step>('idle')
   const [countdown, setCountdown] = useState(3)
   const [error, setError] = useState<string | null>(null)
@@ -95,6 +101,8 @@ export function RecordMoment(props: Props) {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [sharing, setSharing] = useState(false)
   const [shareStatus, setShareStatus] = useState<string | null>(null)
+  const [reminderStatus, setReminderStatus] = useState<string | null>(null)
+  const [reminderBusy, setReminderBusy] = useState(false)
   const [recordingMaxUpsellOpen, setRecordingMaxUpsellOpen] = useState(false)
   const [postSuccessUpsell, setPostSuccessUpsell] = useState<PostSuccessUpsell>(null)
 
@@ -131,6 +139,8 @@ export function RecordMoment(props: Props) {
     setPreviewUrl(null)
     setSharing(false)
     setShareStatus(null)
+    setReminderStatus(null)
+    setReminderBusy(false)
     setRecordingMaxUpsellOpen(false)
     setPostSuccessUpsell(null)
     hitRecordingMaxRef.current = false
@@ -639,6 +649,36 @@ export function RecordMoment(props: Props) {
     }
   }
 
+  async function handleEnableReminder() {
+    if (reminderBusy) return
+    setReminderBusy(true)
+    setReminderStatus(null)
+    captureEvent('notification_prompt_started', { surface: 'post_upload_success' })
+    try {
+      const result = await subscribeCurrentDeviceToPush()
+      captureEvent('notification_prompt_result', {
+        surface: 'post_upload_success',
+        result: result.ok ? 'enabled' : 'failed',
+        permission: notificationPermission(),
+      })
+      if (result.ok) {
+        setReminderStatus('Reminder set — we’ll nudge you around tomorrow’s 5PM.')
+      } else {
+        setReminderStatus(result.error)
+      }
+    } catch (err) {
+      console.error('Notification reminder failed:', err)
+      captureEvent('notification_prompt_result', {
+        surface: 'post_upload_success',
+        result: 'error',
+        error_name: err instanceof Error ? err.name : 'UnknownError',
+      })
+      setReminderStatus('Could not enable reminders on this device. You can try again from Profile.')
+    } finally {
+      setReminderBusy(false)
+    }
+  }
+
   function stopRecording() {
     const recorder = mediaRecorderRef.current
     if (!recorder || recorder.state !== 'recording') return
@@ -904,9 +944,14 @@ export function RecordMoment(props: Props) {
                     className="mx-auto h-14 w-auto max-w-[min(220px,72vw)] object-contain sm:h-16"
                   />
                 </div>
-                <p className="max-w-md text-balance text-lg font-semibold leading-snug text-sunset-50 sm:text-xl">
-                  Your 5PM moment is live—thanks for sharing!
-                </p>
+                <div className="max-w-md space-y-2">
+                  <p className="text-balance text-lg font-semibold leading-snug text-sunset-50 sm:text-xl">
+                    Your 5PM moment is live 🌍
+                  </p>
+                  <p className="text-sm leading-relaxed text-sunset-100/80">
+                    Come back tomorrow at 5:00 PM to keep your streak going and add another tiny daily memory.
+                  </p>
+                </div>
 
                 {!isPremium && (
                   <p className="max-w-sm text-xs leading-relaxed text-amber-100/85">
@@ -915,25 +960,46 @@ export function RecordMoment(props: Props) {
                   </p>
                 )}
 
-                {shareStatus && (
-                  <p className="text-xs text-sunset-100/70 max-w-xs" aria-live="polite">
-                    {shareStatus}
-                  </p>
+                {(shareStatus || reminderStatus) && (
+                  <div className="max-w-xs space-y-1 text-xs text-sunset-100/70" aria-live="polite">
+                    {shareStatus ? <p>{shareStatus}</p> : null}
+                    {reminderStatus ? <p>{reminderStatus}</p> : null}
+                  </div>
                 )}
 
                 <div className="flex w-full max-w-xs flex-col gap-2">
                   <button
                     type="button"
+                    onClick={() => {
+                      captureEvent('post_upload_success_action_clicked', { action: 'watch_live' })
+                      onWatchLive?.()
+                    }}
+                    className="btn-glow-gold min-h-[48px] w-full touch-manipulation px-8 text-base"
+                  >
+                    Watch it live 🌍
+                  </button>
+                  {pushNotificationsSupported() && notificationPermission() !== 'denied' ? (
+                    <button
+                      type="button"
+                      onClick={() => void handleEnableReminder()}
+                      disabled={reminderBusy}
+                      className="btn-glow-muted min-h-[44px] w-full touch-manipulation px-8 text-sm disabled:opacity-60"
+                    >
+                      {reminderBusy ? 'Setting reminder…' : 'Remind me tomorrow 🔔'}
+                    </button>
+                  ) : null}
+                  <button
+                    type="button"
                     onClick={() => void handleShare()}
                     disabled={sharing || !recordedBlobRef.current}
-                    className="btn-glow-gold min-h-[48px] w-full touch-manipulation px-8 text-base disabled:opacity-60"
+                    className="btn-glow-muted min-h-[44px] w-full touch-manipulation px-8 text-sm disabled:opacity-60"
                   >
                     {sharing ? 'Preparing share…' : 'Share this moment 📤'}
                   </button>
                   <button
                     type="button"
                     onClick={onClose}
-                    className="btn-glow-muted min-h-[44px] w-full touch-manipulation px-8 text-sm"
+                    className="min-h-[44px] w-full touch-manipulation px-8 text-sm text-sunset-100/75 hover:text-sunset-50"
                   >
                     Done
                   </button>
