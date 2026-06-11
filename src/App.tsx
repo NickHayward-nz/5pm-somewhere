@@ -82,10 +82,13 @@ function isHowItWorksPath() {
 function HowItWorksCard({ compact = false, onOpen }: { compact?: boolean; onOpen?: () => void }) {
   if (compact) {
     return (
-      <div className="app-how-it-works-action mt-3 flex flex-col sm:mt-4 sm:flex-row">
+      <div className="app-how-it-works-action mt-3 flex flex-col gap-2 sm:mt-4 sm:flex-row sm:items-center sm:justify-between">
+        <p className="max-w-xl text-center text-[11px] leading-relaxed text-sunset-100/75 sm:text-left sm:text-xs">
+          One daily clip at your local 5:00 PM — then watch the same moment roll across cities around the world.
+        </p>
         <button
           type="button"
-          className="app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation"
+          className="app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation sm:shrink-0"
           onClick={onOpen}
         >
           How it works
@@ -146,31 +149,31 @@ function HowItWorksPage({ isSignedIn, isPremium, onBack, onWatchLive, onSignIn, 
             One short moment, every day at 5:00 PM.
           </h1>
           <p className="mb-5 max-w-3xl text-sm leading-relaxed text-sunset-100/85 sm:text-base">
-            5PM Somewhere is a daily video ritual. When it reaches 5:00 PM in your local timezone,
-            capture a short clip, send it into the live stream, and watch other people&apos;s 5:00 PM
-            moments as the day moves around the world.
+            5PM Somewhere is a daily global video ritual. When it reaches 5:00 PM where you are,
+            capture one short clip, send it into the live stream, and watch real 5:00 PM moments
+            from other people as the day moves around the world.
           </p>
 
           <div className="grid gap-3 md:grid-cols-3">
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="mb-2 text-sm font-semibold text-sunset-50">Capture your moment</div>
               <p className="text-xs leading-relaxed text-sunset-100/75">
-                Tap capture during your 5:00 PM window, record a quick video, add an optional caption,
-                then post it to the stream.
+                When your local window opens, record one quick clip of whatever 5:00 PM looks like
+                today — sunset, dinner, commute, work, kids, friends, quiet, chaos.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="mb-2 text-sm font-semibold text-sunset-50">Watch live 5:00 PMs</div>
               <p className="text-xs leading-relaxed text-sunset-100/75">
-                The live moments page shows recent uploads from people whose 5:00 PM window has just
-                opened somewhere in the world.
+                The live stream shows fresh 5:00 PM clips from cities whose evening has just arrived,
+                so the ritual keeps moving from timezone to timezone.
               </p>
             </div>
             <div className="rounded-2xl border border-white/10 bg-white/5 p-4">
               <div className="mb-2 text-sm font-semibold text-sunset-50">Build your streak</div>
               <p className="text-xs leading-relaxed text-sunset-100/75">
-                Posting consistently builds streak perks, queue priority, reach, and a reason to come
-                back for tomorrow&apos;s sunset.
+                Posting consistently builds a tiny daily memory, a streak, and a reason to come back
+                tomorrow when your next 5:00 PM arrives.
               </p>
             </div>
           </div>
@@ -672,6 +675,15 @@ function App() {
             <div className="polaroid-inner p-2.5 sm:p-5 lg:p-6 flex min-h-0 flex-1 flex-col overflow-hidden max-lg:min-h-0">
               {featured && (
                 <div className="flex flex-col items-center gap-4 sm:gap-5 lg:gap-6 text-center shrink-0 mb-3 sm:mb-5 lg:mb-6">
+                  <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 shadow-lg sm:px-5 sm:py-3">
+                    <p className="text-sm font-semibold leading-snug text-sunset-50 sm:text-base">
+                      See what 5:00 PM looks like around the world.
+                    </p>
+                    <p className="mt-1 text-[11px] leading-relaxed text-sunset-100/75 sm:text-sm">
+                      Post one short video when it hits 5:00 PM where you are, then watch the day move
+                      across the globe through real people&apos;s moments.
+                    </p>
+                  </div>
                   <div
                     className="uppercase tracking-[0.34em] text-sunset-100/70"
                     style={{ fontSize: 'clamp(1rem, 4vw, 1.8rem)' }}
@@ -739,7 +751,7 @@ function App() {
                       : 'app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation'
                   }
                   disabled={captureButtonDisabled}
-                  title="Upload your 5PM moment during your active window"
+                  title="Post one short video when your local 5:00 PM window opens"
                   onClick={() => {
                     captureEvent('capture_intent', {
                       active_window: captureWindow.active,
@@ -772,7 +784,7 @@ function App() {
                         timezone: userTz,
                       })
                       showToast(
-                        "You're outside your personal 5:00 PM window — come back at 5:00 PM local time!",
+                        "Your personal 5:00 PM window isn't open yet — come back at 5:00 PM local time to add today's moment.",
                       )
                       return
                     }
@@ -804,7 +816,7 @@ function App() {
                     setRecordOpen(true)
                   }}
                 >
-                  Capture My 5PM Moment 🎥
+                  Capture today&apos;s 5PM 🎥
                 </button>
 
                 <button

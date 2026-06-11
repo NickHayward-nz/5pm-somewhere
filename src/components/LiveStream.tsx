@@ -140,7 +140,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
       })
       if (rows.length === 0) {
         setError(
-          'No 5PM moments right now — we’re just starting the wave. Share 5PM Somewhere with a friend and help fill the stream with 5PM moments from around the world.',
+          'No fresh 5PM moments are live right now. The wave is still moving — come back as each timezone hits 5:00 PM, or invite a friend to add their city today.',
         )
       }
     })
