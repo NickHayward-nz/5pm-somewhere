@@ -33,6 +33,58 @@ type Step = 'idle' | 'countdown' | 'recording' | 'preview' | 'uploading' | 'succ
 
 type PostSuccessUpsell = 'moment_retention' | 'first_daily' | null
 
+type VideoFrameCallbackVideoElement = HTMLVideoElement & {
+  requestVideoFrameCallback?: (callback: () => void) => number
+  cancelVideoFrameCallback?: (handle: number) => void
+}
+
+type RecordingDiagnostics = {
+  cameraWidth: number
+  cameraHeight: number
+  cameraFrameRate: number
+  audioSampleRate: number
+  mimeType: string
+  videoBitsPerSecond: number
+  audioBitsPerSecond: number
+}
+
+const TARGET_VIDEO_WIDTH = 720
+const TARGET_VIDEO_HEIGHT = 1280
+const TARGET_FRAME_RATE = 30
+const TARGET_VIDEO_BITS_PER_SECOND = 3_500_000
+const TARGET_AUDIO_BITS_PER_SECOND = 128_000
+
+const RECORDING_MIME_TYPES = [
+  'video/mp4;codecs=avc1,mp4a',
+  'video/webm;codecs=vp8,opus',
+  'video/webm;codecs=vp9,opus',
+  'video/webm',
+] as const
+
+function getBestRecordingMimeType(): string | undefined {
+  if (typeof MediaRecorder === 'undefined') return undefined
+  return RECORDING_MIME_TYPES.find((mime) => {
+    try {
+      return MediaRecorder.isTypeSupported(mime)
+    } catch {
+      return false
+    }
+  })
+}
+
+function getRecordingFileExtension(mimeType: string): 'mp4' | 'webm' {
+  return mimeType.includes('mp4') ? 'mp4' : 'webm'
+}
+
+function getRecordingOptions(): MediaRecorderOptions {
+  const mimeType = getBestRecordingMimeType()
+  return {
+    ...(mimeType ? { mimeType } : {}),
+    videoBitsPerSecond: TARGET_VIDEO_BITS_PER_SECOND,
+    audioBitsPerSecond: TARGET_AUDIO_BITS_PER_SECOND,
+  }
+}
+
 export function RecordMoment(props: Props) {
   const { open, onClose, userId, userTz, city, country, isPremium, profile, onProfileUpdated } = props
   const [step, setStep] = useState<Step>('idle')
@@ -51,10 +103,12 @@ export function RecordMoment(props: Props) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null)
   const previewUrlRef = useRef<string | null>(null)
   const recordedBlobRef = useRef<Blob | null>(null)
+  const recordingDiagnosticsRef = useRef<RecordingDiagnostics | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const chunksRef = useRef<BlobPart[]>([])
   const recordingStartRef = useRef<number | null>(null)
   const rafRef = useRef<number | null>(null)
+  const videoFrameCallbackRef = useRef<number | null>(null)
   const streamRef = useRef<MediaStream | null>(null)
 
   const MIN_SEC = isPremium ? 5 : 10
@@ -81,11 +135,17 @@ export function RecordMoment(props: Props) {
     setPostSuccessUpsell(null)
     hitRecordingMaxRef.current = false
     recordedBlobRef.current = null
+    recordingDiagnosticsRef.current = null
   }, [open])
 
   function cleanup() {
     if (rafRef.current) cancelAnimationFrame(rafRef.current)
     rafRef.current = null
+    const frameCallbackVideo = videoRef.current as VideoFrameCallbackVideoElement | null
+    if (videoFrameCallbackRef.current != null && frameCallbackVideo?.cancelVideoFrameCallback) {
+      frameCallbackVideo.cancelVideoFrameCallback(videoFrameCallbackRef.current)
+    }
+    videoFrameCallbackRef.current = null
     if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
       mediaRecorderRef.current.stop()
     }
@@ -121,8 +181,17 @@ export function RecordMoment(props: Props) {
     try {
       captureEvent('camera_permission_requested', { is_premium: isPremium, timezone: userTz })
       stream = await navigator.mediaDevices.getUserMedia({
-        video: { facingMode: 'user' },
-        audio: true,
+        video: {
+          facingMode: 'user',
+          width: { ideal: TARGET_VIDEO_WIDTH },
+          height: { ideal: TARGET_VIDEO_HEIGHT },
+          frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
+        },
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
       })
       if (!stream || stream.getTracks().length === 0) {
         console.error('RecordMoment: stream null or no tracks')
@@ -131,6 +200,8 @@ export function RecordMoment(props: Props) {
         return
       }
       captureEvent('camera_permission_granted', { is_premium: isPremium, timezone: userTz })
+      const videoSettings = stream.getVideoTracks()[0]?.getSettings?.()
+      const audioSettings = stream.getAudioTracks()[0]?.getSettings?.()
       streamRef.current = stream
       const video = videoRef.current
       const canvas = canvasRef.current
@@ -383,7 +454,12 @@ export function RecordMoment(props: Props) {
 
         ctx.restore()
 
-        rafRef.current = requestAnimationFrame(drawFrame)
+        const frameCallbackVideo = videoRef.current as VideoFrameCallbackVideoElement | null
+        if (frameCallbackVideo?.requestVideoFrameCallback) {
+          videoFrameCallbackRef.current = frameCallbackVideo.requestVideoFrameCallback(() => drawFrame())
+        } else {
+          rafRef.current = requestAnimationFrame(drawFrame)
+        }
       }
 
       if (video) {
@@ -406,7 +482,17 @@ export function RecordMoment(props: Props) {
       canvasStream.getVideoTracks().forEach((t) => combinedStream.addTrack(t))
       stream.getAudioTracks().forEach((t) => combinedStream.addTrack(t))
 
-      const recorder = new MediaRecorder(combinedStream, { mimeType: 'video/webm;codecs=vp9,opus' })
+      const recordingOptions = getRecordingOptions()
+      const recorder = new MediaRecorder(combinedStream, recordingOptions)
+      recordingDiagnosticsRef.current = {
+        cameraWidth: videoSettings?.width ?? 0,
+        cameraHeight: videoSettings?.height ?? 0,
+        cameraFrameRate: videoSettings?.frameRate ?? 0,
+        audioSampleRate: audioSettings?.sampleRate ?? 0,
+        mimeType: recorder.mimeType || recordingOptions.mimeType || 'browser_default',
+        videoBitsPerSecond: recorder.videoBitsPerSecond || TARGET_VIDEO_BITS_PER_SECOND,
+        audioBitsPerSecond: recorder.audioBitsPerSecond || TARGET_AUDIO_BITS_PER_SECOND,
+      }
       mediaRecorderRef.current = recorder
       chunksRef.current = []
 
@@ -414,7 +500,8 @@ export function RecordMoment(props: Props) {
         if (e.data.size > 0) chunksRef.current.push(e.data)
       }
       recorder.onstop = () => {
-        const blob = new Blob(chunksRef.current, { type: 'video/webm' })
+        const blobType = recorder.mimeType || recordingOptions.mimeType || 'video/webm'
+        const blob = new Blob(chunksRef.current, { type: blobType })
         const duration = recordingStartRef.current
           ? Math.floor((Date.now() - recordingStartRef.current) / 1000)
           : 0
@@ -443,6 +530,17 @@ export function RecordMoment(props: Props) {
           chunksRef.current = []
           recorder.start()
           recordingStartRef.current = Date.now()
+          const diagnostics = recordingDiagnosticsRef.current
+          captureEvent('recording_pipeline_started', {
+            is_premium: isPremium,
+            camera_width: diagnostics?.cameraWidth ?? 0,
+            camera_height: diagnostics?.cameraHeight ?? 0,
+            camera_frame_rate: diagnostics?.cameraFrameRate ?? 0,
+            audio_sample_rate: diagnostics?.audioSampleRate ?? 0,
+            mime_type: diagnostics?.mimeType ?? 'browser_default',
+            video_bits_per_second: diagnostics?.videoBitsPerSecond ?? TARGET_VIDEO_BITS_PER_SECOND,
+            audio_bits_per_second: diagnostics?.audioBitsPerSecond ?? TARGET_AUDIO_BITS_PER_SECOND,
+          })
           trackCaptureStarted({ userId, isPremium, tz: userTz, city, country })
           const tick = () => {
             const start = recordingStartRef.current
@@ -595,12 +693,15 @@ export function RecordMoment(props: Props) {
 
       const now = DateTime.now().setZone(userTz)
 
-      const path = `${authUserId}/${now.toFormat('yyyy/LL/dd')}/${now.toMillis()}.webm`
+      const contentType = blob.type || 'video/webm'
+      const diagnostics = recordingDiagnosticsRef.current
+      const extension = getRecordingFileExtension(contentType)
+      const path = `${authUserId}/${now.toFormat('yyyy/LL/dd')}/${now.toMillis()}.${extension}`
 
       const { data: storageData, error: storageError } = await sb.storage
         .from('moments')
         .upload(path, blob, {
-          contentType: 'video/webm',
+          contentType,
           upsert: false,
         })
       if (storageError || !storageData?.path) {
@@ -609,6 +710,14 @@ export function RecordMoment(props: Props) {
       captureEvent('video_storage_uploaded', {
         duration_sec: durationSec,
         is_premium: isPremium,
+        file_size_bytes: blob.size,
+        approx_bitrate_mbps: durationSec > 0 ? Number(((blob.size * 8) / durationSec / 1_000_000).toFixed(2)) : 0,
+        content_type: contentType,
+        camera_width: diagnostics?.cameraWidth ?? 0,
+        camera_height: diagnostics?.cameraHeight ?? 0,
+        camera_frame_rate: diagnostics?.cameraFrameRate ?? 0,
+        audio_sample_rate: diagnostics?.audioSampleRate ?? 0,
+        mime_type: diagnostics?.mimeType ?? contentType,
       })
 
       const { data: publicUrlData } = sb.storage.from('moments').getPublicUrl(storageData.path)
@@ -928,4 +1037,3 @@ export function RecordMoment(props: Props) {
     </div>
   )
 }
-
