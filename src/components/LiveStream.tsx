@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 import { formatReachViews, incrementMomentView, type ReachStats } from '../lib/reach'
+import { getPlayableMomentVideoUrl } from '../lib/momentVideo'
 import { getStreakTier } from '../lib/capture'
 import { CopyrightFooter } from './CopyrightFooter'
 import { captureEvent } from '../lib/analytics'
@@ -25,7 +26,6 @@ export type MomentRow = {
 }
 
 const FETCH_LIMIT = 20
-const PRELOAD_NEXT = 3
 /** How far back (from now) uploads stay eligible for the live stream queue */
 const LIVE_WINDOW_HOURS = 20
 const LIVE_WINDOW_MINUTES = LIVE_WINDOW_HOURS * 60
@@ -554,9 +554,16 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     }
     setCurrentBlobUrl(null)
     let cancelled = false
-    fetch(current.video_url)
-      .then((res) => res.blob())
-      .then((blob) => {
+    ;(async () => {
+      try {
+        const playableUrl = await getPlayableMomentVideoUrl({
+          sb: getSupabase(),
+          momentId: current.id,
+          fallbackUrl: current.video_url,
+        })
+        const res = await fetch(playableUrl)
+        if (!res.ok) throw new Error(`Stream fetch failed: ${res.status}`)
+        const blob = await res.blob()
         if (cancelled) return
         if (previousBlobUrlRef.current) {
           urlToRevokeAfterLoadRef.current = previousBlobUrlRef.current
@@ -565,14 +572,13 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
         const blobUrl = URL.createObjectURL(blob)
         previousBlobUrlRef.current = blobUrl
         setCurrentBlobUrl(blobUrl)
-      })
-      .catch((err) => {
+      } catch (err) {
         if (!cancelled) {
-           
           console.error('Stream blob fetch failed:', err)
           setCurrentBlobUrl(current.video_url)
         }
-      })
+      }
+    })()
     return () => {
       cancelled = true
     }
@@ -870,17 +876,6 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
                     Tap for sound
                   </button>
                 )}
-                {queue
-                  .slice(currentIndex + 1, currentIndex + 1 + PRELOAD_NEXT)
-                  .map((m) => (
-                    <video
-                      key={`preload-${m.id}`}
-                      src={m.video_url}
-                      preload="auto"
-                      className="hidden"
-                      aria-hidden
-                    />
-                  ))}
                 {transitioning && (
                   <div className="absolute inset-0 z-10 flex items-center justify-center bg-midnight-900/80">
                     <div className="h-12 w-12 animate-spin rounded-full border-2 border-sunset-400 border-t-transparent" />

@@ -11,6 +11,7 @@
     "montage-worker": "node workers/montage-worker.mjs",
     "deploy:montage-cron": "supabase functions deploy montage-cron",
     "deploy:save-push-subscription": "supabase functions deploy save-push-subscription",
+    "deploy:get-moment-video-url": "supabase functions deploy get-moment-video-url --no-verify-jwt",
     "deploy:get-montage-download-url": "supabase functions deploy get-montage-download-url --no-verify-jwt",
     "deploy:send-5pm-notifications": "supabase functions deploy send-5pm-notifications --no-verify-jwt",
     "deploy:checkout-fn": "supabase functions deploy create-checkout-session",
@@ -19,7 +20,7 @@
     "deploy:stripe": "npm run deploy:checkout-fn && npm run deploy:billing-portal-fn && npm run deploy:stripe-webhook",
     "check:edge-fmt": "deno fmt --check supabase/functions",
     "check:edge-lint": "deno lint --config supabase/functions/deno.json supabase/functions",
-    "check:edge-types": "deno check --config supabase/functions/deno.json supabase/functions/_shared/stripeCustomer.ts supabase/functions/create-billing-portal-session/index.ts supabase/functions/create-checkout-session/index.ts supabase/functions/get-montage-download-url/index.ts supabase/functions/montage-cron/index.ts supabase/functions/save-push-subscription/index.ts supabase/functions/send-5pm-notifications/index.ts supabase/functions/stripe-webhook/index.ts",
+    "check:edge-types": "deno check --config supabase/functions/deno.json supabase/functions/_shared/stripeCustomer.ts supabase/functions/create-billing-portal-session/index.ts supabase/functions/create-checkout-session/index.ts supabase/functions/get-moment-video-url/index.ts supabase/functions/get-montage-download-url/index.ts supabase/functions/montage-cron/index.ts supabase/functions/save-push-subscription/index.ts supabase/functions/send-5pm-notifications/index.ts supabase/functions/stripe-webhook/index.ts",
     "check:edge": "npm run check:edge-fmt && npm run check:edge-lint && npm run check:edge-types"
   },
   "dependencies": {
