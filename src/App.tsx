@@ -97,10 +97,7 @@ function formatDurationUntilNextFivePm(now: DateTime, userTz: string): string {
 function HowItWorksCard({ compact = false, onOpen }: { compact?: boolean; onOpen?: () => void }) {
   if (compact) {
     return (
-      <div className="app-how-it-works-action mt-3 flex flex-col gap-2 sm:mt-4 sm:flex-row sm:items-center sm:justify-between">
-        <p className="max-w-xl text-center text-[11px] leading-relaxed text-sunset-100/75 sm:text-left sm:text-xs">
-          One daily clip at your local 5:00 PM — then watch the same moment roll across cities around the world.
-        </p>
+      <div className="app-how-it-works-action mt-2 flex justify-center sm:mt-3 sm:justify-end">
         <button
           type="button"
           className="app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation sm:shrink-0"
@@ -557,7 +554,7 @@ function App() {
     !windowClosingBannerDismissed
 
   const timeUntilNextFivePm = formatDurationUntilNextFivePm(now, userTz)
-  const outsideWindowMessage = `Your 5PM window opens in ${timeUntilNextFivePm}. Until then, watch what 5PM looks like somewhere else in the world.`
+  const outsideWindowMessage = `Your 5PM opens in ${timeUntilNextFivePm}. Watch live moments meanwhile.`
 
   const captureButtonGold =
     captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit
@@ -704,16 +701,7 @@ function App() {
           <section className="app-card-landscape app-clock-panel polaroid-frame p-2 sm:p-4 lg:p-5 min-h-0 flex flex-col overflow-hidden max-lg:flex-shrink-0">
             <div className="polaroid-inner p-2.5 sm:p-5 lg:p-6 flex min-h-0 flex-1 flex-col overflow-hidden max-lg:min-h-0">
               {featured && (
-                <div className="flex flex-col items-center gap-4 sm:gap-5 lg:gap-6 text-center shrink-0 mb-3 sm:mb-5 lg:mb-6">
-                  <div className="max-w-2xl rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 shadow-lg sm:px-5 sm:py-3">
-                    <p className="text-sm font-semibold leading-snug text-sunset-50 sm:text-base">
-                      See what 5:00 PM looks like around the world.
-                    </p>
-                    <p className="mt-1 text-[11px] leading-relaxed text-sunset-100/75 sm:text-sm">
-                      Post one short video when it hits 5:00 PM where you are, then watch the day move
-                      across the globe through real people&apos;s moments.
-                    </p>
-                  </div>
+                <div className="flex flex-col items-center gap-3 text-center shrink-0 mb-2 sm:mb-4 lg:mb-5">
                   <div
                     className="uppercase tracking-[0.34em] text-sunset-100/70"
                     style={{ fontSize: 'clamp(1rem, 4vw, 1.8rem)' }}
