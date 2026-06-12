@@ -36,6 +36,7 @@ import {
   identifyUser,
   resetAnalytics,
 } from './lib/analytics'
+import { consumePendingLegalAcceptance, recordAccountLegalAcceptance } from './lib/legal'
 
 type FeaturedCity = {
   city: City
@@ -366,6 +367,18 @@ function App() {
           captureEvent('auth_signed_in', { auth_event: event })
           if (session.user?.id) {
             identifyUser({ id: session.user.id, email: session.user.email })
+            const pendingLegalAcceptance = consumePendingLegalAcceptance()
+            if (pendingLegalAcceptance) {
+              void recordAccountLegalAcceptance(sb, session.user.id, pendingLegalAcceptance)
+                .then(() => captureEvent('legal_account_terms_recorded', { source: pendingLegalAcceptance.source }))
+                .catch((error) => {
+                  console.error('Failed to record legal acceptance:', error)
+                  captureEvent('legal_account_terms_record_failed', {
+                    source: pendingLegalAcceptance.source,
+                    error_name: error instanceof Error ? error.name : 'UnknownError',
+                  })
+                })
+            }
           }
           signedInToastShownRef.current = true
           showToast("You're signed in.")
@@ -885,7 +898,10 @@ function App() {
           if (!sb || !userId) return
           const { error } = await sb
             .from('profiles')
-            .update({ upload_terms_accepted_at: new Date().toISOString() })
+            .update({
+              upload_terms_accepted_at: new Date().toISOString(),
+              upload_terms_version: '2026-06-12',
+            })
             .eq('id', userId)
           if (error) {
             window.alert(error.message ?? 'Could not save your agreement. Please try again.')
