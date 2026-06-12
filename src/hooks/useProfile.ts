@@ -12,6 +12,11 @@ type ProfileRow = {
   last_post_date?: string | null
   total_uploads?: number | null
   upload_terms_accepted_at?: string | null
+  terms_accepted_at?: string | null
+  privacy_policy_accepted_at?: string | null
+  age_confirmed_at?: string | null
+  legal_terms_version?: string | null
+  upload_terms_version?: string | null
 }
 
 export function useProfile(userId: string | null) {
@@ -37,7 +42,7 @@ export function useProfile(userId: string | null) {
       const { data, error: e } = await sb
         .from('profiles')
         .select(
-          'id, is_premium, timezone, current_streak, longest_streak, last_post_date, total_uploads, upload_terms_accepted_at',
+          'id, is_premium, timezone, current_streak, longest_streak, last_post_date, total_uploads, upload_terms_accepted_at, terms_accepted_at, privacy_policy_accepted_at, age_confirmed_at, legal_terms_version, upload_terms_version',
         )
         .eq('id', userId)
         .single<ProfileRow>()
@@ -52,6 +57,11 @@ export function useProfile(userId: string | null) {
             last_post_date: null,
             total_uploads: 0,
             upload_terms_accepted_at: null,
+            terms_accepted_at: null,
+            privacy_policy_accepted_at: null,
+            age_confirmed_at: null,
+            legal_terms_version: null,
+            upload_terms_version: null,
           }
           await sb.from('profiles').upsert(
             { id: userId, is_premium: false },
@@ -74,6 +84,11 @@ export function useProfile(userId: string | null) {
         last_post_date: data.last_post_date ?? null,
         total_uploads: data.total_uploads ?? 0,
         upload_terms_accepted_at: data.upload_terms_accepted_at ?? null,
+        terms_accepted_at: data.terms_accepted_at ?? null,
+        privacy_policy_accepted_at: data.privacy_policy_accepted_at ?? null,
+        age_confirmed_at: data.age_confirmed_at ?? null,
+        legal_terms_version: data.legal_terms_version ?? null,
+        upload_terms_version: data.upload_terms_version ?? null,
       })
     } catch (err) {
       setError(err instanceof Error ? err : new Error('Failed to load profile'))

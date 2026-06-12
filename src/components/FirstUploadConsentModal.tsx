@@ -66,10 +66,13 @@ export function FirstUploadConsentModal({ open, onClose, onAccepted }: Props) {
 
           <div className="mb-4 space-y-3 text-sm leading-relaxed text-sunset-100/90">
             <p>
-              You keep ownership of every video you upload. By uploading, you grant 5PM Somewhere a{' '}
-              <strong className="text-sunset-100">worldwide, perpetual, non-exclusive, royalty-free</strong>{' '}
-              licence to host, stream, and display your 5PM Moments in the app and related channels. You will
-              not be paid for ordinary use of your content in the service.
+              Before recording, please confirm you have permission to upload what you capture. Do not film private
+              information, music you do not have rights to, or people who have not agreed to be included.
+            </p>
+            <p>
+              You keep ownership of your video. By uploading, you give 5PM Somewhere permission to host, stream,
+              edit for format/branding, include in montages, and use your 5PM Moment in official app, website,
+              social media, launch, and promotional materials without payment unless we separately agree.
             </p>
             <p className="text-xs text-sunset-100/65">
               Full details are in our Terms of Service and Privacy Policy below.
@@ -85,7 +88,7 @@ export function FirstUploadConsentModal({ open, onClose, onAccepted }: Props) {
               onChange={(e) => setAgreed(e.target.checked)}
             />
             <span className="leading-snug">
-              I agree — take me to the{' '}
+              I confirm I have the rights/consent needed for this moment and agree to the{' '}
               <button
                 type="button"
                 className="text-sunset-300 underline hover:text-sunset-200"
