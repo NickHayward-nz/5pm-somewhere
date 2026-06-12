@@ -79,6 +79,20 @@ function isHowItWorksPath() {
   return typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/how-it-works'
 }
 
+function formatDurationUntilNextFivePm(now: DateTime, userTz: string): string {
+  const local = now.setZone(userTz)
+  let nextFive = local.set({ hour: 17, minute: 0, second: 0, millisecond: 0 })
+  if (local >= nextFive) nextFive = nextFive.plus({ days: 1 })
+
+  const totalMinutes = Math.max(1, Math.ceil(nextFive.diff(local, 'minutes').minutes))
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
+
+  if (hours <= 0) return `${minutes}m`
+  if (minutes === 0) return `${hours}h`
+  return `${hours}h ${minutes}m`
+}
+
 function HowItWorksCard({ compact = false, onOpen }: { compact?: boolean; onOpen?: () => void }) {
   if (compact) {
     return (
@@ -529,6 +543,9 @@ function App() {
     !captureIsPremium &&
     !windowClosingBannerDismissed
 
+  const timeUntilNextFivePm = formatDurationUntilNextFivePm(now, userTz)
+  const outsideWindowMessage = `Your 5PM window opens in ${timeUntilNextFivePm}. Until then, watch what 5PM looks like somewhere else in the world.`
+
   const captureButtonGold =
     captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit
 
@@ -783,9 +800,7 @@ function App() {
                         diff_minutes: captureWindow.diffMinutes,
                         timezone: userTz,
                       })
-                      showToast(
-                        "Your personal 5:00 PM window isn't open yet — come back at 5:00 PM local time to add today's moment.",
-                      )
+                      showToast(outsideWindowMessage)
                       return
                     }
                     if (hasUsedDailyQuota) {
@@ -827,6 +842,11 @@ function App() {
                   Watch Live 5PM Moments 🌍
                 </button>
               </div>
+              {!captureWindow.active && (
+                <div className="mt-2 rounded-xl border border-sunset-300/25 bg-midnight-900/45 px-3 py-2 text-center text-xs leading-relaxed text-sunset-100/80 sm:mt-3 sm:text-sm">
+                  {outsideWindowMessage}
+                </div>
+              )}
               <HowItWorksCard compact onOpen={openHowItWorks} />
 
             </div>
