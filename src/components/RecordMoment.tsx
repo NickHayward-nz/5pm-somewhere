@@ -58,7 +58,7 @@ const TARGET_VIDEO_WIDTH = 720
 const TARGET_VIDEO_HEIGHT = 1280
 const TARGET_FRAME_RATE = 30
 const TARGET_VIDEO_BITS_PER_SECOND = 3_500_000
-const TARGET_AUDIO_BITS_PER_SECOND = 128_000
+const TARGET_AUDIO_BITS_PER_SECOND = 192_000
 
 const RECORDING_MIME_TYPES = [
   'video/mp4;codecs=avc1,mp4a',
@@ -198,9 +198,9 @@ export function RecordMoment(props: Props) {
           frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
         },
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
         },
       })
       if (!stream || stream.getTracks().length === 0) {

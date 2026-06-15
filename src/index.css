@@ -412,8 +412,9 @@ body {
     flex-direction: row !important;
     flex-wrap: wrap;
     justify-content: center;
-    align-items: center;
+    align-items: stretch;
     gap: clamp(0.5rem, 1vw, 0.75rem);
+    width: 100%;
   }
 
   .app-how-it-works-action {
@@ -421,15 +422,16 @@ body {
   }
 
   .app-btn-landscape {
-    width: clamp(12rem, 23vw, 16rem) !important;
-    min-width: clamp(12rem, 23vw, 16rem);
-    min-height: 48px;
+    width: clamp(13rem, 21vw, 16rem) !important;
+    min-width: clamp(13rem, 21vw, 16rem);
+    min-height: 60px;
+    height: 60px;
     padding: 0.75rem 1rem;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     text-align: center;
-    font-size: clamp(0.8rem, 1.1vw, 1rem) !important;
+    font-size: clamp(0.78rem, 1vw, 0.98rem) !important;
     line-height: 1.2;
     flex-shrink: 0;
   }

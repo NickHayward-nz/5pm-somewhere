@@ -654,16 +654,20 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     }
     if (hasNext) {
       setCurrentIndex((i) => i + 1)
-    } else {
-      fetchMore().then((rows) => {
-        if (rows.length > 0) {
-          setQueue(rows)
-          setCurrentIndex(0)
-        }
-        setTransitioning(false)
-      })
+      return
     }
-  }, [hasNext, fetchMore])
+
+    fetchMore().then((rows) => {
+      const existingIds = new Set(queue.map((moment) => moment.id))
+      const newOnes = rows.filter((moment) => !existingIds.has(moment.id))
+      if (newOnes.length === 0) {
+        setTransitioning(false)
+        return
+      }
+      setQueue((currentQueue) => [...currentQueue, ...newOnes])
+      setCurrentIndex(queue.length)
+    })
+  }, [hasNext, fetchMore, queue])
 
   const goPrev = useCallback(() => {
     setTransitioning(true)
@@ -888,8 +892,9 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
                     visibility: 'visible',
                     opacity: 1,
                     background: 'transparent',
-                    borderRadius: '3.5%',
-                    clipPath: 'inset(0 round 3.5%)',
+                    borderRadius: '18px',
+                    clipPath: 'inset(1px round 18px)',
+                    overflow: 'hidden',
                   }}
                   onEnded={handleEnded}
                   onPlay={handlePlay}
