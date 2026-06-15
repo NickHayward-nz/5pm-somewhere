@@ -74,13 +74,22 @@ function hasReacted(momentId: string, field: string): boolean {
   }
 }
 
+function shouldStreamDirectToVideoElement(): boolean {
+  if (typeof navigator === 'undefined') return false
+  const ua = navigator.userAgent || ''
+  // iOS Safari/WebKit can be glitchy with fetched Blob media URLs, especially
+  // for WebM/Opus. Let the native media element stream the signed URL directly
+  // so it can use normal range requests and buffering.
+  return /iPad|iPhone|iPod/.test(ua) || (/Safari/.test(ua) && /AppleWebKit/.test(ua) && !/Chrome|CriOS|Android/.test(ua))
+}
+
 export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 0 }: Props) {
   const [queue, setQueue] = useState<MomentRow[]>([])
   const [currentIndex, setCurrentIndex] = useState(0)
   const [loading, setLoading] = useState(false)
   const [transitioning, setTransitioning] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [currentBlobUrl, setCurrentBlobUrl] = useState<string | null>(null)
+  const [currentPlayable, setCurrentPlayable] = useState<{ momentId: string; url: string; objectUrl: boolean } | null>(null)
   const [prettyCount, setPrettyCount] = useState(0)
   const [funnyCount, setFunnyCount] = useState(0)
   const [cheersCount, setCheersCount] = useState(0)
@@ -103,6 +112,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
   const loadingMoreRef = useRef(false)
+  const advancingRef = useRef(false)
   const previousBlobUrlRef = useRef<string | null>(null)
   const urlToRevokeAfterLoadRef = useRef<string | null>(null)
   const realtimeReactionFetchTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -132,6 +142,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     if (!open) return
     setStreamSoundOn(false)
     setPlayBlocked(false)
+    setCurrentPlayable(null)
     setQueue([])
     setCurrentIndex(0)
     setReportOpen(false)
@@ -554,13 +565,17 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     }
   }, [userId, current?.id, fetchReactionCounts])
 
-  // Load current video as blob URL; revoke previous only after new one loads (in onCanPlay)
+  // Load the current video. Most browsers keep the blob path because it has been
+  // reliable with private signed storage. Apple WebKit/iOS gets the direct signed
+  // URL instead so the native media pipeline can buffer/range-request audio more
+  // smoothly. In both modes, tie the URL to the moment id so the previous clip is
+  // never rendered for the next queue item while its media is still loading.
   useEffect(() => {
     if (!current?.video_url) {
-      setCurrentBlobUrl(null)
+      setCurrentPlayable(null)
       return
     }
-    setCurrentBlobUrl(null)
+    setCurrentPlayable(null)
     let cancelled = false
     ;(async () => {
       try {
@@ -569,6 +584,13 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
           momentId: current.id,
           fallbackUrl: current.video_url,
         })
+        if (cancelled) return
+
+        if (shouldStreamDirectToVideoElement()) {
+          setCurrentPlayable({ momentId: current.id, url: playableUrl, objectUrl: false })
+          return
+        }
+
         const res = await fetch(playableUrl)
         if (!res.ok) throw new Error(`Stream fetch failed: ${res.status}`)
         const blob = await res.blob()
@@ -579,11 +601,11 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
         }
         const blobUrl = URL.createObjectURL(blob)
         previousBlobUrlRef.current = blobUrl
-        setCurrentBlobUrl(blobUrl)
+        setCurrentPlayable({ momentId: current.id, url: blobUrl, objectUrl: true })
       } catch (err) {
         if (!cancelled) {
-          console.error('Stream blob fetch failed:', err)
-          setCurrentBlobUrl(null)
+          console.error('Stream video fetch failed:', err)
+          setCurrentPlayable(null)
         }
       }
     })()
@@ -624,62 +646,84 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     }
   }, [])
 
-  // On blob URL ready: reset then set new src so video renders (fixes black frame)
+  const currentVideoSrc = currentPlayable?.momentId === current?.id ? currentPlayable.url : undefined
+
+  // On playable URL ready: reset then start from the beginning.
   useEffect(() => {
     const video = videoRef.current
-    if (!video || !currentBlobUrl) return
+    if (!video || !currentVideoSrc) return
     setPlayBlocked(false)
     video.pause()
-    video.src = ''
-    video.load()
+    video.currentTime = 0
     video.style.display = 'block'
     video.style.visibility = 'visible'
     video.style.opacity = '1'
-    video.src = currentBlobUrl
     video.load()
-    setTimeout(() => {
+    const playTimer = window.setTimeout(() => {
       void video.play().catch((e) => {
-         
         console.error('Play failed:', e)
         setPlayBlocked(true)
+        setTransitioning(false)
       })
-    }, 50)
-  }, [currentBlobUrl])
+    }, 80)
+    return () => window.clearTimeout(playTimer)
+  }, [currentVideoSrc])
 
   const goNext = useCallback(() => {
+    if (advancingRef.current) return
+    advancingRef.current = true
     setTransitioning(true)
     const video = videoRef.current
     if (video) {
       video.pause()
+      video.removeAttribute('src')
+      video.load()
     }
+    setCurrentPlayable(null)
     if (hasNext) {
       setCurrentIndex((i) => i + 1)
+      window.setTimeout(() => {
+        advancingRef.current = false
+      }, 300)
       return
     }
 
-    fetchMore().then((rows) => {
-      const existingIds = new Set(queue.map((moment) => moment.id))
-      const newOnes = rows.filter((moment) => !existingIds.has(moment.id))
-      if (newOnes.length === 0) {
-        setTransitioning(false)
-        return
-      }
-      setQueue((currentQueue) => [...currentQueue, ...newOnes])
-      setCurrentIndex(queue.length)
-    })
+    fetchMore()
+      .then((rows) => {
+        const existingIds = new Set(queue.map((moment) => moment.id))
+        const newOnes = rows.filter((moment) => !existingIds.has(moment.id))
+        if (newOnes.length === 0) {
+          setTransitioning(false)
+          return
+        }
+        setQueue((currentQueue) => [...currentQueue, ...newOnes])
+        setCurrentIndex(queue.length)
+      })
+      .finally(() => {
+        window.setTimeout(() => {
+          advancingRef.current = false
+        }, 300)
+      })
   }, [hasNext, fetchMore, queue])
 
   const goPrev = useCallback(() => {
+    if (advancingRef.current) return
+    advancingRef.current = true
     setTransitioning(true)
     const video = videoRef.current
     if (video) {
       video.pause()
+      video.removeAttribute('src')
+      video.load()
     }
+    setCurrentPlayable(null)
     setCurrentIndex((i) => {
       if (i <= 0) return 0
       return i - 1
     })
-    setTransitioning(false)
+    window.setTimeout(() => {
+      advancingRef.current = false
+    }, 300)
   }, [])
 
   const handleEnded = useCallback(() => {
@@ -872,7 +916,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
                 <video
                   ref={videoRef}
                   key={currentVideoKey}
-                  src={currentBlobUrl || undefined}
+                  src={currentVideoSrc}
                   poster={POSTER_PLACEHOLDER}
                   autoPlay
                   playsInline
