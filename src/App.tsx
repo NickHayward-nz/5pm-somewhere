@@ -80,24 +80,10 @@ function isHowItWorksPath() {
   return typeof window !== 'undefined' && window.location.pathname.replace(/\/+$/, '') === '/how-it-works'
 }
 
-function formatDurationUntilNextFivePm(now: DateTime, userTz: string): string {
-  const local = now.setZone(userTz)
-  let nextFive = local.set({ hour: 17, minute: 0, second: 0, millisecond: 0 })
-  if (local >= nextFive) nextFive = nextFive.plus({ days: 1 })
-
-  const totalMinutes = Math.max(1, Math.ceil(nextFive.diff(local, 'minutes').minutes))
-  const hours = Math.floor(totalMinutes / 60)
-  const minutes = totalMinutes % 60
-
-  if (hours <= 0) return `${minutes}m`
-  if (minutes === 0) return `${hours}h`
-  return `${hours}h ${minutes}m`
-}
-
 function HowItWorksCard({ compact = false, onOpen }: { compact?: boolean; onOpen?: () => void }) {
   if (compact) {
     return (
-      <div className="app-how-it-works-action mt-2 flex justify-center sm:mt-3 sm:justify-end">
+      <div className="app-how-it-works-action mt-2 flex w-full justify-center sm:mt-3">
         <button
           type="button"
           className="app-btn-landscape btn-glow-muted w-full sm:w-auto min-h-[48px] sm:min-h-0 text-sm sm:text-base touch-manipulation sm:shrink-0"
@@ -553,8 +539,7 @@ function App() {
     !captureIsPremium &&
     !windowClosingBannerDismissed
 
-  const timeUntilNextFivePm = formatDurationUntilNextFivePm(now, userTz)
-  const outsideWindowMessage = `Your 5PM opens in ${timeUntilNextFivePm}. Watch live moments meanwhile.`
+  const outsideWindowMessage = `Post a clip at your local 5PM, and watch the 5PM moments roll across the globe.`
 
   const captureButtonGold =
     captureWindow.active && !hasUsedDailyQuota && !checkingDailyLimit

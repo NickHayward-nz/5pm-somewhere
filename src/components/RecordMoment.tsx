@@ -48,6 +48,9 @@ type RecordingDiagnostics = {
   cameraWidth: number
   cameraHeight: number
   cameraFrameRate: number
+  outputWidth: number
+  outputHeight: number
+  outputOrientation: 'portrait' | 'landscape'
   audioSampleRate: number
   mimeType: string
   videoBitsPerSecond: number
@@ -58,7 +61,7 @@ const TARGET_VIDEO_WIDTH = 720
 const TARGET_VIDEO_HEIGHT = 1280
 const TARGET_FRAME_RATE = 30
 const TARGET_VIDEO_BITS_PER_SECOND = 3_500_000
-const TARGET_AUDIO_BITS_PER_SECOND = 128_000
+const TARGET_AUDIO_BITS_PER_SECOND = 192_000
 
 const RECORDING_MIME_TYPES = [
   'video/mp4;codecs=avc1,mp4a',
@@ -89,6 +92,45 @@ function getRecordingOptions(): MediaRecorderOptions {
     videoBitsPerSecond: TARGET_VIDEO_BITS_PER_SECOND,
     audioBitsPerSecond: TARGET_AUDIO_BITS_PER_SECOND,
   }
+}
+
+function getRecordingCanvasSize() {
+  const isPortrait =
+    typeof window !== 'undefined'
+      ? window.matchMedia?.('(orientation: portrait)').matches || window.innerHeight >= window.innerWidth
+      : true
+
+  return isPortrait
+    ? { width: TARGET_VIDEO_WIDTH, height: TARGET_VIDEO_HEIGHT, orientation: 'portrait' as const }
+    : { width: TARGET_VIDEO_HEIGHT, height: TARGET_VIDEO_WIDTH, orientation: 'landscape' as const }
+}
+
+function drawCoverVideoFrame(
+  ctx: CanvasRenderingContext2D,
+  video: HTMLVideoElement,
+  canvasWidth: number,
+  canvasHeight: number,
+) {
+  const sourceWidth = video.videoWidth
+  const sourceHeight = video.videoHeight
+  if (sourceWidth <= 0 || sourceHeight <= 0 || canvasWidth <= 0 || canvasHeight <= 0) return
+
+  const sourceAspect = sourceWidth / sourceHeight
+  const targetAspect = canvasWidth / canvasHeight
+  let sx = 0
+  let sy = 0
+  let sw = sourceWidth
+  let sh = sourceHeight
+
+  if (sourceAspect > targetAspect) {
+    sw = sourceHeight * targetAspect
+    sx = (sourceWidth - sw) / 2
+  } else if (sourceAspect < targetAspect) {
+    sh = sourceWidth / targetAspect
+    sy = (sourceHeight - sh) / 2
+  }
+
+  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvasWidth, canvasHeight)
 }
 
 export function RecordMoment(props: Props) {
@@ -198,9 +240,9 @@ export function RecordMoment(props: Props) {
           frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
         },
         audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
+          echoCancellation: false,
+          noiseSuppression: false,
+          autoGainControl: false,
         },
       })
       if (!stream || stream.getTracks().length === 0) {
@@ -239,17 +281,18 @@ export function RecordMoment(props: Props) {
       function drawFrame() {
         const v = videoRef.current
         if (!v || !canvas || !ctx) return
-        // Canvas size set once on loadedmetadata; only draw here (full frame, no crop)
-        if (
-          v.videoWidth > 0 &&
-          v.videoHeight > 0 &&
-          (canvas.width !== v.videoWidth || canvas.height !== v.videoHeight)
-        ) {
-          canvas.width = v.videoWidth
-          canvas.height = v.videoHeight
+        // Keep the recorded file in the user's device orientation, not whatever raw
+        // camera sensor dimensions the browser reports. Some phones return a 16:9
+        // frame even while held portrait, which made portrait moments play back as
+        // small landscape clips. Record to a stable orientation-shaped canvas and
+        // cover-crop the live camera frame into it.
+        const canvasSize = getRecordingCanvasSize()
+        if (canvas.width !== canvasSize.width || canvas.height !== canvasSize.height) {
+          canvas.width = canvasSize.width
+          canvas.height = canvasSize.height
         }
         if (canvas.width === 0 || canvas.height === 0) return
-        ctx.drawImage(v, 0, 0, canvas.width, canvas.height)
+        drawCoverVideoFrame(ctx, v, canvas.width, canvas.height)
 
         // Premium visual indicator: thin sunset-gradient border matching the app's
         // bg-sunset-gradient. Baked into every recorded frame so premium users see
@@ -475,10 +518,9 @@ export function RecordMoment(props: Props) {
       if (video) {
         video.srcObject = stream
         const startDrawLoop = () => {
-          if (video.videoWidth > 0 && video.videoHeight > 0) {
-            canvas.width = video.videoWidth
-            canvas.height = video.videoHeight
-          }
+          const canvasSize = getRecordingCanvasSize()
+          canvas.width = canvasSize.width
+          canvas.height = canvasSize.height
           drawFrame()
         }
         video.onloadedmetadata = startDrawLoop
@@ -487,6 +529,11 @@ export function RecordMoment(props: Props) {
         if (video.readyState >= 1) startDrawLoop()
       }
 
+      const initialCanvasSize = getRecordingCanvasSize()
+      if (canvas.width !== initialCanvasSize.width || canvas.height !== initialCanvasSize.height) {
+        canvas.width = initialCanvasSize.width
+        canvas.height = initialCanvasSize.height
+      }
       const canvasStream = canvas.captureStream(30)
       const combinedStream = new MediaStream()
       canvasStream.getVideoTracks().forEach((t) => combinedStream.addTrack(t))
@@ -494,10 +541,14 @@ export function RecordMoment(props: Props) {
 
       const recordingOptions = getRecordingOptions()
       const recorder = new MediaRecorder(combinedStream, recordingOptions)
+      const diagnosticCanvasSize = getRecordingCanvasSize()
       recordingDiagnosticsRef.current = {
         cameraWidth: videoSettings?.width ?? 0,
         cameraHeight: videoSettings?.height ?? 0,
         cameraFrameRate: videoSettings?.frameRate ?? 0,
+        outputWidth: diagnosticCanvasSize.width,
+        outputHeight: diagnosticCanvasSize.height,
+        outputOrientation: diagnosticCanvasSize.orientation,
         audioSampleRate: audioSettings?.sampleRate ?? 0,
         mimeType: recorder.mimeType || recordingOptions.mimeType || 'browser_default',
         videoBitsPerSecond: recorder.videoBitsPerSecond || TARGET_VIDEO_BITS_PER_SECOND,
@@ -546,6 +597,9 @@ export function RecordMoment(props: Props) {
             camera_width: diagnostics?.cameraWidth ?? 0,
             camera_height: diagnostics?.cameraHeight ?? 0,
             camera_frame_rate: diagnostics?.cameraFrameRate ?? 0,
+            output_width: diagnostics?.outputWidth ?? 0,
+            output_height: diagnostics?.outputHeight ?? 0,
+            output_orientation: diagnostics?.outputOrientation ?? 'unknown',
             audio_sample_rate: diagnostics?.audioSampleRate ?? 0,
             mime_type: diagnostics?.mimeType ?? 'browser_default',
             video_bits_per_second: diagnostics?.videoBitsPerSecond ?? TARGET_VIDEO_BITS_PER_SECOND,
@@ -756,6 +810,9 @@ export function RecordMoment(props: Props) {
         camera_width: diagnostics?.cameraWidth ?? 0,
         camera_height: diagnostics?.cameraHeight ?? 0,
         camera_frame_rate: diagnostics?.cameraFrameRate ?? 0,
+        output_width: diagnostics?.outputWidth ?? 0,
+        output_height: diagnostics?.outputHeight ?? 0,
+        output_orientation: diagnostics?.outputOrientation ?? 'unknown',
         audio_sample_rate: diagnostics?.audioSampleRate ?? 0,
         mime_type: diagnostics?.mimeType ?? contentType,
       })
