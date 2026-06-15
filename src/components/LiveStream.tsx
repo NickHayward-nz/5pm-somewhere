@@ -594,6 +594,8 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     }
   }, [current?.id, current?.video_url])
 
+  const currentVideoSrc = currentPlayableUrl?.momentId === current?.id ? currentPlayableUrl.url : undefined
+
   // Keep the rendered element fitted to the actual video rectangle so the
   // baked rounded sunset border clips cleanly against the page background.
   useEffect(() => {
@@ -612,8 +614,6 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
       window.removeEventListener('orientationchange', handleResize)
     }
   }, [])
-
-  const currentVideoSrc = currentPlayableUrl?.momentId === current?.id ? currentPlayableUrl.url : undefined
 
   // When the current signed URL is ready, reset playback from the beginning.
   // This prevents any stale previous clip from continuing during the transition
