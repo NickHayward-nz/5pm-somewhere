@@ -1,6 +1,6 @@
 // Thin trigger: validate CRON_SECRET, forward job to montage worker (VERCEL_MONTAGE_WORKER_URL) with MONTAGE_WORKER_SECRET.
 // Schedule: Supabase pg_cron (or external cron) POSTs here with Authorization: Bearer CRON_SECRET
-// Body or ?type= weekly | monthly | both
+// Body or ?type= weekly | monthly | both | playback-renditions
 
 import { serve } from "https://deno.land/std@0.208.0/http/server.ts";
 
@@ -32,20 +32,35 @@ serve(async (req) => {
     );
   }
 
-  let type: "weekly" | "monthly" | "both" = "weekly";
+  let type: "weekly" | "monthly" | "both" | "playback-renditions" = "weekly";
+  let limit: number | undefined;
+  let momentId: string | undefined;
   try {
     const body = await req.json();
     if (
       body?.type === "monthly" || body?.type === "both" ||
-      body?.type === "weekly"
+      body?.type === "weekly" || body?.type === "playback-renditions"
     ) {
       type = body.type;
     }
+    if (typeof body?.limit === "number") limit = body.limit;
+    if (typeof body?.momentId === "string") momentId = body.momentId;
   } catch {
     /* ignore */
   }
   const q = new URL(req.url).searchParams.get("type");
-  if (q === "monthly" || q === "both" || q === "weekly") type = q;
+  if (
+    q === "monthly" || q === "both" || q === "weekly" ||
+    q === "playback-renditions"
+  ) type = q;
+
+  const workerBody: { type: typeof type; limit?: number; momentId?: string } = {
+    type,
+  };
+  if (type === "playback-renditions") {
+    if (limit !== undefined) workerBody.limit = limit;
+    if (momentId) workerBody.momentId = momentId;
+  }
 
   const r = await fetch(workerUrl, {
     method: "POST",
@@ -53,7 +68,7 @@ serve(async (req) => {
       Authorization: `Bearer ${workerSecret}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ type }),
+    body: JSON.stringify(workerBody),
   });
   const text = await r.text();
   return new Response(text, {
