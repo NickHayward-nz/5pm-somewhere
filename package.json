@@ -8,6 +8,7 @@
     "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
+    "test": "node --experimental-strip-types --test tests/*.test.ts",
     "montage-worker": "node workers/montage-worker.mjs",
     "deploy:montage-cron": "supabase functions deploy montage-cron",
     "deploy:save-push-subscription": "supabase functions deploy save-push-subscription",
@@ -23,7 +24,7 @@
     "check:edge-types": "deno check --config supabase/functions/deno.json supabase/functions/_shared/stripeCustomer.ts supabase/functions/create-billing-portal-session/index.ts supabase/functions/create-checkout-session/index.ts supabase/functions/get-moment-video-url/index.ts supabase/functions/get-montage-download-url/index.ts supabase/functions/montage-cron/index.ts supabase/functions/save-push-subscription/index.ts supabase/functions/send-5pm-notifications/index.ts supabase/functions/stripe-webhook/index.ts",
     "check:edge": "npm run check:edge-fmt && npm run check:edge-lint && npm run check:edge-types",
     "check:production-smoke": "node scripts/production-smoke.mjs",
-    "check:launch": "npm run lint && npm run build && npm run check:edge && npm run check:production-smoke"
+    "check:launch": "npm run test && npm run lint && npm run build && npm run check:edge && npm run check:production-smoke"
   },
   "dependencies": {
     "@sentry/react": "^10.53.1",

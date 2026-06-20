@@ -2,7 +2,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { getSupabase } from '../lib/supabase'
 import { formatReachViews, incrementMomentView, type ReachStats } from '../lib/reach'
-import { getPlayableMomentVideoUrl } from '../lib/momentVideo'
+import { getPlayableMomentVideoUrl, shouldPreferPlaybackRendition } from '../lib/momentVideo'
 import { getStreakTier } from '../lib/capture'
 import { CopyrightFooter } from './CopyrightFooter'
 import { captureEvent } from '../lib/analytics'
@@ -565,10 +565,12 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     let cancelled = false
     ;(async () => {
       try {
+        const preferPlayback = shouldPreferPlaybackRendition(typeof navigator === 'undefined' ? null : navigator)
         const playableUrl = await getPlayableMomentVideoUrl({
           sb: getSupabase(),
           momentId: current.id,
           fallbackUrl: current.video_url,
+          preferPlayback,
         })
         const res = await fetch(playableUrl)
         if (!res.ok) throw new Error(`Stream fetch failed: ${res.status}`)
