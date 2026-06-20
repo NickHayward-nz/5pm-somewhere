@@ -8,6 +8,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.1";
 
 type Body = {
   momentId?: unknown;
+  /** Prefer an iOS/Safari-friendly MP4 playback rendition when one exists. */
+  preferPlayback?: unknown;
 };
 
 type MomentRow = {
@@ -16,6 +18,9 @@ type MomentRow = {
   created_at: string;
   video_url: string | null;
   storage_path: string | null;
+  playback_storage_path: string | null;
+  playback_content_type: string | null;
+  playback_status: string | null;
 };
 
 const LIVE_WINDOW_HOURS = 20;
@@ -100,7 +105,9 @@ serve(async (req) => {
 
   const { data: row, error: rowError } = await admin
     .from("moments")
-    .select("id, user_id, created_at, video_url, storage_path")
+    .select(
+      "id, user_id, created_at, video_url, storage_path, playback_storage_path, playback_content_type, playback_status",
+    )
     .eq("id", body.momentId)
     .maybeSingle<MomentRow>();
 
@@ -116,11 +123,17 @@ serve(async (req) => {
     return jsonResponse({ error: "Moment is not available." }, 403);
   }
 
-  const storagePath = row.storage_path ||
-    storagePathFromMomentsUrl(row.video_url);
+  const shouldPreferPlayback = body.preferPlayback === true;
+  const hasReadyPlayback = row.playback_status === "ready" &&
+    Boolean(row.playback_storage_path);
+  const storagePath = shouldPreferPlayback && hasReadyPlayback
+    ? row.playback_storage_path
+    : row.storage_path || storagePathFromMomentsUrl(row.video_url);
   if (!storagePath) {
     return jsonResponse({ error: "Moment video path is missing." }, 500);
   }
+
+  const usedPlaybackRendition = storagePath === row.playback_storage_path;
 
   const { data: signed, error: signError } = await admin.storage
     .from("moments")
@@ -137,5 +150,9 @@ serve(async (req) => {
   return jsonResponse({
     signedUrl: signed.signedUrl,
     expiresIn: SIGNED_URL_TTL_SECONDS,
+    contentType: usedPlaybackRendition
+      ? row.playback_content_type || "video/mp4"
+      : null,
+    usedPlaybackRendition,
   });
 });
