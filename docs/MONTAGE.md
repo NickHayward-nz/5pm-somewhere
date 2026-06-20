@@ -3,7 +3,7 @@
 ## Architecture
 
 1. **Supabase Edge Function** `montage-cron` — validates `CRON_SECRET`, forwards `POST` to your **montage worker URL** with `MONTAGE_WORKER_SECRET`.
-2. **Montage worker** (`workers/montage-worker.mjs`) — runs **outside Vercel** (Railway, Fly.io, Render, a VPS, etc.). It uses the service role to read `profiles` / `moments`, trims clips (FFmpeg), mixes music from Storage, uploads MP4 to the `montages` bucket, creates a **Mux** asset from a signed URL, and writes **`user_montages`**.
+2. **Montage worker** (`workers/montage-worker.mjs`) — runs **outside Vercel** (Railway, Fly.io, Render, a VPS, etc.). It uses the service role to read `profiles` / `moments`, trims clips (FFmpeg), mixes music from Storage, uploads MP4 to the `montages` bucket, creates a **Mux** asset from a signed URL, and writes **`user_montages`**. The same worker can also generate iOS/Safari-friendly moment playback renditions with `POST {"type":"playback-renditions"}`.
 3. **Premium Profile UI** reads the signed-in user's latest `user_montages` row and plays the ready Mux HLS URL in-app.
 
 The Vite app deploys to Vercel on **Hobby** without bundling FFmpeg; the worker is a separate Node process with `npm run montage-worker` (or your host’s start command).
@@ -77,10 +77,40 @@ Direct worker (bypasses Edge):
 
 ```bash
 curl -X POST "https://<your-worker-host>/" \
-  -H "Authorization: Bearer <MONTAGE_WORKER_SECRET>" \
+  -H "Authorization: Bearer <MONTA...ET>" \
   -H "Content-Type: application/json" \
   -d '{"type":"weekly"}'
 ```
+
+## iOS/Safari playback renditions
+
+The worker can generate optional MP4/H.264/AAC playback copies for recent moments. This is separate from uploads and montages: originals remain untouched, and live playback falls back to the original video whenever no ready rendition exists.
+
+Direct worker, small safe batch:
+
+```bash
+curl -X POST "https://<your-worker-host>/" \
+  -H "Authorization: Bearer <MONTA...ET>" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"playback-renditions","limit":5}'
+```
+
+Target one moment:
+
+```bash
+curl -X POST "https://<your-worker-host>/" \
+  -H "Authorization: Bearer <MONTA...ET>" \
+  -H "Content-Type: application/json" \
+  -d '{"type":"playback-renditions","momentId":"<moment-id>","limit":1}'
+```
+
+The worker:
+
+- selects moments with `playback_status` of `none` or `failed` unless a `momentId` is provided;
+- marks each row `pending` before transcoding;
+- uploads MP4 output under `moments/playback/<original-path>.mp4`;
+- updates `playback_storage_path`, `playback_content_type`, `playback_status`, and `playback_generated_at` when ready;
+- marks individual failures as `failed` with `playback_error` without breaking original playback.
 
 ## Sharing the MP4 from the app (Storage CORS)
 
