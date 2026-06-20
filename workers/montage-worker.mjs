@@ -17,6 +17,11 @@ import { fileURLToPath } from 'url'
 
 import ffmpegPath from 'ffmpeg-static'
 import ffprobeStatic from 'ffprobe-static'
+import {
+  buildPlaybackRenditionObjectPath,
+  getPlaybackRenditionFfmpegArgs,
+  normalizePlaybackLimit,
+} from './playback-rendition-utils.mjs'
 
 const ffprobePath = ffprobeStatic.path
 
@@ -295,6 +300,107 @@ async function addMusicTitle(ffmpeg, videoIn, audioStoragePath, sb, _titleLine, 
   ])
 }
 
+async function pickMomentsForPlaybackRendition(sb, { limit, momentId }) {
+  let query = sb
+    .from('moments')
+    .select('id, video_url, storage_path, playback_storage_path, playback_status, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (momentId) {
+    query = query.eq('id', momentId)
+  } else {
+    query = query.in('playback_status', ['none', 'failed'])
+  }
+
+  const { data, error } = await query
+  if (error) throw error
+  return (data ?? []).filter((moment) => moment.storage_path || moment.video_url)
+}
+
+async function transcodePlaybackRendition(inputPath, outputPath) {
+  await execFileAsync(ffmpegPath, getPlaybackRenditionFfmpegArgs(inputPath, outputPath), {
+    maxBuffer: 1024 * 1024 * 10,
+  })
+}
+
+async function processOnePlaybackRendition(sb, moment) {
+  const storagePath = moment.storage_path || storagePathFromMomentsUrl(moment.video_url)
+  if (!storagePath) throw new Error('Moment has no storage path')
+
+  const objectPath = buildPlaybackRenditionObjectPath(storagePath)
+  const tmp = path.join(os.tmpdir(), `playback-rendition-${moment.id}-${crypto.randomBytes(4).toString('hex')}`)
+  await fs.mkdir(tmp, { recursive: true })
+  const rawPath = path.join(tmp, 'source.bin')
+  const mp4Path = path.join(tmp, 'playback.mp4')
+
+  await sb
+    .from('moments')
+    .update({ playback_status: 'pending', playback_error: null })
+    .eq('id', moment.id)
+
+  try {
+    await downloadMomentToFile(sb, { ...moment, storage_path: storagePath }, rawPath)
+    await transcodePlaybackRendition(rawPath, mp4Path)
+    const fileBuf = await fs.readFile(mp4Path)
+    const { error: uploadError } = await sb.storage.from('moments').upload(objectPath, fileBuf, {
+      contentType: 'video/mp4',
+      upsert: true,
+    })
+    if (uploadError) throw uploadError
+
+    const { error: updateError } = await sb
+      .from('moments')
+      .update({
+        playback_storage_path: objectPath,
+        playback_content_type: 'video/mp4',
+        playback_status: 'ready',
+        playback_error: null,
+        playback_generated_at: new Date().toISOString(),
+      })
+      .eq('id', moment.id)
+    if (updateError) throw updateError
+
+    return { momentId: moment.id, playback_storage_path: objectPath, bytes: fileBuf.length }
+  } catch (e) {
+    const message = String(e?.message || e).slice(0, 2000)
+    await sb
+      .from('moments')
+      .update({ playback_status: 'failed', playback_error: message })
+      .eq('id', moment.id)
+    throw e
+  } finally {
+    try {
+      await fs.rm(tmp, { recursive: true, force: true })
+    } catch {
+      /* ignore */
+    }
+  }
+}
+
+async function processPlaybackRenditions(sb, opts) {
+  const moments = await pickMomentsForPlaybackRendition(sb, opts)
+  const results = []
+  const errors = []
+
+  for (const moment of moments) {
+    try {
+      results.push(await processOnePlaybackRendition(sb, moment))
+    } catch (e) {
+      errors.push({ momentId: moment.id, message: String(e?.message || e).slice(0, 500) })
+    }
+  }
+
+  return {
+    requestedLimit: opts.limit,
+    candidates: moments.length,
+    processed: results.length,
+    failed: errors.length,
+    results,
+    errors,
+  }
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' })
@@ -310,7 +416,7 @@ export default async function handler(req, res) {
       ? req.body
       : JSON.parse(typeof req.body === 'string' ? req.body : '{}')
 
-  const type = body.type === 'monthly' ? 'monthly' : body.type === 'both' ? 'both' : 'weekly'
+  const type = body.type === 'monthly' ? 'monthly' : body.type === 'both' ? 'both' : body.type === 'playback-renditions' ? 'playback-renditions' : 'weekly'
   const maxUsers = Math.min(100, Math.max(1, parseInt(process.env.MONTAGE_MAX_USERS || '25', 10) || 25))
 
   const supabaseUrl = process.env.SUPABASE_URL
@@ -324,6 +430,15 @@ export default async function handler(req, res) {
   }
 
   const sb = createClient(supabaseUrl, serviceKey)
+
+  if (type === 'playback-renditions') {
+    const result = await processPlaybackRenditions(sb, {
+      limit: normalizePlaybackLimit(body.limit),
+      momentId: typeof body.momentId === 'string' ? body.momentId : null,
+    })
+    return res.status(200).json({ ok: true, type, ...result })
+  }
+
   const now = new Date()
   const results = { weekly: [], monthly: [], errors: [] }
 
