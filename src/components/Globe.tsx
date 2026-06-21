@@ -157,11 +157,14 @@ export function Globe({ now, cities }: Props) {
     const controls = new OrbitControls(camera, renderer.domElement)
     controls.target.set(0, 0, 0)
     controls.enableZoom = true
-    controls.zoomSpeed = 1.0
+    controls.zoomSpeed = 0.55
     controls.minDistance = 1.5
     controls.maxDistance = 5.0
     controls.enablePan = false
     controls.enableRotate = true
+    controls.rotateSpeed = 0.38
+    controls.enableDamping = true
+    controls.dampingFactor = 0.08
     controls.autoRotate = true
     controls.autoRotateSpeed = 0.5
 

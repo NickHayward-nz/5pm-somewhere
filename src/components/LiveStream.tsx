@@ -49,6 +49,10 @@ const POSTER_PLACEHOLDER =
 
 const REACTION_STORAGE_PREFIX = 'fivepm_react_'
 
+function isBlobObjectUrl(url: string | null): url is string {
+  return Boolean(url?.startsWith('blob:'))
+}
+
 function getDeviceFingerprint(): string {
   if (typeof window === 'undefined') return 'unknown'
   const parts = [
@@ -94,6 +98,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
   const [streamSoundOn, setStreamSoundOn] = useState(false)
   const [playBlocked, setPlayBlocked] = useState(false)
   const [streakOpen, setStreakOpen] = useState(false)
+  const [reactionSignInOpen, setReactionSignInOpen] = useState(false)
   const [reportOpen, setReportOpen] = useState(false)
   const [reportReason, setReportReason] = useState('unsafe_or_inappropriate')
   const [reportNote, setReportNote] = useState('')
@@ -136,6 +141,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     setQueue([])
     setCurrentIndex(0)
     setReportOpen(false)
+    setReactionSignInOpen(false)
     setReportStatus(null)
     setReportNote('')
     setError(null)
@@ -254,7 +260,11 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
       if (momentId !== currentVideoId) return
 
       if (!userId) {
-        window.alert('Please sign in to react to 5PM moments.')
+        setReactionSignInOpen(true)
+        window.setTimeout(() => {
+          const v = videoRef.current
+          if (v && !playBlocked) void v.play().catch(() => setPlayBlocked(true))
+        }, 0)
         return
       }
 
@@ -469,7 +479,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
       setLastReactionTime(nowAdd)
       await fetchReactionCounts(momentId, { force: true })
     },
-    [prettyCount, funnyCount, cheersCount, current?.id, fetchReactionCounts, userId],
+    [prettyCount, funnyCount, cheersCount, current?.id, fetchReactionCounts, userId, playBlocked],
   )
 
   // When current video changes (skip, return, initial load), fetch latest reaction counts from Supabase
@@ -572,6 +582,17 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
           fallbackUrl: current.video_url,
           preferPlayback,
         })
+        if (preferPlayback) {
+          // Apple/WebKit media playback is more reliable when Safari can stream
+          // the signed URL directly instead of playing a fetched blob URL.
+          if (cancelled) return
+          if (previousBlobUrlRef.current) {
+            urlToRevokeAfterLoadRef.current = previousBlobUrlRef.current
+            previousBlobUrlRef.current = null
+          }
+          setCurrentBlobUrl(playableUrl)
+          return
+        }
         const res = await fetch(playableUrl)
         if (!res.ok) throw new Error(`Stream fetch failed: ${res.status}`)
         const blob = await res.blob()
@@ -597,11 +618,11 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
 
   useEffect(() => {
     return () => {
-      if (previousBlobUrlRef.current) {
+      if (isBlobObjectUrl(previousBlobUrlRef.current)) {
         URL.revokeObjectURL(previousBlobUrlRef.current)
         previousBlobUrlRef.current = null
       }
-      if (urlToRevokeAfterLoadRef.current) {
+      if (isBlobObjectUrl(urlToRevokeAfterLoadRef.current)) {
         URL.revokeObjectURL(urlToRevokeAfterLoadRef.current)
         urlToRevokeAfterLoadRef.current = null
       }
@@ -725,8 +746,10 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
   const handleLoadedMetadata = useCallback(() => {}, [])
 
   const handleCanPlay = useCallback(() => {
-    if (urlToRevokeAfterLoadRef.current) {
+    if (isBlobObjectUrl(urlToRevokeAfterLoadRef.current)) {
       URL.revokeObjectURL(urlToRevokeAfterLoadRef.current)
+      urlToRevokeAfterLoadRef.current = null
+    } else {
       urlToRevokeAfterLoadRef.current = null
     }
   }, [])
@@ -1073,6 +1096,43 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
           Close
         </button>
       </div>
+      {reactionSignInOpen && (
+        <div
+          className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/55 px-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="reaction-sign-in-title"
+          onClick={() => {
+            setReactionSignInOpen(false)
+            window.setTimeout(() => void videoRef.current?.play().catch(() => setPlayBlocked(true)), 0)
+          }}
+        >
+          <div
+            className="w-full max-w-sm rounded-2xl border border-sunset-500/40 bg-midnight-900/95 p-4 text-center shadow-xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div
+              id="reaction-sign-in-title"
+              className="mb-2 text-xs font-semibold uppercase tracking-[0.14em] text-sunset-100/80"
+            >
+              Sign in to react
+            </div>
+            <p className="mb-4 text-sm leading-relaxed text-sunset-100/85">
+              Please sign in to react to 5PM moments.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                setReactionSignInOpen(false)
+                window.setTimeout(() => void videoRef.current?.play().catch(() => setPlayBlocked(true)), 0)
+              }}
+              className="btn-glow-muted min-h-[44px] w-full text-sm"
+            >
+              Keep watching
+            </button>
+          </div>
+        </div>
+      )}
       {reportOpen && current && (
         <div
           className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/70 px-4"

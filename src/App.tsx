@@ -745,7 +745,7 @@ function App() {
                 </div>
               )}
 
-              <div className="app-primary-actions mt-2 sm:mt-5 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center flex-shrink-0">
+              <div className="app-primary-actions mt-2 sm:mt-5 flex flex-col gap-2 sm:gap-3 sm:flex-row sm:items-center sm:justify-center flex-shrink-0">
                 <button
                   type="button"
                   className={
@@ -828,11 +828,9 @@ function App() {
                   Watch Live 5PM Moments 🌍
                 </button>
               </div>
-              {!captureWindow.active && (
-                <div className="mt-2 rounded-xl border border-sunset-300/25 bg-midnight-900/45 px-3 py-2 text-center text-xs leading-relaxed text-sunset-100/80 sm:mt-3 sm:text-sm">
-                  {outsideWindowMessage}
-                </div>
-              )}
+              <div className="app-ritual-tagline mt-2 rounded-xl px-3 py-2 text-center text-xs leading-relaxed text-sunset-100/90 sm:mt-3 sm:text-sm">
+                {outsideWindowMessage}
+              </div>
               <HowItWorksCard compact onOpen={openHowItWorks} />
 
             </div>

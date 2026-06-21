@@ -105,7 +105,7 @@ function getRecordingCanvasSize() {
     : { width: TARGET_VIDEO_HEIGHT, height: TARGET_VIDEO_WIDTH, orientation: 'landscape' as const }
 }
 
-function drawCoverVideoFrame(
+function drawComfortableVideoFrame(
   ctx: CanvasRenderingContext2D,
   video: HTMLVideoElement,
   canvasWidth: number,
@@ -130,7 +130,20 @@ function drawCoverVideoFrame(
     sy = (sourceHeight - sh) / 2
   }
 
-  ctx.drawImage(video, sx, sy, sw, sh, 0, 0, canvasWidth, canvasHeight)
+  // Soft full-frame backdrop keeps the branded portrait/landscape canvas filled.
+  ctx.save()
+  ctx.filter = 'blur(18px) brightness(0.7) saturate(1.15)'
+  ctx.drawImage(video, sx, sy, sw, sh, -18, -18, canvasWidth + 36, canvasHeight + 36)
+  ctx.restore()
+
+  // Foreground uses contain instead of cover so selfie faces are not aggressively
+  // cropped/zoomed. Leave a little breathing room around the camera frame.
+  const containScale = Math.min(canvasWidth / sourceWidth, canvasHeight / sourceHeight) * 0.92
+  const dw = sourceWidth * containScale
+  const dh = sourceHeight * containScale
+  const dx = (canvasWidth - dw) / 2
+  const dy = (canvasHeight - dh) / 2
+  ctx.drawImage(video, 0, 0, sourceWidth, sourceHeight, dx, dy, dw, dh)
 }
 
 export function RecordMoment(props: Props) {
@@ -292,7 +305,7 @@ export function RecordMoment(props: Props) {
           canvas.height = canvasSize.height
         }
         if (canvas.width === 0 || canvas.height === 0) return
-        drawCoverVideoFrame(ctx, v, canvas.width, canvas.height)
+        drawComfortableVideoFrame(ctx, v, canvas.width, canvas.height)
 
         // Premium visual indicator: thin sunset-gradient border matching the app's
         // bg-sunset-gradient. Baked into every recorded frame so premium users see
@@ -935,7 +948,7 @@ export function RecordMoment(props: Props) {
           </div>
 
           {/* Preview: flex-grow fills space; min height so live preview is never tiny */}
-          <div className="relative flex-1 min-h-[280px] sm:min-h-[40vh] overflow-hidden rounded-xl sm:rounded-2xl bg-midnight-900/90 border border-sunset-500/25 flex items-center justify-center">
+          <div className={`relative flex-1 ${step === 'success' ? 'min-h-[320px]' : 'min-h-[280px] sm:min-h-[40vh]'} overflow-hidden rounded-xl sm:rounded-2xl bg-midnight-900/90 border border-sunset-500/25 flex items-center justify-center`}>
             {/* Hidden live video: feeds canvas only */}
             <video
               ref={videoRef}
@@ -990,28 +1003,28 @@ export function RecordMoment(props: Props) {
 
             {step === 'success' && (
               <div
-                className="absolute inset-0 z-20 flex flex-col items-center justify-center gap-5 bg-midnight-950/92 px-5 py-8 text-center backdrop-blur-[2px]"
+                className="absolute inset-0 z-20 flex flex-col items-center justify-start gap-3 overflow-y-auto bg-midnight-950/92 px-4 py-4 text-center backdrop-blur-[2px] sm:justify-center sm:gap-4 sm:px-5 sm:py-6"
                 role="status"
                 aria-live="polite"
               >
-                <div className="rounded-2xl border border-amber-400/50 bg-amber-500/15 px-6 py-4 shadow-[0_0_32px_rgba(251,191,36,0.25)]">
+                <div className="rounded-2xl border border-amber-400/50 bg-amber-500/15 px-4 py-3 shadow-[0_0_32px_rgba(251,191,36,0.25)] sm:px-6 sm:py-4">
                   <img
                     src="/Logo.png"
                     alt="5PM Somewhere"
-                    className="mx-auto h-14 w-auto max-w-[min(220px,72vw)] object-contain sm:h-16"
+                    className="mx-auto h-10 w-auto max-w-[min(180px,60vw)] object-contain sm:h-16 sm:max-w-[min(220px,72vw)]"
                   />
                 </div>
-                <div className="max-w-md space-y-2">
-                  <p className="text-balance text-lg font-semibold leading-snug text-sunset-50 sm:text-xl">
+                <div className="max-w-md space-y-1.5 sm:space-y-2">
+                  <p className="text-balance text-base font-semibold leading-snug text-sunset-50 sm:text-xl">
                     Your 5PM moment is live 🌍
                   </p>
-                  <p className="text-sm leading-relaxed text-sunset-100/80">
+                  <p className="text-xs leading-relaxed text-sunset-100/80 sm:text-sm">
                     Come back tomorrow at 5:00 PM to keep your streak going and add another tiny daily memory.
                   </p>
                 </div>
 
                 {!isPremium && (
-                  <p className="max-w-sm text-xs leading-relaxed text-amber-100/85">
+                  <p className="max-w-sm text-[11px] leading-relaxed text-amber-100/85 sm:text-xs">
                     Premium moments get stronger placement in the live stream and a golden sunset frame on
                     every capture.
                   </p>
@@ -1024,7 +1037,7 @@ export function RecordMoment(props: Props) {
                   </div>
                 )}
 
-                <div className="flex w-full max-w-xs flex-col gap-2">
+                <div className="flex w-full max-w-xs flex-col gap-2 pb-1">
                   <button
                     type="button"
                     onClick={() => {
