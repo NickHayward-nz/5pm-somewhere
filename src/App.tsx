@@ -287,6 +287,7 @@ function App() {
   const [recordOpen, setRecordOpen] = useState(false)
   const [liveStreamOpen, setLiveStreamOpen] = useState(false)
   const [myMomentsOpen, setMyMomentsOpen] = useState(false)
+  const [ritualIntroVisible, setRitualIntroVisible] = useState(true)
   const [dailyLimitModalOpen, setDailyLimitModalOpen] = useState(false)
   const [premiumWindowModalOpen, setPremiumWindowModalOpen] = useState(false)
   const [windowClosingBannerDismissed, setWindowClosingBannerDismissed] = useState(false)
@@ -332,6 +333,11 @@ function App() {
   useEffect(() => {
     capturePageView(howItWorksOpen ? '/how-it-works' : shareLandingOpen ? '/share' : '/')
   }, [howItWorksOpen, shareLandingOpen])
+
+  useEffect(() => {
+    const hideTimer = window.setTimeout(() => setRitualIntroVisible(false), 4200)
+    return () => window.clearTimeout(hideTimer)
+  }, [])
 
   useEffect(() => {
     const sb = getSupabase()
@@ -828,9 +834,6 @@ function App() {
                   Watch Live 5PM Moments 🌍
                 </button>
               </div>
-              <div className="app-ritual-tagline mt-2 rounded-xl px-3 py-2 text-center text-xs leading-relaxed text-sunset-100/90 sm:mt-3 sm:text-sm">
-                {outsideWindowMessage}
-              </div>
               <HowItWorksCard compact onOpen={openHowItWorks} />
 
             </div>
@@ -851,6 +854,27 @@ function App() {
           </section>
         </main>
         <CopyrightFooter variant="main" className="shrink-0" />
+      </div>
+      <div
+        className={`app-ritual-intro ${ritualIntroVisible ? 'app-ritual-intro--visible' : ''}`}
+        role="status"
+        aria-live="polite"
+      >
+        <div className="app-ritual-intro-card">
+          <div className="text-[10px] font-semibold uppercase tracking-[0.2em] text-sunset-100/75 sm:text-xs">
+            Daily 5PM ritual
+          </div>
+          <p className="mt-1 text-sm font-medium leading-relaxed text-sunset-50 sm:text-base">
+            Post a clip at your local 5PM, then watch 5PM moments roll around the globe.
+          </p>
+          <button
+            type="button"
+            onClick={() => setRitualIntroVisible(false)}
+            className="mt-2 text-[11px] font-medium uppercase tracking-[0.14em] text-sunset-100/70 hover:text-sunset-50"
+          >
+            Got it
+          </button>
+        </div>
       </div>
       <SignInModal
         open={signInModalOpen}
