@@ -115,35 +115,51 @@ function drawComfortableVideoFrame(
   const sourceHeight = video.videoHeight
   if (sourceWidth <= 0 || sourceHeight <= 0 || canvasWidth <= 0 || canvasHeight <= 0) return
 
-  const sourceAspect = sourceWidth / sourceHeight
-  const targetAspect = canvasWidth / canvasHeight
-  let sx = 0
-  let sy = 0
-  let sw = sourceWidth
-  let sh = sourceHeight
+  // Fill the recording with intentional app framing, not a second blurred copy of
+  // the camera. The actual camera frame is drawn as large as possible while still
+  // preserving the full selfie view, so faces/arms are not aggressively zoomed or
+  // cropped just to fill a portrait canvas.
+  const backdrop = ctx.createLinearGradient(0, 0, canvasWidth, canvasHeight)
+  backdrop.addColorStop(0, '#2563eb')
+  backdrop.addColorStop(0.36, '#7c3aed')
+  backdrop.addColorStop(0.68, '#ec4899')
+  backdrop.addColorStop(1, '#f97316')
+  ctx.fillStyle = backdrop
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
-  if (sourceAspect > targetAspect) {
-    sw = sourceHeight * targetAspect
-    sx = (sourceWidth - sw) / 2
-  } else if (sourceAspect < targetAspect) {
-    sh = sourceWidth / targetAspect
-    sy = (sourceHeight - sh) / 2
-  }
+  const vignette = ctx.createRadialGradient(
+    canvasWidth / 2,
+    canvasHeight / 2,
+    Math.min(canvasWidth, canvasHeight) * 0.18,
+    canvasWidth / 2,
+    canvasHeight / 2,
+    Math.max(canvasWidth, canvasHeight) * 0.72,
+  )
+  vignette.addColorStop(0, 'rgba(255, 255, 255, 0.08)')
+  vignette.addColorStop(0.62, 'rgba(8, 11, 31, 0.1)')
+  vignette.addColorStop(1, 'rgba(8, 11, 31, 0.5)')
+  ctx.fillStyle = vignette
+  ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
-  // Soft full-frame backdrop keeps the branded portrait/landscape canvas filled.
-  ctx.save()
-  ctx.filter = 'blur(18px) brightness(0.7) saturate(1.15)'
-  ctx.drawImage(video, sx, sy, sw, sh, -18, -18, canvasWidth + 36, canvasHeight + 36)
-  ctx.restore()
-
-  // Foreground uses contain instead of cover so selfie faces are not aggressively
-  // cropped/zoomed. Leave a little breathing room around the camera frame.
-  const containScale = Math.min(canvasWidth / sourceWidth, canvasHeight / sourceHeight) * 0.92
+  const containScale = Math.min(canvasWidth / sourceWidth, canvasHeight / sourceHeight)
   const dw = sourceWidth * containScale
   const dh = sourceHeight * containScale
   const dx = (canvasWidth - dw) / 2
   const dy = (canvasHeight - dh) / 2
+
+  // Subtle mask/shadow makes the app frame feel deliberate when the camera aspect
+  // ratio does not match the recording aspect ratio. It avoids the old “tiny clip
+  // over a blurred duplicate” look without switching to a face-cropping cover zoom.
+  ctx.save()
+  ctx.shadowColor = 'rgba(5, 7, 22, 0.45)'
+  ctx.shadowBlur = Math.max(18, Math.round(Math.min(canvasWidth, canvasHeight) * 0.04))
+  ctx.shadowOffsetY = Math.round(canvasHeight * 0.008)
   ctx.drawImage(video, 0, 0, sourceWidth, sourceHeight, dx, dy, dw, dh)
+  ctx.restore()
+
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'
+  ctx.lineWidth = Math.max(2, Math.round(Math.min(canvasWidth, canvasHeight) * 0.003))
+  ctx.strokeRect(dx, dy, dw, dh)
 }
 
 export function RecordMoment(props: Props) {
