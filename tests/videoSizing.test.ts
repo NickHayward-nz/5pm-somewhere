@@ -2,7 +2,12 @@
 import assert from 'node:assert/strict'
 import test from 'node:test'
 
-import { getFillDrawRect, getNaturalCameraVideoConstraints } from '../src/lib/videoSizing.ts'
+import {
+  getFillDrawRect,
+  getMomentThumbnailCanvasSize,
+  getNaturalCameraVideoConstraints,
+  getVideoAspectRatio,
+} from '../src/lib/videoSizing.ts'
 
 test('getFillDrawRect fills a portrait moment frame from a landscape camera without changing output orientation', () => {
   const rect = getFillDrawRect({
@@ -50,4 +55,27 @@ test('getNaturalCameraVideoConstraints does not force a browser portrait crop', 
   assert.equal(constraints.facingMode, 'user')
   assert.equal('height' in constraints, false)
   assert.equal('aspectRatio' in constraints, false)
+})
+
+test('getVideoAspectRatio preserves natural portrait and landscape dimensions', () => {
+  assert.equal(getVideoAspectRatio({ width: 720, height: 1280 }), 720 / 1280)
+  assert.equal(getVideoAspectRatio({ width: 1280, height: 720 }), 1280 / 720)
+})
+
+test('getVideoAspectRatio falls back for invalid metadata', () => {
+  assert.equal(getVideoAspectRatio({ width: 0, height: 1280, fallbackRatio: 16 / 9 }), 16 / 9)
+  assert.equal(getVideoAspectRatio({ width: 720, height: 0 }), 9 / 16)
+})
+
+test('getMomentThumbnailCanvasSize follows the source orientation', () => {
+  assert.deepEqual(getMomentThumbnailCanvasSize({ sourceWidth: 720, sourceHeight: 1280 }), {
+    width: 270,
+    height: 480,
+    aspectRatio: 720 / 1280,
+  })
+  assert.deepEqual(getMomentThumbnailCanvasSize({ sourceWidth: 1280, sourceHeight: 720 }), {
+    width: 480,
+    height: 270,
+    aspectRatio: 1280 / 720,
+  })
 })

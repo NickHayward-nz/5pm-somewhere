@@ -11,6 +11,41 @@ export type DrawRect = {
   dh: number
 }
 
+export const DEFAULT_MOMENT_ASPECT_RATIO = 9 / 16
+
+export function getVideoAspectRatio(args: {
+  width: number
+  height: number
+  fallbackRatio?: number
+}): number {
+  const fallbackRatio = args.fallbackRatio && args.fallbackRatio > 0 ? args.fallbackRatio : DEFAULT_MOMENT_ASPECT_RATIO
+  if (args.width <= 0 || args.height <= 0) return fallbackRatio
+  return args.width / args.height
+}
+
+export function getMomentThumbnailCanvasSize(args: {
+  sourceWidth: number
+  sourceHeight: number
+  longSide?: number
+}): { width: number; height: number; aspectRatio: number } {
+  const longSide = args.longSide && args.longSide > 0 ? args.longSide : 480
+  const aspectRatio = getVideoAspectRatio({ width: args.sourceWidth, height: args.sourceHeight })
+
+  if (aspectRatio >= 1) {
+    return {
+      width: longSide,
+      height: Math.max(1, Math.round(longSide / aspectRatio)),
+      aspectRatio,
+    }
+  }
+
+  return {
+    width: Math.max(1, Math.round(longSide * aspectRatio)),
+    height: longSide,
+    aspectRatio,
+  }
+}
+
 export function getContainDrawRect(args: {
   sourceWidth: number
   sourceHeight: number
