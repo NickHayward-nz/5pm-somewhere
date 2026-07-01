@@ -16,6 +16,7 @@ import { FREE_USER_MOMENT_LIMIT, pruneExcessMomentsForFreeUser } from '../lib/mo
 import { PremiumUpsellModal } from './PremiumUpsellModal'
 import { prepareShareableVideo, shareVideoNatively, SHARE_CAPTION, drawSunsetBorder } from '../lib/share'
 import { captureEvent } from '../lib/analytics'
+import { getFillDrawRect, getNaturalCameraVideoConstraints } from '../lib/videoSizing'
 import {
   notificationPermission,
   pushNotificationsSupported,
@@ -59,7 +60,6 @@ type RecordingDiagnostics = {
 
 const TARGET_VIDEO_WIDTH = 720
 const TARGET_VIDEO_HEIGHT = 1280
-const TARGET_FRAME_RATE = 30
 const TARGET_VIDEO_BITS_PER_SECOND = 3_500_000
 const TARGET_AUDIO_BITS_PER_SECOND = 192_000
 
@@ -115,10 +115,10 @@ function drawComfortableVideoFrame(
   const sourceHeight = video.videoHeight
   if (sourceWidth <= 0 || sourceHeight <= 0 || canvasWidth <= 0 || canvasHeight <= 0) return
 
-  // Fill the recording with intentional app framing, not a second blurred copy of
-  // the camera. The actual camera frame is drawn as large as possible while still
-  // preserving the full selfie view, so faces/arms are not aggressively zoomed or
-  // cropped just to fill a portrait canvas.
+  // Fill the bordered moment area while still using the natural front-camera
+  // stream. We do not ask the browser/camera to zoom or force a portrait crop;
+  // any mismatch is masked here at the app frame, like a normal phone camera
+  // preview filling a portrait screen.
   const backdrop = ctx.createLinearGradient(0, 0, canvasWidth, canvasHeight)
   backdrop.addColorStop(0, '#2563eb')
   backdrop.addColorStop(0.36, '#7c3aed')
@@ -127,39 +127,15 @@ function drawComfortableVideoFrame(
   ctx.fillStyle = backdrop
   ctx.fillRect(0, 0, canvasWidth, canvasHeight)
 
-  const vignette = ctx.createRadialGradient(
-    canvasWidth / 2,
-    canvasHeight / 2,
-    Math.min(canvasWidth, canvasHeight) * 0.18,
-    canvasWidth / 2,
-    canvasHeight / 2,
-    Math.max(canvasWidth, canvasHeight) * 0.72,
-  )
-  vignette.addColorStop(0, 'rgba(255, 255, 255, 0.08)')
-  vignette.addColorStop(0.62, 'rgba(8, 11, 31, 0.1)')
-  vignette.addColorStop(1, 'rgba(8, 11, 31, 0.5)')
-  ctx.fillStyle = vignette
-  ctx.fillRect(0, 0, canvasWidth, canvasHeight)
+  const rect = getFillDrawRect({
+    sourceWidth,
+    sourceHeight,
+    targetWidth: canvasWidth,
+    targetHeight: canvasHeight,
+  })
+  if (!rect) return
 
-  const containScale = Math.min(canvasWidth / sourceWidth, canvasHeight / sourceHeight)
-  const dw = sourceWidth * containScale
-  const dh = sourceHeight * containScale
-  const dx = (canvasWidth - dw) / 2
-  const dy = (canvasHeight - dh) / 2
-
-  // Subtle mask/shadow makes the app frame feel deliberate when the camera aspect
-  // ratio does not match the recording aspect ratio. It avoids the old “tiny clip
-  // over a blurred duplicate” look without switching to a face-cropping cover zoom.
-  ctx.save()
-  ctx.shadowColor = 'rgba(5, 7, 22, 0.45)'
-  ctx.shadowBlur = Math.max(18, Math.round(Math.min(canvasWidth, canvasHeight) * 0.04))
-  ctx.shadowOffsetY = Math.round(canvasHeight * 0.008)
-  ctx.drawImage(video, 0, 0, sourceWidth, sourceHeight, dx, dy, dw, dh)
-  ctx.restore()
-
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.14)'
-  ctx.lineWidth = Math.max(2, Math.round(Math.min(canvasWidth, canvasHeight) * 0.003))
-  ctx.strokeRect(dx, dy, dw, dh)
+  ctx.drawImage(video, rect.sx, rect.sy, rect.sw, rect.sh, rect.dx, rect.dy, rect.dw, rect.dh)
 }
 
 export function RecordMoment(props: Props) {
@@ -262,12 +238,7 @@ export function RecordMoment(props: Props) {
     try {
       captureEvent('camera_permission_requested', { is_premium: isPremium, timezone: userTz })
       stream = await navigator.mediaDevices.getUserMedia({
-        video: {
-          facingMode: 'user',
-          width: { ideal: TARGET_VIDEO_WIDTH },
-          height: { ideal: TARGET_VIDEO_HEIGHT },
-          frameRate: { ideal: TARGET_FRAME_RATE, max: TARGET_FRAME_RATE },
-        },
+        video: getNaturalCameraVideoConstraints(),
         audio: {
           echoCancellation: false,
           noiseSuppression: false,
@@ -311,10 +282,9 @@ export function RecordMoment(props: Props) {
         const v = videoRef.current
         if (!v || !canvas || !ctx) return
         // Keep the recorded file in the user's device orientation, not whatever raw
-        // camera sensor dimensions the browser reports. Some phones return a 16:9
-        // frame even while held portrait, which made portrait moments play back as
-        // small landscape clips. Record to a stable orientation-shaped canvas and
-        // cover-crop the live camera frame into it.
+        // camera sensor dimensions the browser reports. The raw camera frame is
+        // drawn into this stable canvas so portrait phone captures are stored as
+        // portrait video, with excess sensor area masked by the app frame.
         const canvasSize = getRecordingCanvasSize()
         if (canvas.width !== canvasSize.width || canvas.height !== canvasSize.height) {
           canvas.width = canvasSize.width
@@ -971,13 +941,13 @@ export function RecordMoment(props: Props) {
               autoPlay
               playsInline
               muted
-              className="absolute inset-0 w-full h-full object-contain pointer-events-none"
+              className="absolute inset-0 h-full w-full object-cover pointer-events-none"
               style={{ visibility: 'hidden', zIndex: 0 }}
             />
-            {/* Single canvas: bitmap = stream size; element fills container, object-contain = full frame no crop */}
+            {/* Single canvas: portrait/landscape recording bitmap fills the bordered frame */}
             <canvas
               ref={canvasRef}
-              className="absolute inset-0 w-full h-full max-h-[80dvh] object-contain"
+              className="absolute inset-0 h-full w-full object-cover"
               style={{
                 visibility: step === 'countdown' || step === 'recording' ? 'visible' : 'hidden',
                 zIndex: 1,
@@ -990,7 +960,7 @@ export function RecordMoment(props: Props) {
                 src={previewUrl}
                 controls
                 playsInline
-                className="absolute inset-0 w-full h-full max-h-[80dvh] object-contain"
+                className="absolute inset-0 h-full w-full object-cover"
                 style={{
                   visibility: step === 'preview' ? 'visible' : 'hidden',
                   zIndex: 2,

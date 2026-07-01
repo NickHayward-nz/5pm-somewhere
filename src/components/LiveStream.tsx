@@ -927,13 +927,13 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
                   controls={false}
                   preload="auto"
                   loop={false}
-                  className="z-[1] block max-w-full max-h-full object-contain"
+                  className="z-[1] block h-full w-full object-cover"
                   style={{
-                    width: 'auto',
+                    width: '100%',
                     height: '100%',
                     maxWidth: '100%',
                     maxHeight: '100%',
-                    objectFit: 'contain',
+                    objectFit: 'cover',
                     display: 'block',
                     zIndex: 1,
                     visibility: 'visible',

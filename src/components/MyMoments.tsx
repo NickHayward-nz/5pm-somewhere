@@ -8,6 +8,7 @@ import { captureEvent } from '../lib/analytics'
 import { FREE_USER_MOMENT_LIMIT } from '../lib/momentsRetention'
 import { PremiumUpsellModal } from './PremiumUpsellModal'
 import { getPlayableMomentVideoUrl } from '../lib/momentVideo'
+import { getFillDrawRect } from '../lib/videoSizing'
 
 type MomentRow = {
   id: string
@@ -190,25 +191,17 @@ async function generateFirstFrameThumbnail(args: {
     const vh = video.videoHeight || targetHeight
     if (!vw || !vh) return null
 
-    // Draw "cover" into the fixed canvas.
-    const srcAspect = vw / vh
-    const dstAspect = targetWidth / targetHeight
-    let sx = 0
-    let sy = 0
-    let sw = vw
-    let sh = vh
+    const rect = getFillDrawRect({
+      sourceWidth: vw,
+      sourceHeight: vh,
+      targetWidth,
+      targetHeight,
+    })
+    if (!rect) return null
 
-    if (srcAspect > dstAspect) {
-      // Wider than target: crop horizontally.
-      sw = vh * dstAspect
-      sx = (vw - sw) / 2
-    } else {
-      // Taller than target: crop vertically.
-      sh = vw / dstAspect
-      sy = (vh - sh) / 2
-    }
-
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight)
+    ctx.fillStyle = '#000000'
+    ctx.fillRect(0, 0, targetWidth, targetHeight)
+    ctx.drawImage(video, rect.sx, rect.sy, rect.sw, rect.sh, rect.dx, rect.dy, rect.dw, rect.dh)
     return canvas.toDataURL('image/jpeg', 0.82)
   } catch {
     return null
@@ -248,7 +241,7 @@ function VideoPlayModal(props: {
           controls
           playsInline
           autoPlay
-          className="w-full aspect-video bg-black"
+          className="w-full max-h-[75vh] bg-black object-contain"
         />
         {caption && <div className="px-4 py-3 text-sm text-white/80">{caption}</div>}
         <CopyrightFooter variant="card" />
