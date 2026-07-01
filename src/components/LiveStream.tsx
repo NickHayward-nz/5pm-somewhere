@@ -6,6 +6,7 @@ import { getPlayableMomentVideoUrl, shouldPreferPlaybackRendition } from '../lib
 import { getStreakTier } from '../lib/capture'
 import { CopyrightFooter } from './CopyrightFooter'
 import { captureEvent } from '../lib/analytics'
+import { DEFAULT_MOMENT_ASPECT_RATIO, getVideoAspectRatio } from '../lib/videoSizing'
 
 export type MomentRow = {
   id: string
@@ -104,6 +105,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
   const [reportNote, setReportNote] = useState('')
   const [reportStatus, setReportStatus] = useState<string | null>(null)
   const [reportBusy, setReportBusy] = useState(false)
+  const [videoAspectRatio, setVideoAspectRatio] = useState(DEFAULT_MOMENT_ASPECT_RATIO)
   const currentVideoIdRef = useRef<string | null>(null)
   const videoRef = useRef<HTMLVideoElement | null>(null)
   const containerRef = useRef<HTMLDivElement | null>(null)
@@ -181,6 +183,10 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
   const currentOwnerId = current?.user_id ?? null
   const hasNext = currentIndex < queue.length - 1
   const hasPrev = currentIndex > 0
+
+  useEffect(() => {
+    setVideoAspectRatio(DEFAULT_MOMENT_ASPECT_RATIO)
+  }, [currentMomentId])
 
   const fetchReactionCounts = useCallback(
     async (momentId: string, options?: { force?: boolean }) => {
@@ -743,7 +749,10 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
     })
   }, [currentMomentId, currentOwnerId, userId])
 
-  const handleLoadedMetadata = useCallback(() => {}, [])
+  const handleLoadedMetadata = useCallback((event: React.SyntheticEvent<HTMLVideoElement, Event>) => {
+    const video = event.currentTarget
+    setVideoAspectRatio(getVideoAspectRatio({ width: video.videoWidth, height: video.videoHeight }))
+  }, [])
 
   const handleCanPlay = useCallback(() => {
     if (isBlobObjectUrl(urlToRevokeAfterLoadRef.current)) {
@@ -809,6 +818,21 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
   }, [currentMomentId, reportBusy, reportNote, reportReason, userId])
 
   const currentVideoKey = `${current?.id ?? 'video'}-${currentIndex}`
+  const isPortraitVideo = videoAspectRatio < 1
+  const videoFrameStyle = isPortraitVideo
+    ? {
+        width: 'min(86vw, 42vh)',
+        maxWidth: '86vw',
+        maxHeight: '82vh',
+      }
+    : {
+        width: 'min(92vw, 132vh)',
+        maxWidth: '92vw',
+        maxHeight: '82vh',
+      }
+  const videoShellStyle = {
+    aspectRatio: videoAspectRatio,
+  }
   const streakTier = getStreakTier(currentStreak)
 
   const handleLoadedData = useCallback(() => {
@@ -887,10 +911,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)',
-            width: '92%',
-            maxWidth: '92vw',
-            height: '82%',
-            maxHeight: '82vh',
+            ...videoFrameStyle,
           }}
         >
           {loading && queue.length === 0 && (
@@ -915,7 +936,7 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
           )}
           {current && !loading && (
             <>
-              <div className="flex-1 min-h-0 relative flex items-center justify-center">
+              <div className="relative flex w-full items-center justify-center overflow-hidden" style={videoShellStyle}>
                 <video
                   ref={videoRef}
                   key={currentVideoKey}
@@ -927,13 +948,13 @@ export function LiveStream({ open, onClose, userId, reachStats, currentStreak = 
                   controls={false}
                   preload="auto"
                   loop={false}
-                  className="z-[1] block max-w-full max-h-full object-contain"
+                  className="z-[1] block h-full w-full object-cover"
                   style={{
-                    width: 'auto',
+                    width: '100%',
                     height: '100%',
                     maxWidth: '100%',
                     maxHeight: '100%',
-                    objectFit: 'contain',
+                    objectFit: 'cover',
                     display: 'block',
                     zIndex: 1,
                     visibility: 'visible',

@@ -8,6 +8,12 @@ import { captureEvent } from '../lib/analytics'
 import { FREE_USER_MOMENT_LIMIT } from '../lib/momentsRetention'
 import { PremiumUpsellModal } from './PremiumUpsellModal'
 import { getPlayableMomentVideoUrl } from '../lib/momentVideo'
+import {
+  DEFAULT_MOMENT_ASPECT_RATIO,
+  getFillDrawRect,
+  getMomentThumbnailCanvasSize,
+  getVideoAspectRatio,
+} from '../lib/videoSizing'
 
 type MomentRow = {
   id: string
@@ -133,12 +139,16 @@ function formatDuration(seconds: number): string {
   return `${m}:${rem.toString().padStart(2, '0')}`
 }
 
+type ThumbnailResult = {
+  dataUrl: string | null
+  aspectRatio: number | null
+}
+
 async function generateFirstFrameThumbnail(args: {
   videoUrl: string
-  targetWidth: number
-  targetHeight: number
-}): Promise<string | null> {
-  const { videoUrl, targetWidth, targetHeight } = args
+  longSide?: number
+}): Promise<ThumbnailResult> {
+  const { videoUrl, longSide = 480 } = args
 
   // Off-DOM video for frame extraction.
   const video = document.createElement('video')
@@ -149,10 +159,8 @@ async function generateFirstFrameThumbnail(args: {
   video.src = videoUrl
 
   const canvas = document.createElement('canvas')
-  canvas.width = targetWidth
-  canvas.height = targetHeight
   const ctx = canvas.getContext('2d')
-  if (!ctx) return null
+  if (!ctx) return { dataUrl: null, aspectRatio: null }
 
   const load = () =>
     new Promise<void>((resolve, reject) => {
@@ -186,32 +194,32 @@ async function generateFirstFrameThumbnail(args: {
     // Some sources require a seek to ensure first frame is ready.
     await seekToStart()
 
-    const vw = video.videoWidth || targetWidth
-    const vh = video.videoHeight || targetHeight
-    if (!vw || !vh) return null
+    const vw = video.videoWidth
+    const vh = video.videoHeight
+    if (!vw || !vh) return { dataUrl: null, aspectRatio: null }
 
-    // Draw "cover" into the fixed canvas.
-    const srcAspect = vw / vh
-    const dstAspect = targetWidth / targetHeight
-    let sx = 0
-    let sy = 0
-    let sw = vw
-    let sh = vh
+    const canvasSize = getMomentThumbnailCanvasSize({ sourceWidth: vw, sourceHeight: vh, longSide })
+    canvas.width = canvasSize.width
+    canvas.height = canvasSize.height
 
-    if (srcAspect > dstAspect) {
-      // Wider than target: crop horizontally.
-      sw = vh * dstAspect
-      sx = (vw - sw) / 2
-    } else {
-      // Taller than target: crop vertically.
-      sh = vw / dstAspect
-      sy = (vh - sh) / 2
+    const rect = getFillDrawRect({
+      sourceWidth: vw,
+      sourceHeight: vh,
+      targetWidth: canvasSize.width,
+      targetHeight: canvasSize.height,
+    })
+    if (!rect) return { dataUrl: null, aspectRatio: canvasSize.aspectRatio }
+
+    try {
+      ctx.fillStyle = '#000000'
+      ctx.fillRect(0, 0, canvasSize.width, canvasSize.height)
+      ctx.drawImage(video, rect.sx, rect.sy, rect.sw, rect.sh, rect.dx, rect.dy, rect.dw, rect.dh)
+      return { dataUrl: canvas.toDataURL('image/jpeg', 0.82), aspectRatio: canvasSize.aspectRatio }
+    } catch {
+      return { dataUrl: null, aspectRatio: canvasSize.aspectRatio }
     }
-
-    ctx.drawImage(video, sx, sy, sw, sh, 0, 0, targetWidth, targetHeight)
-    return canvas.toDataURL('image/jpeg', 0.82)
   } catch {
-    return null
+    return { dataUrl: null, aspectRatio: null }
   }
 }
 
@@ -222,6 +230,13 @@ function VideoPlayModal(props: {
   caption: string | null
 }) {
   const { open, onClose, url, caption } = props
+  const [aspectRatio, setAspectRatio] = useState(DEFAULT_MOMENT_ASPECT_RATIO)
+
+  useEffect(() => {
+    if (!open) return
+    setAspectRatio(DEFAULT_MOMENT_ASPECT_RATIO)
+  }, [open, url])
+
   if (!open) return null
   return (
     <div
@@ -232,7 +247,11 @@ function VideoPlayModal(props: {
       aria-label="Play moment video"
     >
       <div
-        className="w-full max-w-3xl rounded-2xl bg-midnight-900/95 border border-sunset-500/30 overflow-hidden"
+        className="w-full rounded-2xl bg-midnight-900/95 border border-sunset-500/30 overflow-hidden"
+        style={{
+          maxWidth: aspectRatio < 1 ? 'min(92vw, 42vh, 430px)' : 'min(92vw, 132vh, 920px)',
+          maxHeight: '86vh',
+        }}
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between px-4 py-3 border-b border-white/10">
@@ -243,13 +262,24 @@ function VideoPlayModal(props: {
             Close
           </button>
         </div>
-        <video
-          src={url}
-          controls
-          playsInline
-          autoPlay
-          className="w-full aspect-video bg-black"
-        />
+        <div
+          className="w-full bg-black"
+          style={{
+            aspectRatio,
+          }}
+        >
+          <video
+            src={url}
+            controls
+            playsInline
+            autoPlay
+            className="h-full w-full bg-black object-cover"
+            onLoadedMetadata={(event) => {
+              const video = event.currentTarget
+              setAspectRatio(getVideoAspectRatio({ width: video.videoWidth, height: video.videoHeight }))
+            }}
+          />
+        </div>
         {caption && <div className="px-4 py-3 text-sm text-white/80">{caption}</div>}
         <CopyrightFooter variant="card" />
       </div>
@@ -263,6 +293,7 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [moments, setMoments] = useState<MomentRow[]>([])
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({})
+  const [thumbAspectRatios, setThumbAspectRatios] = useState<Record<string, number>>({})
   const [playableUrls, setPlayableUrls] = useState<Record<string, string>>({})
   const [libraryUpsellOpen, setLibraryUpsellOpen] = useState(false)
 
@@ -305,6 +336,7 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
       const rows = (data ?? []) as MomentRow[]
       setMoments(rows)
       setThumbs({})
+      setThumbAspectRatios({})
       setPlayableUrls({})
       setLoading(false)
       if (!isPremium && rows.length >= FREE_USER_MOMENT_LIMIT) {
@@ -334,11 +366,14 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
         setPlayableUrls((prev) => ({ ...prev, [m.id]: videoUrl }))
         const thumb = await generateFirstFrameThumbnail({
           videoUrl,
-          targetWidth: 480,
-          targetHeight: 270,
         })
         if (cancelled) return
-        setThumbs((prev) => ({ ...prev, [m.id]: thumb }))
+        setThumbs((prev) => ({ ...prev, [m.id]: thumb.dataUrl }))
+        const aspectRatio = thumb.aspectRatio
+        if (aspectRatio !== null) {
+          const nextAspectRatio = aspectRatio
+          setThumbAspectRatios((prev) => ({ ...prev, [m.id]: nextAspectRatio }))
+        }
       }
     })()
 
@@ -431,6 +466,7 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
               {moments.map((m) => {
                 const thumb = thumbs[m.id]
+                const thumbAspectRatio = thumbAspectRatios[m.id] ?? DEFAULT_MOMENT_ASPECT_RATIO
                 const caption = m.caption ?? ''
                 const createdLabel = m.created_at
                   ? DateTime.fromISO(m.created_at).toFormat('LLL d, h:mm a')
@@ -440,7 +476,7 @@ export default function MyMoments({ open, onClose, userId, isPremium }: Props) {
                     key={m.id}
                     className="rounded-2xl bg-white/5 border border-white/10 overflow-hidden flex flex-col"
                   >
-                    <div className="relative aspect-video bg-black">
+                    <div className="relative bg-black" style={{ aspectRatio: thumbAspectRatio }}>
                       {thumb ? (
                         <img src={thumb} alt={`Thumbnail for ${m.city}`} className="absolute inset-0 w-full h-full object-cover" />
                       ) : (
